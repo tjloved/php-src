@@ -6091,13 +6091,18 @@ void zend_do_isset_or_isempty(int type, znode *result, znode *variable TSRMLS_DC
 
 	if (zend_is_function_or_method_call(variable)) {
 		if (type == ZEND_ISEMPTY) {
-			// if the empty() argument is the result of a function call we
-			// already know that the variable exists, so we can just convert
-			// the empty() call to a boolean not
+			// empty(func()) can be transformed to !func()
 			zend_do_unary_op(ZEND_BOOL_NOT, result, variable TSRMLS_CC);
 		} else {
-			zend_error(E_COMPILE_ERROR, "isset() can not be used on the result of a function or method call");
+			// isset(func()) can be transformed to func() !== null
+			znode null_value;
+			null_value.op_type = IS_CONST;
+			ZVAL_NULL(&null_value.u.constant);
+
+			zend_do_binary_op(ZEND_IS_NOT_IDENTICAL, result, variable, &null_value TSRMLS_CC);
 		}
+
+		return;
 	}
 
 	if (variable->op_type == IS_CV) {

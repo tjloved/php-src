@@ -1147,7 +1147,7 @@ encaps_var_offset:
 
 
 internal_functions_in_yacc:
-		T_ISSET '(' isset_variables ')' { $$ = $3; }
+		T_ISSET '(' isset_exprs ')' { $$ = $3; }
 	|	T_EMPTY '(' variable ')'	{ zend_do_isset_or_isempty(ZEND_ISEMPTY, &$$, &$3 TSRMLS_CC); }
 	|	T_EMPTY '(' expr_without_variable ')' { zend_do_unary_op(ZEND_BOOL_NOT, &$$, &$3 TSRMLS_CC); }
 	|	T_INCLUDE expr 			{ zend_do_include_or_eval(ZEND_INCLUDE, &$$, &$2 TSRMLS_CC); }
@@ -1157,10 +1157,14 @@ internal_functions_in_yacc:
 	|	T_REQUIRE_ONCE expr		{ zend_do_include_or_eval(ZEND_REQUIRE_ONCE, &$$, &$2 TSRMLS_CC); }
 ;
 
-isset_variables:
-		variable 				{ zend_do_isset_or_isempty(ZEND_ISSET, &$$, &$1 TSRMLS_CC); }
-	|	isset_variables ',' { zend_do_boolean_and_begin(&$1, &$2 TSRMLS_CC); } variable { znode tmp; zend_do_isset_or_isempty(ZEND_ISSET, &tmp, &$4 TSRMLS_CC); zend_do_boolean_and_end(&$$, &$1, &tmp, &$2 TSRMLS_CC); }
+isset_exprs:
+		isset_expr				{ $$ = $1; }
+	|	isset_exprs ',' { zend_do_boolean_and_begin(&$1, &$2 TSRMLS_CC); } isset_expr { zend_do_boolean_and_end(&$$, &$1, &$4, &$2 TSRMLS_CC); }
 ;
+
+isset_expr:
+		variable				{ zend_do_isset_or_isempty(ZEND_ISSET, &$$, &$1 TSRMLS_CC); }
+	|	expr_without_variable	{ znode null_value; null_value.op_type = IS_CONST; ZVAL_NULL(&null_value.u.constant); zend_do_binary_op(ZEND_IS_NOT_IDENTICAL, &$$, &$1, &null_value TSRMLS_CC); }
 
 class_constant:
 		class_name T_PAAMAYIM_NEKUDOTAYIM T_STRING { zend_do_fetch_constant(&$$, &$1, &$3, ZEND_RT, 0 TSRMLS_CC); }
