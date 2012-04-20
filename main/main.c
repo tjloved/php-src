@@ -1711,6 +1711,15 @@ void php_request_shutdown(void *dummy)
 	EG(opline_ptr) = NULL;
 	EG(active_op_array) = NULL;
 
+	/* If there is an active exception, drop it. Otherwise the shutdown
+     * functions won't be able to run. This can happen when a fatal error is
+     * thrown before the engine had time to handle the exception.
+     * See also bug #60909. */
+	if (EG(exception)) {
+		zval_ptr_dtor(&EG(exception));
+		EG(exception) = NULL;
+	}
+
 	php_deactivate_ticks(TSRMLS_C);
 
 	/* 1. Call all possible shutdown functions registered with register_shutdown_function() */
