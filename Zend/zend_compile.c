@@ -6640,6 +6640,13 @@ void zend_do_qm_false(znode *result, const znode *false_value, const znode *qm_t
 }
 /* }}} */
 
+void zend_do_inherit_parent_symtable(TSRMLS_D) /* {{{ */
+{
+	zend_op *opline = get_next_op(CG(active_op_array) TSRMLS_CC);
+	opline->opcode = ZEND_INHERIT_PARENT_SYMTABLE;
+}
+/* }}} */
+
 void zend_do_extended_info(TSRMLS_D) /* {{{ */
 {
 	zend_op *opline;

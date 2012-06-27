@@ -811,6 +811,72 @@ expr_without_variable:
 	|	T_STATIC function is_generator is_reference { zend_do_begin_lambda_function_declaration(&$$, &$2, $3.op_type, $4.op_type, 1 TSRMLS_CC); }
 		'(' parameter_list ')' lexical_vars { zend_do_suspend_if_generator(TSRMLS_C); }
 		'{' inner_statement_list '}' { zend_do_end_function_declaration(&$2 TSRMLS_CC); $$ = $5; }
+	|	'(' {
+			zend_do_begin_lambda_function_declaration(&$$, &$1, 1, 0, 0 TSRMLS_CC);
+			zend_do_inherit_parent_symtable(TSRMLS_C);
+			zend_do_suspend_if_generator(TSRMLS_C);
+		}
+		generator_expression_foreach
+		')' {
+			zend_do_end_function_declaration(&$1 TSRMLS_CC);
+
+			zend_do_begin_dynamic_function_call(&$2, 0 TSRMLS_CC);
+			{
+				znode param_count_node;
+				Z_LVAL(param_count_node.u.constant) = 0;
+				zend_do_end_function_call(&$2, &$$, &param_count_node, 0, 1 TSRMLS_CC);
+			}
+			zend_do_extended_fcall_end(TSRMLS_C);
+		}
+	|	'[' {
+			zend_do_begin_lambda_function_declaration(&$$, &$1, 1, 0, 0 TSRMLS_CC);
+			zend_do_inherit_parent_symtable(TSRMLS_C);
+			zend_do_suspend_if_generator(TSRMLS_C);
+		}
+		generator_expression_foreach
+		']' {
+			znode generator_instance_node;
+
+			zend_do_end_function_declaration(&$1 TSRMLS_CC);
+
+			zend_do_begin_dynamic_function_call(&$2, 0 TSRMLS_CC);
+			{
+				znode param_count_node;
+				Z_LVAL(param_count_node.u.constant) = 0;
+				zend_do_end_function_call(&$2, &generator_instance_node, &param_count_node, 0, 1 TSRMLS_CC);
+			}
+			zend_do_extended_fcall_end(TSRMLS_C);
+
+			{
+				znode function_node, param_count_node;
+
+				function_node.op_type = IS_CONST;
+				ZVAL_STRING(&function_node.u.constant, "iterator_to_array", 1);
+
+				Z_LVAL(param_count_node.u.constant) = 1;
+
+				zend_do_begin_function_call(&function_node, 0 TSRMLS_CC);
+				zend_do_pass_param(&generator_instance_node, ZEND_SEND_VAL, 1 TSRMLS_CC);
+				zend_do_end_function_call(&function_node, &$$, &param_count_node, 0, 0 TSRMLS_CC);
+				zend_do_extended_fcall_end(TSRMLS_C);
+			}
+		}
+;
+
+generator_expression_foreach:
+		T_FOREACH '(' variable T_AS { zend_do_foreach_begin(&$1, &$2, &$3, &$4, 1 TSRMLS_CC); }
+		foreach_variable foreach_optional_arg ')' { zend_do_foreach_cont(&$1, &$2, &$4, &$6, &$7 TSRMLS_CC); }
+		generator_expression_content { zend_do_foreach_end(&$1, &$4 TSRMLS_CC); }
+	|	T_FOREACH '(' expr_without_variable T_AS { zend_do_foreach_begin(&$1, &$2, &$3, &$4, 0 TSRMLS_CC); }
+		variable foreach_optional_arg ')' { zend_check_writable_variable(&$6); zend_do_foreach_cont(&$1, &$2, &$4, &$6, &$7 TSRMLS_CC); }
+		generator_expression_content { zend_do_foreach_end(&$1, &$4 TSRMLS_CC); }
+;
+
+generator_expression_content:
+		generator_expression_foreach
+	|	T_IF '(' expr ')' { zend_do_if_cond(&$3, &$4 TSRMLS_CC); } generator_expression_content { zend_do_if_after_statement(&$4, 1 TSRMLS_CC); zend_do_if_end(TSRMLS_C); }
+	|	T_YIELD expr { zend_do_yield(&$$, &$2, NULL TSRMLS_CC); }
+	|	T_YIELD expr T_DOUBLE_ARROW expr { zend_do_yield(&$$, &$4, &$2 TSRMLS_CC); }
 ;
 
 combined_scalar_offset:

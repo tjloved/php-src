@@ -162,3 +162,4 @@
 #define ZEND_SUSPEND_AND_RETURN_GENERATOR    159
 #define ZEND_YIELD                           160
 #define ZEND_DELEGATE_YIELD                  161
+#define ZEND_INHERIT_PARENT_SYMTABLE         162

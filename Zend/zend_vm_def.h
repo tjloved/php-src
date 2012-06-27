@@ -2395,14 +2395,14 @@ ZEND_VM_HANDLER(59, ZEND_INIT_FCALL_BY_NAME, ANY, CONST|TMP|VAR|CV)
 			EX(object) = NULL;
 			CHECK_EXCEPTION();
 			ZEND_VM_NEXT_OPCODE();
-		} else if (OP2_TYPE != IS_CONST && OP2_TYPE != IS_TMP_VAR &&
+		} else if (OP2_TYPE != IS_CONST &&
 		    EXPECTED(Z_TYPE_P(function_name) == IS_OBJECT) &&
 			Z_OBJ_HANDLER_P(function_name, get_closure) &&
 			Z_OBJ_HANDLER_P(function_name, get_closure)(function_name, &EX(called_scope), &EX(fbc), &EX(object) TSRMLS_CC) == SUCCESS) {
 			if (EX(object)) {
 				Z_ADDREF_P(EX(object));
 			}
-			if (OP2_TYPE == IS_VAR && OP2_FREE &&
+			if (OP2_TYPE != IS_CV && OP2_FREE &&
 			    EX(fbc)->common.fn_flags & ZEND_ACC_CLOSURE) {
 				/* Delay closure destruction until its invocation */
 				EX(fbc)->common.prototype = (zend_function*)function_name;
@@ -5237,6 +5237,7 @@ ZEND_VM_HANDLER(159, ZEND_SUSPEND_AND_RETURN_GENERATOR, ANY, ANY)
 
 		EX(current_scope) = EG(scope);
 		EX(current_called_scope) = EG(called_scope);
+		EX(symbol_table) = EG(active_symbol_table);
 
 		if (EG(This)) {
 			Z_ADDREF_P(EG(This));
@@ -5418,6 +5419,29 @@ ZEND_VM_HANDLER(160, ZEND_YIELD, CONST|TMP|VAR|CV|UNUSED, CONST|TMP|VAR|CV|UNUSE
 
 ZEND_VM_HANDLER(161, ZEND_DELEGATE_YIELD, CONST|TMP|VAR|CV, ANY)
 {
+	ZEND_VM_NEXT_OPCODE();
+}
+
+ZEND_VM_HANDLER(162, ZEND_INHERIT_PARENT_SYMTABLE, ANY, ANY)
+{
+	HashTable *symbol_table;
+
+	/* Make sure that the parent scope has a symbol table. As
+	 * zend_rebuild_symbol_table() acts upon EG(current_execute_data) we
+	 * have to temporarily set it to the parent scope and then set it back. */
+	EG(current_execute_data) = EX(prev_execute_data);
+	zend_rebuild_symbol_table(TSRMLS_C);
+	EG(current_execute_data) = execute_data;
+
+	/* Create a new symbol table into which the parent symbol table is copied.
+	 * The parent symbol table was put into EG(active_symbol_table) by
+	 * zend_rebuild_symbol_table(). Then set EG(active_symbol_table) to the
+	 * newly created copy of the parent table. */
+	ALLOC_HASHTABLE(symbol_table);
+	zend_hash_init(symbol_table, zend_hash_num_elements(EG(active_symbol_table)), NULL, ZVAL_PTR_DTOR, 0);
+	zend_hash_copy(symbol_table, EG(active_symbol_table), (copy_ctor_func_t) zval_add_ref, NULL, sizeof(zval *));
+	EG(active_symbol_table) = symbol_table;
+
 	ZEND_VM_NEXT_OPCODE();
 }
 

@@ -1220,6 +1220,7 @@ static int ZEND_FASTCALL  ZEND_SUSPEND_AND_RETURN_GENERATOR_SPEC_HANDLER(ZEND_OP
 
 		EX(current_scope) = EG(scope);
 		EX(current_called_scope) = EG(called_scope);
+		EX(symbol_table) = EG(active_symbol_table);
 
 		if (EG(This)) {
 			Z_ADDREF_P(EG(This));
@@ -1294,6 +1295,29 @@ static int ZEND_FASTCALL  ZEND_SUSPEND_AND_RETURN_GENERATOR_SPEC_HANDLER(ZEND_OP
 	LOAD_OPLINE();
 	ZEND_VM_INC_OPCODE();
 	ZEND_VM_LEAVE();
+}
+
+static int ZEND_FASTCALL  ZEND_INHERIT_PARENT_SYMTABLE_SPEC_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
+{
+	HashTable *symbol_table;
+
+	/* Make sure that the parent scope has a symbol table. As
+	 * zend_rebuild_symbol_table() acts upon EG(current_execute_data) we
+	 * have to temporarily set it to the parent scope and then set it back. */
+	EG(current_execute_data) = EX(prev_execute_data);
+	zend_rebuild_symbol_table(TSRMLS_C);
+	EG(current_execute_data) = execute_data;
+
+	/* Create a new symbol table into which the parent symbol table is copied.
+	 * The parent symbol table was put into EG(active_symbol_table) by
+	 * zend_rebuild_symbol_table(). Then set EG(active_symbol_table) to the
+	 * newly created copy of the parent table. */
+	ALLOC_HASHTABLE(symbol_table);
+	zend_hash_init(symbol_table, zend_hash_num_elements(EG(active_symbol_table)), NULL, ZVAL_PTR_DTOR, 0);
+	zend_hash_copy(symbol_table, EG(active_symbol_table), (copy_ctor_func_t) zval_add_ref, NULL, sizeof(zval *));
+	EG(active_symbol_table) = symbol_table;
+
+	ZEND_VM_NEXT_OPCODE();
 }
 
 static int ZEND_FASTCALL  ZEND_FETCH_CLASS_SPEC_CONST_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
@@ -1374,14 +1398,14 @@ static int ZEND_FASTCALL  ZEND_INIT_FCALL_BY_NAME_SPEC_CONST_HANDLER(ZEND_OPCODE
 			EX(object) = NULL;
 			CHECK_EXCEPTION();
 			ZEND_VM_NEXT_OPCODE();
-		} else if (IS_CONST != IS_CONST && IS_CONST != IS_TMP_VAR &&
+		} else if (IS_CONST != IS_CONST &&
 		    EXPECTED(Z_TYPE_P(function_name) == IS_OBJECT) &&
 			Z_OBJ_HANDLER_P(function_name, get_closure) &&
 			Z_OBJ_HANDLER_P(function_name, get_closure)(function_name, &EX(called_scope), &EX(fbc), &EX(object) TSRMLS_CC) == SUCCESS) {
 			if (EX(object)) {
 				Z_ADDREF_P(EX(object));
 			}
-			if (IS_CONST == IS_VAR && 0 &&
+			if (IS_CONST != IS_CV && 0 &&
 			    EX(fbc)->common.fn_flags & ZEND_ACC_CLOSURE) {
 				/* Delay closure destruction until its invocation */
 				EX(fbc)->common.prototype = (zend_function*)function_name;
@@ -1676,14 +1700,14 @@ static int ZEND_FASTCALL  ZEND_INIT_FCALL_BY_NAME_SPEC_TMP_HANDLER(ZEND_OPCODE_H
 			EX(object) = NULL;
 			CHECK_EXCEPTION();
 			ZEND_VM_NEXT_OPCODE();
-		} else if (IS_TMP_VAR != IS_CONST && IS_TMP_VAR != IS_TMP_VAR &&
+		} else if (IS_TMP_VAR != IS_CONST &&
 		    EXPECTED(Z_TYPE_P(function_name) == IS_OBJECT) &&
 			Z_OBJ_HANDLER_P(function_name, get_closure) &&
 			Z_OBJ_HANDLER_P(function_name, get_closure)(function_name, &EX(called_scope), &EX(fbc), &EX(object) TSRMLS_CC) == SUCCESS) {
 			if (EX(object)) {
 				Z_ADDREF_P(EX(object));
 			}
-			if (IS_TMP_VAR == IS_VAR && 1 &&
+			if (IS_TMP_VAR != IS_CV && 1 &&
 			    EX(fbc)->common.fn_flags & ZEND_ACC_CLOSURE) {
 				/* Delay closure destruction until its invocation */
 				EX(fbc)->common.prototype = (zend_function*)function_name;
@@ -1840,14 +1864,14 @@ static int ZEND_FASTCALL  ZEND_INIT_FCALL_BY_NAME_SPEC_VAR_HANDLER(ZEND_OPCODE_H
 			EX(object) = NULL;
 			CHECK_EXCEPTION();
 			ZEND_VM_NEXT_OPCODE();
-		} else if (IS_VAR != IS_CONST && IS_VAR != IS_TMP_VAR &&
+		} else if (IS_VAR != IS_CONST &&
 		    EXPECTED(Z_TYPE_P(function_name) == IS_OBJECT) &&
 			Z_OBJ_HANDLER_P(function_name, get_closure) &&
 			Z_OBJ_HANDLER_P(function_name, get_closure)(function_name, &EX(called_scope), &EX(fbc), &EX(object) TSRMLS_CC) == SUCCESS) {
 			if (EX(object)) {
 				Z_ADDREF_P(EX(object));
 			}
-			if (IS_VAR == IS_VAR && (free_op2.var != NULL) &&
+			if (IS_VAR != IS_CV && (free_op2.var != NULL) &&
 			    EX(fbc)->common.fn_flags & ZEND_ACC_CLOSURE) {
 				/* Delay closure destruction until its invocation */
 				EX(fbc)->common.prototype = (zend_function*)function_name;
@@ -2037,14 +2061,14 @@ static int ZEND_FASTCALL  ZEND_INIT_FCALL_BY_NAME_SPEC_CV_HANDLER(ZEND_OPCODE_HA
 			EX(object) = NULL;
 			CHECK_EXCEPTION();
 			ZEND_VM_NEXT_OPCODE();
-		} else if (IS_CV != IS_CONST && IS_CV != IS_TMP_VAR &&
+		} else if (IS_CV != IS_CONST &&
 		    EXPECTED(Z_TYPE_P(function_name) == IS_OBJECT) &&
 			Z_OBJ_HANDLER_P(function_name, get_closure) &&
 			Z_OBJ_HANDLER_P(function_name, get_closure)(function_name, &EX(called_scope), &EX(fbc), &EX(object) TSRMLS_CC) == SUCCESS) {
 			if (EX(object)) {
 				Z_ADDREF_P(EX(object));
 			}
-			if (IS_CV == IS_VAR && 0 &&
+			if (IS_CV != IS_CV && 0 &&
 			    EX(fbc)->common.fn_flags & ZEND_ACC_CLOSURE) {
 				/* Delay closure destruction until its invocation */
 				EX(fbc)->common.prototype = (zend_function*)function_name;
@@ -43600,6 +43624,31 @@ void zend_init_opcodes_handlers(void)
   	ZEND_DELEGATE_YIELD_SPEC_CV_HANDLER,
   	ZEND_DELEGATE_YIELD_SPEC_CV_HANDLER,
   	ZEND_DELEGATE_YIELD_SPEC_CV_HANDLER,
+  	ZEND_INHERIT_PARENT_SYMTABLE_SPEC_HANDLER,
+  	ZEND_INHERIT_PARENT_SYMTABLE_SPEC_HANDLER,
+  	ZEND_INHERIT_PARENT_SYMTABLE_SPEC_HANDLER,
+  	ZEND_INHERIT_PARENT_SYMTABLE_SPEC_HANDLER,
+  	ZEND_INHERIT_PARENT_SYMTABLE_SPEC_HANDLER,
+  	ZEND_INHERIT_PARENT_SYMTABLE_SPEC_HANDLER,
+  	ZEND_INHERIT_PARENT_SYMTABLE_SPEC_HANDLER,
+  	ZEND_INHERIT_PARENT_SYMTABLE_SPEC_HANDLER,
+  	ZEND_INHERIT_PARENT_SYMTABLE_SPEC_HANDLER,
+  	ZEND_INHERIT_PARENT_SYMTABLE_SPEC_HANDLER,
+  	ZEND_INHERIT_PARENT_SYMTABLE_SPEC_HANDLER,
+  	ZEND_INHERIT_PARENT_SYMTABLE_SPEC_HANDLER,
+  	ZEND_INHERIT_PARENT_SYMTABLE_SPEC_HANDLER,
+  	ZEND_INHERIT_PARENT_SYMTABLE_SPEC_HANDLER,
+  	ZEND_INHERIT_PARENT_SYMTABLE_SPEC_HANDLER,
+  	ZEND_INHERIT_PARENT_SYMTABLE_SPEC_HANDLER,
+  	ZEND_INHERIT_PARENT_SYMTABLE_SPEC_HANDLER,
+  	ZEND_INHERIT_PARENT_SYMTABLE_SPEC_HANDLER,
+  	ZEND_INHERIT_PARENT_SYMTABLE_SPEC_HANDLER,
+  	ZEND_INHERIT_PARENT_SYMTABLE_SPEC_HANDLER,
+  	ZEND_INHERIT_PARENT_SYMTABLE_SPEC_HANDLER,
+  	ZEND_INHERIT_PARENT_SYMTABLE_SPEC_HANDLER,
+  	ZEND_INHERIT_PARENT_SYMTABLE_SPEC_HANDLER,
+  	ZEND_INHERIT_PARENT_SYMTABLE_SPEC_HANDLER,
+  	ZEND_INHERIT_PARENT_SYMTABLE_SPEC_HANDLER,
   	ZEND_NULL_HANDLER
   };
   zend_opcode_handlers = (opcode_handler_t*)labels;
