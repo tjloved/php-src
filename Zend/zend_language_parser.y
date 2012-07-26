@@ -93,7 +93,7 @@ static YYSIZE_T zend_yytnamerr(char*, const char*);
 %token T_IS_NOT_EQUAL "!= (T_IS_NOT_EQUAL)"
 %token T_IS_IDENTICAL "=== (T_IS_IDENTICAL)"
 %token T_IS_NOT_IDENTICAL "!== (T_IS_NOT_IDENTICAL)"
-%nonassoc '<' T_IS_SMALLER_OR_EQUAL '>' T_IS_GREATER_OR_EQUAL
+%nonassoc '<' T_IS_SMALLER_OR_EQUAL '>' T_IS_GREATER_OR_EQUAL T_IN
 %token T_IS_SMALLER_OR_EQUAL "<= (T_IS_SMALLER_OR_EQUAL)"
 %token T_IS_GREATER_OR_EQUAL ">= (T_IS_GREATER_OR_EQUAL)"
 %token T_IN "in (T_IN)"
@@ -770,6 +770,7 @@ expr_without_variable:
 	|	expr T_IS_SMALLER_OR_EQUAL expr { zend_do_binary_op(ZEND_IS_SMALLER_OR_EQUAL, &$$, &$1, &$3 TSRMLS_CC); }
 	|	expr '>' expr 					{ zend_do_binary_op(ZEND_IS_SMALLER, &$$, &$3, &$1 TSRMLS_CC); }
 	|	expr T_IS_GREATER_OR_EQUAL expr { zend_do_binary_op(ZEND_IS_SMALLER_OR_EQUAL, &$$, &$3, &$1 TSRMLS_CC); }
+	|	expr T_IN expr
 	|	expr T_INSTANCEOF class_name_reference { zend_do_instanceof(&$$, &$1, &$3, 0 TSRMLS_CC); }
 	|	'(' expr ')' 	{ $$ = $2; }
 	|	new_expr		{ $$ = $1; }
