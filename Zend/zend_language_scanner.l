@@ -1363,6 +1363,10 @@ NEWLINE ("\r"|"\n"|"\r\n")
 	return T_IS_GREATER_OR_EQUAL;
 }
 
+<ST_IN_SCRIPTING>"in" {
+	return T_IN;
+}
+
 <ST_IN_SCRIPTING>"+=" {
 	return T_PLUS_EQUAL;
 }
