@@ -3954,6 +3954,74 @@ static int ZEND_FASTCALL  ZEND_DECLARE_CONST_SPEC_CONST_CONST_HANDLER(ZEND_OPCOD
 	ZEND_VM_NEXT_OPCODE();
 }
 
+static int ZEND_FASTCALL  ZEND_IN_SPEC_CONST_CONST_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
+{
+	USE_OPLINE
+
+	zval *op1, *op2;
+
+	SAVE_OPLINE();
+	op1 = opline->op1.zv;
+	op2 = opline->op2.zv;
+
+	if (Z_TYPE_P(op2) == IS_STRING) {
+		zval op1_copy;
+		int use_copy;
+
+		/* Convert the needle into a string */
+		zend_make_printable_zval(op1, &op1_copy, &use_copy);
+		if (use_copy) {
+			op1 = &op1_copy;
+		}
+
+		if (Z_STRLEN_P(op1) == 0) {
+			/* For empty needles return true */
+			ZVAL_TRUE(&EX_T(opline->result.var).tmp_var);
+		} else {
+			char *found = zend_memnstr(
+				Z_STRVAL_P(op2),                  /* haystack */
+				Z_STRVAL_P(op1),                  /* needle */
+				Z_STRLEN_P(op1),                  /* needle length */
+				Z_STRVAL_P(op2) + Z_STRLEN_P(op2) /* haystack end ptr */
+			);
+
+			ZVAL_BOOL(&EX_T(opline->result.var).tmp_var, found != NULL);
+		}
+
+		/* Free copy */
+		if (use_copy) {
+			zval_dtor(&op1_copy);
+		}
+	} else if (Z_TYPE_P(op2) == IS_ARRAY) {
+		HashPosition pos;
+		zval **value;
+
+		/* Start under the assumption that the value isn't contained */
+		ZVAL_FALSE(&EX_T(opline->result.var).tmp_var);
+
+		/* Iterate through the array */
+		zend_hash_internal_pointer_reset_ex(Z_ARRVAL_P(op2), &pos);
+		while (zend_hash_get_current_data_ex(Z_ARRVAL_P(op2), (void **) &value, &pos) == SUCCESS) {
+			zval result;
+
+			/* Compare values using == */
+			if (is_equal_function(&result, op1, *value) == SUCCESS && Z_LVAL(result)) {
+				ZVAL_TRUE(&EX_T(opline->result.var).tmp_var);
+				break;
+			}
+
+			zend_hash_move_forward_ex(Z_ARRVAL_P(op2), &pos);
+		}
+	} else {
+		zend_error(E_WARNING, "Right operand of in has to be either string or array");
+		ZVAL_FALSE(&EX_T(opline->result.var).tmp_var);
+	}
+
+
+	CHECK_EXCEPTION();
+	ZEND_VM_NEXT_OPCODE();
+}
+
 static int ZEND_FASTCALL  ZEND_ADD_SPEC_CONST_TMP_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
 {
 	USE_OPLINE
@@ -4492,6 +4560,74 @@ static int ZEND_FASTCALL  ZEND_INIT_ARRAY_SPEC_CONST_TMP_HANDLER(ZEND_OPCODE_HAN
 		return ZEND_ADD_ARRAY_ELEMENT_SPEC_CONST_TMP_HANDLER(ZEND_OPCODE_HANDLER_ARGS_PASSTHRU);
 #endif
 	}
+}
+
+static int ZEND_FASTCALL  ZEND_IN_SPEC_CONST_TMP_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
+{
+	USE_OPLINE
+	zend_free_op free_op2;
+	zval *op1, *op2;
+
+	SAVE_OPLINE();
+	op1 = opline->op1.zv;
+	op2 = _get_zval_ptr_tmp(opline->op2.var, EX_Ts(), &free_op2 TSRMLS_CC);
+
+	if (Z_TYPE_P(op2) == IS_STRING) {
+		zval op1_copy;
+		int use_copy;
+
+		/* Convert the needle into a string */
+		zend_make_printable_zval(op1, &op1_copy, &use_copy);
+		if (use_copy) {
+			op1 = &op1_copy;
+		}
+
+		if (Z_STRLEN_P(op1) == 0) {
+			/* For empty needles return true */
+			ZVAL_TRUE(&EX_T(opline->result.var).tmp_var);
+		} else {
+			char *found = zend_memnstr(
+				Z_STRVAL_P(op2),                  /* haystack */
+				Z_STRVAL_P(op1),                  /* needle */
+				Z_STRLEN_P(op1),                  /* needle length */
+				Z_STRVAL_P(op2) + Z_STRLEN_P(op2) /* haystack end ptr */
+			);
+
+			ZVAL_BOOL(&EX_T(opline->result.var).tmp_var, found != NULL);
+		}
+
+		/* Free copy */
+		if (use_copy) {
+			zval_dtor(&op1_copy);
+		}
+	} else if (Z_TYPE_P(op2) == IS_ARRAY) {
+		HashPosition pos;
+		zval **value;
+
+		/* Start under the assumption that the value isn't contained */
+		ZVAL_FALSE(&EX_T(opline->result.var).tmp_var);
+
+		/* Iterate through the array */
+		zend_hash_internal_pointer_reset_ex(Z_ARRVAL_P(op2), &pos);
+		while (zend_hash_get_current_data_ex(Z_ARRVAL_P(op2), (void **) &value, &pos) == SUCCESS) {
+			zval result;
+
+			/* Compare values using == */
+			if (is_equal_function(&result, op1, *value) == SUCCESS && Z_LVAL(result)) {
+				ZVAL_TRUE(&EX_T(opline->result.var).tmp_var);
+				break;
+			}
+
+			zend_hash_move_forward_ex(Z_ARRVAL_P(op2), &pos);
+		}
+	} else {
+		zend_error(E_WARNING, "Right operand of in has to be either string or array");
+		ZVAL_FALSE(&EX_T(opline->result.var).tmp_var);
+	}
+
+	zval_dtor(free_op2.var);
+	CHECK_EXCEPTION();
+	ZEND_VM_NEXT_OPCODE();
 }
 
 static int ZEND_FASTCALL  ZEND_ADD_SPEC_CONST_VAR_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
@@ -5355,6 +5491,74 @@ static int ZEND_FASTCALL  ZEND_ISSET_ISEMPTY_VAR_SPEC_CONST_VAR_HANDLER(ZEND_OPC
 		}
 	}
 
+	CHECK_EXCEPTION();
+	ZEND_VM_NEXT_OPCODE();
+}
+
+static int ZEND_FASTCALL  ZEND_IN_SPEC_CONST_VAR_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
+{
+	USE_OPLINE
+	zend_free_op free_op2;
+	zval *op1, *op2;
+
+	SAVE_OPLINE();
+	op1 = opline->op1.zv;
+	op2 = _get_zval_ptr_var(opline->op2.var, EX_Ts(), &free_op2 TSRMLS_CC);
+
+	if (Z_TYPE_P(op2) == IS_STRING) {
+		zval op1_copy;
+		int use_copy;
+
+		/* Convert the needle into a string */
+		zend_make_printable_zval(op1, &op1_copy, &use_copy);
+		if (use_copy) {
+			op1 = &op1_copy;
+		}
+
+		if (Z_STRLEN_P(op1) == 0) {
+			/* For empty needles return true */
+			ZVAL_TRUE(&EX_T(opline->result.var).tmp_var);
+		} else {
+			char *found = zend_memnstr(
+				Z_STRVAL_P(op2),                  /* haystack */
+				Z_STRVAL_P(op1),                  /* needle */
+				Z_STRLEN_P(op1),                  /* needle length */
+				Z_STRVAL_P(op2) + Z_STRLEN_P(op2) /* haystack end ptr */
+			);
+
+			ZVAL_BOOL(&EX_T(opline->result.var).tmp_var, found != NULL);
+		}
+
+		/* Free copy */
+		if (use_copy) {
+			zval_dtor(&op1_copy);
+		}
+	} else if (Z_TYPE_P(op2) == IS_ARRAY) {
+		HashPosition pos;
+		zval **value;
+
+		/* Start under the assumption that the value isn't contained */
+		ZVAL_FALSE(&EX_T(opline->result.var).tmp_var);
+
+		/* Iterate through the array */
+		zend_hash_internal_pointer_reset_ex(Z_ARRVAL_P(op2), &pos);
+		while (zend_hash_get_current_data_ex(Z_ARRVAL_P(op2), (void **) &value, &pos) == SUCCESS) {
+			zval result;
+
+			/* Compare values using == */
+			if (is_equal_function(&result, op1, *value) == SUCCESS && Z_LVAL(result)) {
+				ZVAL_TRUE(&EX_T(opline->result.var).tmp_var);
+				break;
+			}
+
+			zend_hash_move_forward_ex(Z_ARRVAL_P(op2), &pos);
+		}
+	} else {
+		zend_error(E_WARNING, "Right operand of in has to be either string or array");
+		ZVAL_FALSE(&EX_T(opline->result.var).tmp_var);
+	}
+
+	if (free_op2.var) {zval_ptr_dtor(&free_op2.var);};
 	CHECK_EXCEPTION();
 	ZEND_VM_NEXT_OPCODE();
 }
@@ -6515,6 +6719,74 @@ static int ZEND_FASTCALL  ZEND_INIT_ARRAY_SPEC_CONST_CV_HANDLER(ZEND_OPCODE_HAND
 		return ZEND_ADD_ARRAY_ELEMENT_SPEC_CONST_CV_HANDLER(ZEND_OPCODE_HANDLER_ARGS_PASSTHRU);
 #endif
 	}
+}
+
+static int ZEND_FASTCALL  ZEND_IN_SPEC_CONST_CV_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
+{
+	USE_OPLINE
+
+	zval *op1, *op2;
+
+	SAVE_OPLINE();
+	op1 = opline->op1.zv;
+	op2 = _get_zval_ptr_cv_BP_VAR_R(EX_CVs(), opline->op2.var TSRMLS_CC);
+
+	if (Z_TYPE_P(op2) == IS_STRING) {
+		zval op1_copy;
+		int use_copy;
+
+		/* Convert the needle into a string */
+		zend_make_printable_zval(op1, &op1_copy, &use_copy);
+		if (use_copy) {
+			op1 = &op1_copy;
+		}
+
+		if (Z_STRLEN_P(op1) == 0) {
+			/* For empty needles return true */
+			ZVAL_TRUE(&EX_T(opline->result.var).tmp_var);
+		} else {
+			char *found = zend_memnstr(
+				Z_STRVAL_P(op2),                  /* haystack */
+				Z_STRVAL_P(op1),                  /* needle */
+				Z_STRLEN_P(op1),                  /* needle length */
+				Z_STRVAL_P(op2) + Z_STRLEN_P(op2) /* haystack end ptr */
+			);
+
+			ZVAL_BOOL(&EX_T(opline->result.var).tmp_var, found != NULL);
+		}
+
+		/* Free copy */
+		if (use_copy) {
+			zval_dtor(&op1_copy);
+		}
+	} else if (Z_TYPE_P(op2) == IS_ARRAY) {
+		HashPosition pos;
+		zval **value;
+
+		/* Start under the assumption that the value isn't contained */
+		ZVAL_FALSE(&EX_T(opline->result.var).tmp_var);
+
+		/* Iterate through the array */
+		zend_hash_internal_pointer_reset_ex(Z_ARRVAL_P(op2), &pos);
+		while (zend_hash_get_current_data_ex(Z_ARRVAL_P(op2), (void **) &value, &pos) == SUCCESS) {
+			zval result;
+
+			/* Compare values using == */
+			if (is_equal_function(&result, op1, *value) == SUCCESS && Z_LVAL(result)) {
+				ZVAL_TRUE(&EX_T(opline->result.var).tmp_var);
+				break;
+			}
+
+			zend_hash_move_forward_ex(Z_ARRVAL_P(op2), &pos);
+		}
+	} else {
+		zend_error(E_WARNING, "Right operand of in has to be either string or array");
+		ZVAL_FALSE(&EX_T(opline->result.var).tmp_var);
+	}
+
+
+	CHECK_EXCEPTION();
+	ZEND_VM_NEXT_OPCODE();
 }
 
 static int ZEND_FASTCALL  ZEND_BW_NOT_SPEC_TMP_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
@@ -8408,6 +8680,75 @@ static int ZEND_FASTCALL  ZEND_ISSET_ISEMPTY_VAR_SPEC_TMP_CONST_HANDLER(ZEND_OPC
 	ZEND_VM_NEXT_OPCODE();
 }
 
+static int ZEND_FASTCALL  ZEND_IN_SPEC_TMP_CONST_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
+{
+	USE_OPLINE
+	zend_free_op free_op1;
+	zval *op1, *op2;
+
+	SAVE_OPLINE();
+	op1 = _get_zval_ptr_tmp(opline->op1.var, EX_Ts(), &free_op1 TSRMLS_CC);
+	op2 = opline->op2.zv;
+
+	if (Z_TYPE_P(op2) == IS_STRING) {
+		zval op1_copy;
+		int use_copy;
+
+		/* Convert the needle into a string */
+		zend_make_printable_zval(op1, &op1_copy, &use_copy);
+		if (use_copy) {
+			op1 = &op1_copy;
+		}
+
+		if (Z_STRLEN_P(op1) == 0) {
+			/* For empty needles return true */
+			ZVAL_TRUE(&EX_T(opline->result.var).tmp_var);
+		} else {
+			char *found = zend_memnstr(
+				Z_STRVAL_P(op2),                  /* haystack */
+				Z_STRVAL_P(op1),                  /* needle */
+				Z_STRLEN_P(op1),                  /* needle length */
+				Z_STRVAL_P(op2) + Z_STRLEN_P(op2) /* haystack end ptr */
+			);
+
+			ZVAL_BOOL(&EX_T(opline->result.var).tmp_var, found != NULL);
+		}
+
+		/* Free copy */
+		if (use_copy) {
+			zval_dtor(&op1_copy);
+		}
+	} else if (Z_TYPE_P(op2) == IS_ARRAY) {
+		HashPosition pos;
+		zval **value;
+
+		/* Start under the assumption that the value isn't contained */
+		ZVAL_FALSE(&EX_T(opline->result.var).tmp_var);
+
+		/* Iterate through the array */
+		zend_hash_internal_pointer_reset_ex(Z_ARRVAL_P(op2), &pos);
+		while (zend_hash_get_current_data_ex(Z_ARRVAL_P(op2), (void **) &value, &pos) == SUCCESS) {
+			zval result;
+
+			/* Compare values using == */
+			if (is_equal_function(&result, op1, *value) == SUCCESS && Z_LVAL(result)) {
+				ZVAL_TRUE(&EX_T(opline->result.var).tmp_var);
+				break;
+			}
+
+			zend_hash_move_forward_ex(Z_ARRVAL_P(op2), &pos);
+		}
+	} else {
+		zend_error(E_WARNING, "Right operand of in has to be either string or array");
+		ZVAL_FALSE(&EX_T(opline->result.var).tmp_var);
+	}
+
+	zval_dtor(free_op1.var);
+
+	CHECK_EXCEPTION();
+	ZEND_VM_NEXT_OPCODE();
+}
+
 static int ZEND_FASTCALL  ZEND_ADD_SPEC_TMP_TMP_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
 {
 	USE_OPLINE
@@ -8946,6 +9287,75 @@ static int ZEND_FASTCALL  ZEND_INIT_ARRAY_SPEC_TMP_TMP_HANDLER(ZEND_OPCODE_HANDL
 		return ZEND_ADD_ARRAY_ELEMENT_SPEC_TMP_TMP_HANDLER(ZEND_OPCODE_HANDLER_ARGS_PASSTHRU);
 #endif
 	}
+}
+
+static int ZEND_FASTCALL  ZEND_IN_SPEC_TMP_TMP_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
+{
+	USE_OPLINE
+	zend_free_op free_op1, free_op2;
+	zval *op1, *op2;
+
+	SAVE_OPLINE();
+	op1 = _get_zval_ptr_tmp(opline->op1.var, EX_Ts(), &free_op1 TSRMLS_CC);
+	op2 = _get_zval_ptr_tmp(opline->op2.var, EX_Ts(), &free_op2 TSRMLS_CC);
+
+	if (Z_TYPE_P(op2) == IS_STRING) {
+		zval op1_copy;
+		int use_copy;
+
+		/* Convert the needle into a string */
+		zend_make_printable_zval(op1, &op1_copy, &use_copy);
+		if (use_copy) {
+			op1 = &op1_copy;
+		}
+
+		if (Z_STRLEN_P(op1) == 0) {
+			/* For empty needles return true */
+			ZVAL_TRUE(&EX_T(opline->result.var).tmp_var);
+		} else {
+			char *found = zend_memnstr(
+				Z_STRVAL_P(op2),                  /* haystack */
+				Z_STRVAL_P(op1),                  /* needle */
+				Z_STRLEN_P(op1),                  /* needle length */
+				Z_STRVAL_P(op2) + Z_STRLEN_P(op2) /* haystack end ptr */
+			);
+
+			ZVAL_BOOL(&EX_T(opline->result.var).tmp_var, found != NULL);
+		}
+
+		/* Free copy */
+		if (use_copy) {
+			zval_dtor(&op1_copy);
+		}
+	} else if (Z_TYPE_P(op2) == IS_ARRAY) {
+		HashPosition pos;
+		zval **value;
+
+		/* Start under the assumption that the value isn't contained */
+		ZVAL_FALSE(&EX_T(opline->result.var).tmp_var);
+
+		/* Iterate through the array */
+		zend_hash_internal_pointer_reset_ex(Z_ARRVAL_P(op2), &pos);
+		while (zend_hash_get_current_data_ex(Z_ARRVAL_P(op2), (void **) &value, &pos) == SUCCESS) {
+			zval result;
+
+			/* Compare values using == */
+			if (is_equal_function(&result, op1, *value) == SUCCESS && Z_LVAL(result)) {
+				ZVAL_TRUE(&EX_T(opline->result.var).tmp_var);
+				break;
+			}
+
+			zend_hash_move_forward_ex(Z_ARRVAL_P(op2), &pos);
+		}
+	} else {
+		zend_error(E_WARNING, "Right operand of in has to be either string or array");
+		ZVAL_FALSE(&EX_T(opline->result.var).tmp_var);
+	}
+
+	zval_dtor(free_op1.var);
+	zval_dtor(free_op2.var);
+	CHECK_EXCEPTION();
+	ZEND_VM_NEXT_OPCODE();
 }
 
 static int ZEND_FASTCALL  ZEND_ADD_SPEC_TMP_VAR_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
@@ -9809,6 +10219,75 @@ static int ZEND_FASTCALL  ZEND_ISSET_ISEMPTY_VAR_SPEC_TMP_VAR_HANDLER(ZEND_OPCOD
 		}
 	}
 
+	CHECK_EXCEPTION();
+	ZEND_VM_NEXT_OPCODE();
+}
+
+static int ZEND_FASTCALL  ZEND_IN_SPEC_TMP_VAR_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
+{
+	USE_OPLINE
+	zend_free_op free_op1, free_op2;
+	zval *op1, *op2;
+
+	SAVE_OPLINE();
+	op1 = _get_zval_ptr_tmp(opline->op1.var, EX_Ts(), &free_op1 TSRMLS_CC);
+	op2 = _get_zval_ptr_var(opline->op2.var, EX_Ts(), &free_op2 TSRMLS_CC);
+
+	if (Z_TYPE_P(op2) == IS_STRING) {
+		zval op1_copy;
+		int use_copy;
+
+		/* Convert the needle into a string */
+		zend_make_printable_zval(op1, &op1_copy, &use_copy);
+		if (use_copy) {
+			op1 = &op1_copy;
+		}
+
+		if (Z_STRLEN_P(op1) == 0) {
+			/* For empty needles return true */
+			ZVAL_TRUE(&EX_T(opline->result.var).tmp_var);
+		} else {
+			char *found = zend_memnstr(
+				Z_STRVAL_P(op2),                  /* haystack */
+				Z_STRVAL_P(op1),                  /* needle */
+				Z_STRLEN_P(op1),                  /* needle length */
+				Z_STRVAL_P(op2) + Z_STRLEN_P(op2) /* haystack end ptr */
+			);
+
+			ZVAL_BOOL(&EX_T(opline->result.var).tmp_var, found != NULL);
+		}
+
+		/* Free copy */
+		if (use_copy) {
+			zval_dtor(&op1_copy);
+		}
+	} else if (Z_TYPE_P(op2) == IS_ARRAY) {
+		HashPosition pos;
+		zval **value;
+
+		/* Start under the assumption that the value isn't contained */
+		ZVAL_FALSE(&EX_T(opline->result.var).tmp_var);
+
+		/* Iterate through the array */
+		zend_hash_internal_pointer_reset_ex(Z_ARRVAL_P(op2), &pos);
+		while (zend_hash_get_current_data_ex(Z_ARRVAL_P(op2), (void **) &value, &pos) == SUCCESS) {
+			zval result;
+
+			/* Compare values using == */
+			if (is_equal_function(&result, op1, *value) == SUCCESS && Z_LVAL(result)) {
+				ZVAL_TRUE(&EX_T(opline->result.var).tmp_var);
+				break;
+			}
+
+			zend_hash_move_forward_ex(Z_ARRVAL_P(op2), &pos);
+		}
+	} else {
+		zend_error(E_WARNING, "Right operand of in has to be either string or array");
+		ZVAL_FALSE(&EX_T(opline->result.var).tmp_var);
+	}
+
+	zval_dtor(free_op1.var);
+	if (free_op2.var) {zval_ptr_dtor(&free_op2.var);};
 	CHECK_EXCEPTION();
 	ZEND_VM_NEXT_OPCODE();
 }
@@ -10773,6 +11252,75 @@ static int ZEND_FASTCALL  ZEND_INIT_ARRAY_SPEC_TMP_CV_HANDLER(ZEND_OPCODE_HANDLE
 		return ZEND_ADD_ARRAY_ELEMENT_SPEC_TMP_CV_HANDLER(ZEND_OPCODE_HANDLER_ARGS_PASSTHRU);
 #endif
 	}
+}
+
+static int ZEND_FASTCALL  ZEND_IN_SPEC_TMP_CV_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
+{
+	USE_OPLINE
+	zend_free_op free_op1;
+	zval *op1, *op2;
+
+	SAVE_OPLINE();
+	op1 = _get_zval_ptr_tmp(opline->op1.var, EX_Ts(), &free_op1 TSRMLS_CC);
+	op2 = _get_zval_ptr_cv_BP_VAR_R(EX_CVs(), opline->op2.var TSRMLS_CC);
+
+	if (Z_TYPE_P(op2) == IS_STRING) {
+		zval op1_copy;
+		int use_copy;
+
+		/* Convert the needle into a string */
+		zend_make_printable_zval(op1, &op1_copy, &use_copy);
+		if (use_copy) {
+			op1 = &op1_copy;
+		}
+
+		if (Z_STRLEN_P(op1) == 0) {
+			/* For empty needles return true */
+			ZVAL_TRUE(&EX_T(opline->result.var).tmp_var);
+		} else {
+			char *found = zend_memnstr(
+				Z_STRVAL_P(op2),                  /* haystack */
+				Z_STRVAL_P(op1),                  /* needle */
+				Z_STRLEN_P(op1),                  /* needle length */
+				Z_STRVAL_P(op2) + Z_STRLEN_P(op2) /* haystack end ptr */
+			);
+
+			ZVAL_BOOL(&EX_T(opline->result.var).tmp_var, found != NULL);
+		}
+
+		/* Free copy */
+		if (use_copy) {
+			zval_dtor(&op1_copy);
+		}
+	} else if (Z_TYPE_P(op2) == IS_ARRAY) {
+		HashPosition pos;
+		zval **value;
+
+		/* Start under the assumption that the value isn't contained */
+		ZVAL_FALSE(&EX_T(opline->result.var).tmp_var);
+
+		/* Iterate through the array */
+		zend_hash_internal_pointer_reset_ex(Z_ARRVAL_P(op2), &pos);
+		while (zend_hash_get_current_data_ex(Z_ARRVAL_P(op2), (void **) &value, &pos) == SUCCESS) {
+			zval result;
+
+			/* Compare values using == */
+			if (is_equal_function(&result, op1, *value) == SUCCESS && Z_LVAL(result)) {
+				ZVAL_TRUE(&EX_T(opline->result.var).tmp_var);
+				break;
+			}
+
+			zend_hash_move_forward_ex(Z_ARRVAL_P(op2), &pos);
+		}
+	} else {
+		zend_error(E_WARNING, "Right operand of in has to be either string or array");
+		ZVAL_FALSE(&EX_T(opline->result.var).tmp_var);
+	}
+
+	zval_dtor(free_op1.var);
+
+	CHECK_EXCEPTION();
+	ZEND_VM_NEXT_OPCODE();
 }
 
 static int ZEND_FASTCALL  ZEND_BW_NOT_SPEC_VAR_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
@@ -14522,6 +15070,75 @@ static int ZEND_FASTCALL  ZEND_ISSET_ISEMPTY_PROP_OBJ_SPEC_VAR_CONST_HANDLER(ZEN
 	return zend_isset_isempty_dim_prop_obj_handler_SPEC_VAR_CONST(1, ZEND_OPCODE_HANDLER_ARGS_PASSTHRU);
 }
 
+static int ZEND_FASTCALL  ZEND_IN_SPEC_VAR_CONST_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
+{
+	USE_OPLINE
+	zend_free_op free_op1;
+	zval *op1, *op2;
+
+	SAVE_OPLINE();
+	op1 = _get_zval_ptr_var(opline->op1.var, EX_Ts(), &free_op1 TSRMLS_CC);
+	op2 = opline->op2.zv;
+
+	if (Z_TYPE_P(op2) == IS_STRING) {
+		zval op1_copy;
+		int use_copy;
+
+		/* Convert the needle into a string */
+		zend_make_printable_zval(op1, &op1_copy, &use_copy);
+		if (use_copy) {
+			op1 = &op1_copy;
+		}
+
+		if (Z_STRLEN_P(op1) == 0) {
+			/* For empty needles return true */
+			ZVAL_TRUE(&EX_T(opline->result.var).tmp_var);
+		} else {
+			char *found = zend_memnstr(
+				Z_STRVAL_P(op2),                  /* haystack */
+				Z_STRVAL_P(op1),                  /* needle */
+				Z_STRLEN_P(op1),                  /* needle length */
+				Z_STRVAL_P(op2) + Z_STRLEN_P(op2) /* haystack end ptr */
+			);
+
+			ZVAL_BOOL(&EX_T(opline->result.var).tmp_var, found != NULL);
+		}
+
+		/* Free copy */
+		if (use_copy) {
+			zval_dtor(&op1_copy);
+		}
+	} else if (Z_TYPE_P(op2) == IS_ARRAY) {
+		HashPosition pos;
+		zval **value;
+
+		/* Start under the assumption that the value isn't contained */
+		ZVAL_FALSE(&EX_T(opline->result.var).tmp_var);
+
+		/* Iterate through the array */
+		zend_hash_internal_pointer_reset_ex(Z_ARRVAL_P(op2), &pos);
+		while (zend_hash_get_current_data_ex(Z_ARRVAL_P(op2), (void **) &value, &pos) == SUCCESS) {
+			zval result;
+
+			/* Compare values using == */
+			if (is_equal_function(&result, op1, *value) == SUCCESS && Z_LVAL(result)) {
+				ZVAL_TRUE(&EX_T(opline->result.var).tmp_var);
+				break;
+			}
+
+			zend_hash_move_forward_ex(Z_ARRVAL_P(op2), &pos);
+		}
+	} else {
+		zend_error(E_WARNING, "Right operand of in has to be either string or array");
+		ZVAL_FALSE(&EX_T(opline->result.var).tmp_var);
+	}
+
+	if (free_op1.var) {zval_ptr_dtor(&free_op1.var);};
+
+	CHECK_EXCEPTION();
+	ZEND_VM_NEXT_OPCODE();
+}
+
 static int ZEND_FASTCALL  ZEND_ADD_SPEC_VAR_TMP_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
 {
 	USE_OPLINE
@@ -16446,6 +17063,75 @@ static int ZEND_FASTCALL  ZEND_ISSET_ISEMPTY_DIM_OBJ_SPEC_VAR_TMP_HANDLER(ZEND_O
 static int ZEND_FASTCALL  ZEND_ISSET_ISEMPTY_PROP_OBJ_SPEC_VAR_TMP_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
 {
 	return zend_isset_isempty_dim_prop_obj_handler_SPEC_VAR_TMP(1, ZEND_OPCODE_HANDLER_ARGS_PASSTHRU);
+}
+
+static int ZEND_FASTCALL  ZEND_IN_SPEC_VAR_TMP_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
+{
+	USE_OPLINE
+	zend_free_op free_op1, free_op2;
+	zval *op1, *op2;
+
+	SAVE_OPLINE();
+	op1 = _get_zval_ptr_var(opline->op1.var, EX_Ts(), &free_op1 TSRMLS_CC);
+	op2 = _get_zval_ptr_tmp(opline->op2.var, EX_Ts(), &free_op2 TSRMLS_CC);
+
+	if (Z_TYPE_P(op2) == IS_STRING) {
+		zval op1_copy;
+		int use_copy;
+
+		/* Convert the needle into a string */
+		zend_make_printable_zval(op1, &op1_copy, &use_copy);
+		if (use_copy) {
+			op1 = &op1_copy;
+		}
+
+		if (Z_STRLEN_P(op1) == 0) {
+			/* For empty needles return true */
+			ZVAL_TRUE(&EX_T(opline->result.var).tmp_var);
+		} else {
+			char *found = zend_memnstr(
+				Z_STRVAL_P(op2),                  /* haystack */
+				Z_STRVAL_P(op1),                  /* needle */
+				Z_STRLEN_P(op1),                  /* needle length */
+				Z_STRVAL_P(op2) + Z_STRLEN_P(op2) /* haystack end ptr */
+			);
+
+			ZVAL_BOOL(&EX_T(opline->result.var).tmp_var, found != NULL);
+		}
+
+		/* Free copy */
+		if (use_copy) {
+			zval_dtor(&op1_copy);
+		}
+	} else if (Z_TYPE_P(op2) == IS_ARRAY) {
+		HashPosition pos;
+		zval **value;
+
+		/* Start under the assumption that the value isn't contained */
+		ZVAL_FALSE(&EX_T(opline->result.var).tmp_var);
+
+		/* Iterate through the array */
+		zend_hash_internal_pointer_reset_ex(Z_ARRVAL_P(op2), &pos);
+		while (zend_hash_get_current_data_ex(Z_ARRVAL_P(op2), (void **) &value, &pos) == SUCCESS) {
+			zval result;
+
+			/* Compare values using == */
+			if (is_equal_function(&result, op1, *value) == SUCCESS && Z_LVAL(result)) {
+				ZVAL_TRUE(&EX_T(opline->result.var).tmp_var);
+				break;
+			}
+
+			zend_hash_move_forward_ex(Z_ARRVAL_P(op2), &pos);
+		}
+	} else {
+		zend_error(E_WARNING, "Right operand of in has to be either string or array");
+		ZVAL_FALSE(&EX_T(opline->result.var).tmp_var);
+	}
+
+	if (free_op1.var) {zval_ptr_dtor(&free_op1.var);};
+	zval_dtor(free_op2.var);
+	CHECK_EXCEPTION();
+	ZEND_VM_NEXT_OPCODE();
 }
 
 static int ZEND_FASTCALL  ZEND_ADD_SPEC_VAR_VAR_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
@@ -18752,6 +19438,75 @@ static int ZEND_FASTCALL  ZEND_ISSET_ISEMPTY_DIM_OBJ_SPEC_VAR_VAR_HANDLER(ZEND_O
 static int ZEND_FASTCALL  ZEND_ISSET_ISEMPTY_PROP_OBJ_SPEC_VAR_VAR_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
 {
 	return zend_isset_isempty_dim_prop_obj_handler_SPEC_VAR_VAR(1, ZEND_OPCODE_HANDLER_ARGS_PASSTHRU);
+}
+
+static int ZEND_FASTCALL  ZEND_IN_SPEC_VAR_VAR_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
+{
+	USE_OPLINE
+	zend_free_op free_op1, free_op2;
+	zval *op1, *op2;
+
+	SAVE_OPLINE();
+	op1 = _get_zval_ptr_var(opline->op1.var, EX_Ts(), &free_op1 TSRMLS_CC);
+	op2 = _get_zval_ptr_var(opline->op2.var, EX_Ts(), &free_op2 TSRMLS_CC);
+
+	if (Z_TYPE_P(op2) == IS_STRING) {
+		zval op1_copy;
+		int use_copy;
+
+		/* Convert the needle into a string */
+		zend_make_printable_zval(op1, &op1_copy, &use_copy);
+		if (use_copy) {
+			op1 = &op1_copy;
+		}
+
+		if (Z_STRLEN_P(op1) == 0) {
+			/* For empty needles return true */
+			ZVAL_TRUE(&EX_T(opline->result.var).tmp_var);
+		} else {
+			char *found = zend_memnstr(
+				Z_STRVAL_P(op2),                  /* haystack */
+				Z_STRVAL_P(op1),                  /* needle */
+				Z_STRLEN_P(op1),                  /* needle length */
+				Z_STRVAL_P(op2) + Z_STRLEN_P(op2) /* haystack end ptr */
+			);
+
+			ZVAL_BOOL(&EX_T(opline->result.var).tmp_var, found != NULL);
+		}
+
+		/* Free copy */
+		if (use_copy) {
+			zval_dtor(&op1_copy);
+		}
+	} else if (Z_TYPE_P(op2) == IS_ARRAY) {
+		HashPosition pos;
+		zval **value;
+
+		/* Start under the assumption that the value isn't contained */
+		ZVAL_FALSE(&EX_T(opline->result.var).tmp_var);
+
+		/* Iterate through the array */
+		zend_hash_internal_pointer_reset_ex(Z_ARRVAL_P(op2), &pos);
+		while (zend_hash_get_current_data_ex(Z_ARRVAL_P(op2), (void **) &value, &pos) == SUCCESS) {
+			zval result;
+
+			/* Compare values using == */
+			if (is_equal_function(&result, op1, *value) == SUCCESS && Z_LVAL(result)) {
+				ZVAL_TRUE(&EX_T(opline->result.var).tmp_var);
+				break;
+			}
+
+			zend_hash_move_forward_ex(Z_ARRVAL_P(op2), &pos);
+		}
+	} else {
+		zend_error(E_WARNING, "Right operand of in has to be either string or array");
+		ZVAL_FALSE(&EX_T(opline->result.var).tmp_var);
+	}
+
+	if (free_op1.var) {zval_ptr_dtor(&free_op1.var);};
+	if (free_op2.var) {zval_ptr_dtor(&free_op2.var);};
+	CHECK_EXCEPTION();
+	ZEND_VM_NEXT_OPCODE();
 }
 
 static int ZEND_FASTCALL zend_binary_assign_op_obj_helper_SPEC_VAR_UNUSED(int (*binary_op)(zval *result, zval *op1, zval *op2 TSRMLS_DC), ZEND_OPCODE_HANDLER_ARGS)
@@ -21711,6 +22466,75 @@ static int ZEND_FASTCALL  ZEND_ISSET_ISEMPTY_DIM_OBJ_SPEC_VAR_CV_HANDLER(ZEND_OP
 static int ZEND_FASTCALL  ZEND_ISSET_ISEMPTY_PROP_OBJ_SPEC_VAR_CV_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
 {
 	return zend_isset_isempty_dim_prop_obj_handler_SPEC_VAR_CV(1, ZEND_OPCODE_HANDLER_ARGS_PASSTHRU);
+}
+
+static int ZEND_FASTCALL  ZEND_IN_SPEC_VAR_CV_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
+{
+	USE_OPLINE
+	zend_free_op free_op1;
+	zval *op1, *op2;
+
+	SAVE_OPLINE();
+	op1 = _get_zval_ptr_var(opline->op1.var, EX_Ts(), &free_op1 TSRMLS_CC);
+	op2 = _get_zval_ptr_cv_BP_VAR_R(EX_CVs(), opline->op2.var TSRMLS_CC);
+
+	if (Z_TYPE_P(op2) == IS_STRING) {
+		zval op1_copy;
+		int use_copy;
+
+		/* Convert the needle into a string */
+		zend_make_printable_zval(op1, &op1_copy, &use_copy);
+		if (use_copy) {
+			op1 = &op1_copy;
+		}
+
+		if (Z_STRLEN_P(op1) == 0) {
+			/* For empty needles return true */
+			ZVAL_TRUE(&EX_T(opline->result.var).tmp_var);
+		} else {
+			char *found = zend_memnstr(
+				Z_STRVAL_P(op2),                  /* haystack */
+				Z_STRVAL_P(op1),                  /* needle */
+				Z_STRLEN_P(op1),                  /* needle length */
+				Z_STRVAL_P(op2) + Z_STRLEN_P(op2) /* haystack end ptr */
+			);
+
+			ZVAL_BOOL(&EX_T(opline->result.var).tmp_var, found != NULL);
+		}
+
+		/* Free copy */
+		if (use_copy) {
+			zval_dtor(&op1_copy);
+		}
+	} else if (Z_TYPE_P(op2) == IS_ARRAY) {
+		HashPosition pos;
+		zval **value;
+
+		/* Start under the assumption that the value isn't contained */
+		ZVAL_FALSE(&EX_T(opline->result.var).tmp_var);
+
+		/* Iterate through the array */
+		zend_hash_internal_pointer_reset_ex(Z_ARRVAL_P(op2), &pos);
+		while (zend_hash_get_current_data_ex(Z_ARRVAL_P(op2), (void **) &value, &pos) == SUCCESS) {
+			zval result;
+
+			/* Compare values using == */
+			if (is_equal_function(&result, op1, *value) == SUCCESS && Z_LVAL(result)) {
+				ZVAL_TRUE(&EX_T(opline->result.var).tmp_var);
+				break;
+			}
+
+			zend_hash_move_forward_ex(Z_ARRVAL_P(op2), &pos);
+		}
+	} else {
+		zend_error(E_WARNING, "Right operand of in has to be either string or array");
+		ZVAL_FALSE(&EX_T(opline->result.var).tmp_var);
+	}
+
+	if (free_op1.var) {zval_ptr_dtor(&free_op1.var);};
+
+	CHECK_EXCEPTION();
+	ZEND_VM_NEXT_OPCODE();
 }
 
 static int ZEND_FASTCALL  ZEND_CLONE_SPEC_UNUSED_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
@@ -30135,6 +30959,74 @@ static int ZEND_FASTCALL  ZEND_ISSET_ISEMPTY_PROP_OBJ_SPEC_CV_CONST_HANDLER(ZEND
 	return zend_isset_isempty_dim_prop_obj_handler_SPEC_CV_CONST(1, ZEND_OPCODE_HANDLER_ARGS_PASSTHRU);
 }
 
+static int ZEND_FASTCALL  ZEND_IN_SPEC_CV_CONST_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
+{
+	USE_OPLINE
+
+	zval *op1, *op2;
+
+	SAVE_OPLINE();
+	op1 = _get_zval_ptr_cv_BP_VAR_R(EX_CVs(), opline->op1.var TSRMLS_CC);
+	op2 = opline->op2.zv;
+
+	if (Z_TYPE_P(op2) == IS_STRING) {
+		zval op1_copy;
+		int use_copy;
+
+		/* Convert the needle into a string */
+		zend_make_printable_zval(op1, &op1_copy, &use_copy);
+		if (use_copy) {
+			op1 = &op1_copy;
+		}
+
+		if (Z_STRLEN_P(op1) == 0) {
+			/* For empty needles return true */
+			ZVAL_TRUE(&EX_T(opline->result.var).tmp_var);
+		} else {
+			char *found = zend_memnstr(
+				Z_STRVAL_P(op2),                  /* haystack */
+				Z_STRVAL_P(op1),                  /* needle */
+				Z_STRLEN_P(op1),                  /* needle length */
+				Z_STRVAL_P(op2) + Z_STRLEN_P(op2) /* haystack end ptr */
+			);
+
+			ZVAL_BOOL(&EX_T(opline->result.var).tmp_var, found != NULL);
+		}
+
+		/* Free copy */
+		if (use_copy) {
+			zval_dtor(&op1_copy);
+		}
+	} else if (Z_TYPE_P(op2) == IS_ARRAY) {
+		HashPosition pos;
+		zval **value;
+
+		/* Start under the assumption that the value isn't contained */
+		ZVAL_FALSE(&EX_T(opline->result.var).tmp_var);
+
+		/* Iterate through the array */
+		zend_hash_internal_pointer_reset_ex(Z_ARRVAL_P(op2), &pos);
+		while (zend_hash_get_current_data_ex(Z_ARRVAL_P(op2), (void **) &value, &pos) == SUCCESS) {
+			zval result;
+
+			/* Compare values using == */
+			if (is_equal_function(&result, op1, *value) == SUCCESS && Z_LVAL(result)) {
+				ZVAL_TRUE(&EX_T(opline->result.var).tmp_var);
+				break;
+			}
+
+			zend_hash_move_forward_ex(Z_ARRVAL_P(op2), &pos);
+		}
+	} else {
+		zend_error(E_WARNING, "Right operand of in has to be either string or array");
+		ZVAL_FALSE(&EX_T(opline->result.var).tmp_var);
+	}
+
+
+	CHECK_EXCEPTION();
+	ZEND_VM_NEXT_OPCODE();
+}
+
 static int ZEND_FASTCALL  ZEND_ADD_SPEC_CV_TMP_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
 {
 	USE_OPLINE
@@ -31930,6 +32822,74 @@ static int ZEND_FASTCALL  ZEND_ISSET_ISEMPTY_DIM_OBJ_SPEC_CV_TMP_HANDLER(ZEND_OP
 static int ZEND_FASTCALL  ZEND_ISSET_ISEMPTY_PROP_OBJ_SPEC_CV_TMP_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
 {
 	return zend_isset_isempty_dim_prop_obj_handler_SPEC_CV_TMP(1, ZEND_OPCODE_HANDLER_ARGS_PASSTHRU);
+}
+
+static int ZEND_FASTCALL  ZEND_IN_SPEC_CV_TMP_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
+{
+	USE_OPLINE
+	zend_free_op free_op2;
+	zval *op1, *op2;
+
+	SAVE_OPLINE();
+	op1 = _get_zval_ptr_cv_BP_VAR_R(EX_CVs(), opline->op1.var TSRMLS_CC);
+	op2 = _get_zval_ptr_tmp(opline->op2.var, EX_Ts(), &free_op2 TSRMLS_CC);
+
+	if (Z_TYPE_P(op2) == IS_STRING) {
+		zval op1_copy;
+		int use_copy;
+
+		/* Convert the needle into a string */
+		zend_make_printable_zval(op1, &op1_copy, &use_copy);
+		if (use_copy) {
+			op1 = &op1_copy;
+		}
+
+		if (Z_STRLEN_P(op1) == 0) {
+			/* For empty needles return true */
+			ZVAL_TRUE(&EX_T(opline->result.var).tmp_var);
+		} else {
+			char *found = zend_memnstr(
+				Z_STRVAL_P(op2),                  /* haystack */
+				Z_STRVAL_P(op1),                  /* needle */
+				Z_STRLEN_P(op1),                  /* needle length */
+				Z_STRVAL_P(op2) + Z_STRLEN_P(op2) /* haystack end ptr */
+			);
+
+			ZVAL_BOOL(&EX_T(opline->result.var).tmp_var, found != NULL);
+		}
+
+		/* Free copy */
+		if (use_copy) {
+			zval_dtor(&op1_copy);
+		}
+	} else if (Z_TYPE_P(op2) == IS_ARRAY) {
+		HashPosition pos;
+		zval **value;
+
+		/* Start under the assumption that the value isn't contained */
+		ZVAL_FALSE(&EX_T(opline->result.var).tmp_var);
+
+		/* Iterate through the array */
+		zend_hash_internal_pointer_reset_ex(Z_ARRVAL_P(op2), &pos);
+		while (zend_hash_get_current_data_ex(Z_ARRVAL_P(op2), (void **) &value, &pos) == SUCCESS) {
+			zval result;
+
+			/* Compare values using == */
+			if (is_equal_function(&result, op1, *value) == SUCCESS && Z_LVAL(result)) {
+				ZVAL_TRUE(&EX_T(opline->result.var).tmp_var);
+				break;
+			}
+
+			zend_hash_move_forward_ex(Z_ARRVAL_P(op2), &pos);
+		}
+	} else {
+		zend_error(E_WARNING, "Right operand of in has to be either string or array");
+		ZVAL_FALSE(&EX_T(opline->result.var).tmp_var);
+	}
+
+	zval_dtor(free_op2.var);
+	CHECK_EXCEPTION();
+	ZEND_VM_NEXT_OPCODE();
 }
 
 static int ZEND_FASTCALL  ZEND_ADD_SPEC_CV_VAR_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
@@ -34106,6 +35066,74 @@ static int ZEND_FASTCALL  ZEND_ISSET_ISEMPTY_DIM_OBJ_SPEC_CV_VAR_HANDLER(ZEND_OP
 static int ZEND_FASTCALL  ZEND_ISSET_ISEMPTY_PROP_OBJ_SPEC_CV_VAR_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
 {
 	return zend_isset_isempty_dim_prop_obj_handler_SPEC_CV_VAR(1, ZEND_OPCODE_HANDLER_ARGS_PASSTHRU);
+}
+
+static int ZEND_FASTCALL  ZEND_IN_SPEC_CV_VAR_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
+{
+	USE_OPLINE
+	zend_free_op free_op2;
+	zval *op1, *op2;
+
+	SAVE_OPLINE();
+	op1 = _get_zval_ptr_cv_BP_VAR_R(EX_CVs(), opline->op1.var TSRMLS_CC);
+	op2 = _get_zval_ptr_var(opline->op2.var, EX_Ts(), &free_op2 TSRMLS_CC);
+
+	if (Z_TYPE_P(op2) == IS_STRING) {
+		zval op1_copy;
+		int use_copy;
+
+		/* Convert the needle into a string */
+		zend_make_printable_zval(op1, &op1_copy, &use_copy);
+		if (use_copy) {
+			op1 = &op1_copy;
+		}
+
+		if (Z_STRLEN_P(op1) == 0) {
+			/* For empty needles return true */
+			ZVAL_TRUE(&EX_T(opline->result.var).tmp_var);
+		} else {
+			char *found = zend_memnstr(
+				Z_STRVAL_P(op2),                  /* haystack */
+				Z_STRVAL_P(op1),                  /* needle */
+				Z_STRLEN_P(op1),                  /* needle length */
+				Z_STRVAL_P(op2) + Z_STRLEN_P(op2) /* haystack end ptr */
+			);
+
+			ZVAL_BOOL(&EX_T(opline->result.var).tmp_var, found != NULL);
+		}
+
+		/* Free copy */
+		if (use_copy) {
+			zval_dtor(&op1_copy);
+		}
+	} else if (Z_TYPE_P(op2) == IS_ARRAY) {
+		HashPosition pos;
+		zval **value;
+
+		/* Start under the assumption that the value isn't contained */
+		ZVAL_FALSE(&EX_T(opline->result.var).tmp_var);
+
+		/* Iterate through the array */
+		zend_hash_internal_pointer_reset_ex(Z_ARRVAL_P(op2), &pos);
+		while (zend_hash_get_current_data_ex(Z_ARRVAL_P(op2), (void **) &value, &pos) == SUCCESS) {
+			zval result;
+
+			/* Compare values using == */
+			if (is_equal_function(&result, op1, *value) == SUCCESS && Z_LVAL(result)) {
+				ZVAL_TRUE(&EX_T(opline->result.var).tmp_var);
+				break;
+			}
+
+			zend_hash_move_forward_ex(Z_ARRVAL_P(op2), &pos);
+		}
+	} else {
+		zend_error(E_WARNING, "Right operand of in has to be either string or array");
+		ZVAL_FALSE(&EX_T(opline->result.var).tmp_var);
+	}
+
+	if (free_op2.var) {zval_ptr_dtor(&free_op2.var);};
+	CHECK_EXCEPTION();
+	ZEND_VM_NEXT_OPCODE();
 }
 
 static int ZEND_FASTCALL zend_binary_assign_op_obj_helper_SPEC_CV_UNUSED(int (*binary_op)(zval *result, zval *op1, zval *op2 TSRMLS_DC), ZEND_OPCODE_HANDLER_ARGS)
@@ -36796,6 +37824,74 @@ static int ZEND_FASTCALL  ZEND_ISSET_ISEMPTY_DIM_OBJ_SPEC_CV_CV_HANDLER(ZEND_OPC
 static int ZEND_FASTCALL  ZEND_ISSET_ISEMPTY_PROP_OBJ_SPEC_CV_CV_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
 {
 	return zend_isset_isempty_dim_prop_obj_handler_SPEC_CV_CV(1, ZEND_OPCODE_HANDLER_ARGS_PASSTHRU);
+}
+
+static int ZEND_FASTCALL  ZEND_IN_SPEC_CV_CV_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
+{
+	USE_OPLINE
+
+	zval *op1, *op2;
+
+	SAVE_OPLINE();
+	op1 = _get_zval_ptr_cv_BP_VAR_R(EX_CVs(), opline->op1.var TSRMLS_CC);
+	op2 = _get_zval_ptr_cv_BP_VAR_R(EX_CVs(), opline->op2.var TSRMLS_CC);
+
+	if (Z_TYPE_P(op2) == IS_STRING) {
+		zval op1_copy;
+		int use_copy;
+
+		/* Convert the needle into a string */
+		zend_make_printable_zval(op1, &op1_copy, &use_copy);
+		if (use_copy) {
+			op1 = &op1_copy;
+		}
+
+		if (Z_STRLEN_P(op1) == 0) {
+			/* For empty needles return true */
+			ZVAL_TRUE(&EX_T(opline->result.var).tmp_var);
+		} else {
+			char *found = zend_memnstr(
+				Z_STRVAL_P(op2),                  /* haystack */
+				Z_STRVAL_P(op1),                  /* needle */
+				Z_STRLEN_P(op1),                  /* needle length */
+				Z_STRVAL_P(op2) + Z_STRLEN_P(op2) /* haystack end ptr */
+			);
+
+			ZVAL_BOOL(&EX_T(opline->result.var).tmp_var, found != NULL);
+		}
+
+		/* Free copy */
+		if (use_copy) {
+			zval_dtor(&op1_copy);
+		}
+	} else if (Z_TYPE_P(op2) == IS_ARRAY) {
+		HashPosition pos;
+		zval **value;
+
+		/* Start under the assumption that the value isn't contained */
+		ZVAL_FALSE(&EX_T(opline->result.var).tmp_var);
+
+		/* Iterate through the array */
+		zend_hash_internal_pointer_reset_ex(Z_ARRVAL_P(op2), &pos);
+		while (zend_hash_get_current_data_ex(Z_ARRVAL_P(op2), (void **) &value, &pos) == SUCCESS) {
+			zval result;
+
+			/* Compare values using == */
+			if (is_equal_function(&result, op1, *value) == SUCCESS && Z_LVAL(result)) {
+				ZVAL_TRUE(&EX_T(opline->result.var).tmp_var);
+				break;
+			}
+
+			zend_hash_move_forward_ex(Z_ARRVAL_P(op2), &pos);
+		}
+	} else {
+		zend_error(E_WARNING, "Right operand of in has to be either string or array");
+		ZVAL_FALSE(&EX_T(opline->result.var).tmp_var);
+	}
+
+
+	CHECK_EXCEPTION();
+	ZEND_VM_NEXT_OPCODE();
 }
 
 static int ZEND_FASTCALL ZEND_NULL_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
@@ -40782,6 +41878,31 @@ void zend_init_opcodes_handlers(void)
   	ZEND_JMP_SET_VAR_SPEC_CV_HANDLER,
   	ZEND_JMP_SET_VAR_SPEC_CV_HANDLER,
   	ZEND_JMP_SET_VAR_SPEC_CV_HANDLER,
+  	ZEND_IN_SPEC_CONST_CONST_HANDLER,
+  	ZEND_IN_SPEC_CONST_TMP_HANDLER,
+  	ZEND_IN_SPEC_CONST_VAR_HANDLER,
+  	ZEND_NULL_HANDLER,
+  	ZEND_IN_SPEC_CONST_CV_HANDLER,
+  	ZEND_IN_SPEC_TMP_CONST_HANDLER,
+  	ZEND_IN_SPEC_TMP_TMP_HANDLER,
+  	ZEND_IN_SPEC_TMP_VAR_HANDLER,
+  	ZEND_NULL_HANDLER,
+  	ZEND_IN_SPEC_TMP_CV_HANDLER,
+  	ZEND_IN_SPEC_VAR_CONST_HANDLER,
+  	ZEND_IN_SPEC_VAR_TMP_HANDLER,
+  	ZEND_IN_SPEC_VAR_VAR_HANDLER,
+  	ZEND_NULL_HANDLER,
+  	ZEND_IN_SPEC_VAR_CV_HANDLER,
+  	ZEND_NULL_HANDLER,
+  	ZEND_NULL_HANDLER,
+  	ZEND_NULL_HANDLER,
+  	ZEND_NULL_HANDLER,
+  	ZEND_NULL_HANDLER,
+  	ZEND_IN_SPEC_CV_CONST_HANDLER,
+  	ZEND_IN_SPEC_CV_TMP_HANDLER,
+  	ZEND_IN_SPEC_CV_VAR_HANDLER,
+  	ZEND_NULL_HANDLER,
+  	ZEND_IN_SPEC_CV_CV_HANDLER,
   	ZEND_NULL_HANDLER
   };
   zend_opcode_handlers = (opcode_handler_t*)labels;
