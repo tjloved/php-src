@@ -37,14 +37,14 @@ if (!function_exists('mysqli_get_charset'))
 	if ($version[0] <= 4 && $version[1] < 1)
 		printf("[006] Need MySQL Server 4.1+ for the test!\n");
 
-	if (!$res = mysqli_query($link, 'SELECT @@character_set_connection AS charset, @@collation_connection AS collation'))
+	if (!$res = mysqli_query($link, 'SELECT @@character_set_client AS charset'))
 		printf("[007] [%d] %s\n", mysqli_errno($link), mysqli_error($link));
 	$tmp = mysqli_fetch_assoc($res);
 	mysqli_free_result($res);
-	if (!($character_set_connection = $tmp['charset']) || !($collation_connection = $tmp['collation']))
-		printf("[008] Cannot determine current character set and collation\n");
+	if (!($character_set_client = $tmp['charset']))
+		printf("[008] Cannot determine current character set\n");
 
-	if (!$res = mysqli_query($link, $sql = sprintf("SHOW CHARACTER SET LIKE '%s'", $character_set_connection)))
+	if (!$res = mysqli_query($link, $sql = sprintf("SHOW CHARACTER SET LIKE '%s'", $character_set_client)))
 		printf("[009] [%d] %s\n", mysqli_errno($link), mysqli_error($link));
 	$tmp = mysqli_fetch_assoc($res);
 	if (empty($tmp))
@@ -52,8 +52,9 @@ if (!function_exists('mysqli_get_charset'))
 
 	$maxlen = (isset($tmp['Maxlen'])) ? $tmp['Maxlen'] : '';
 	$comment = (isset($tmp['Description'])) ? $tmp['Description'] : '';
+	$collation = $tmp['Default collation'];
 
-	if (!$res = mysqli_query($link, sprintf("SHOW COLLATION LIKE '%s'", $collation_connection)))
+	if (!$res = mysqli_query($link, sprintf("SHOW COLLATION LIKE '%s'", $collation)))
 		printf("[011] [%d] %s\n", mysqli_errno($link), mysqli_error($link));
 	$tmp = mysqli_fetch_assoc($res);
 	mysqli_free_result($res);
@@ -72,12 +73,12 @@ if (!function_exists('mysqli_get_charset'))
 
 	if (!isset($charset->charset) ||
 		!in_array(gettype($charset->charset), array("string", "unicode")) ||
-		($character_set_connection !== $charset->charset))
-		printf("[016] Expecting string/%s, got %s/%s\n", $character_set_connection, gettype($charset->charset), $charset->charset);
+		($character_set_client !== $charset->charset))
+		printf("[016] Expecting string/%s, got %s/%s\n", $character_set_client, gettype($charset->charset), $charset->charset);
 	if (!isset($charset->collation) ||
 		!in_array(gettype($charset->collation), array("string", "unicode")) ||
-		($collation_connection !== $charset->collation))
-		printf("[017] Expecting string/%s, got %s/%s\n", $collation_connection, gettype($charset->collation), $charset->collation);
+		($collation !== $charset->collation))
+		printf("[017] Expecting string/%s, got %s/%s\n", $collation, gettype($charset->collation), $charset->collation);
 
 	if (!isset($charset->dir) ||
 		!is_string($charset->dir))
