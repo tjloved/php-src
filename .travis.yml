@@ -9,7 +9,7 @@ env:
 before_script:
     # Install dependencies
     - sudo apt-get update -qq
-    - sudo apt-get install -qq libicu-dev
+    - sudo apt-get install -qq libicu-dev libmcrypt-dev
     # Compile PHP
     - ./travis/compile.sh
     # Setup Extensions 
