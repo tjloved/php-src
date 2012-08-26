@@ -33,5 +33,6 @@
 --with-gettext \
 --enable-sockets \
 --with-bz2 \
---enable-bcmath
-make
+--enable-bcmath \
+--quiet
+make --quiet
