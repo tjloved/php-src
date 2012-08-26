@@ -33,7 +33,5 @@
 --with-gettext \
 --enable-sockets \
 --with-bz2 \
---enable-bcmath \
---enable-fastcgi \
---with-mime-magic
+--enable-bcmath
 make
