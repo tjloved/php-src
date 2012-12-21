@@ -223,7 +223,6 @@ static void zend_generator_clone_storage(zend_generator *orig, zend_generator **
 		/* copy */
 		clone->execute_data->opline = execute_data->opline;
 		clone->execute_data->function_state = execute_data->function_state;
-		clone->execute_data->object = execute_data->object;
 		clone->execute_data->current_scope = execute_data->current_scope;
 		clone->execute_data->current_called_scope = execute_data->current_called_scope;
 		clone->execute_data->fast_ret = execute_data->fast_ret;

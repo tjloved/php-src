@@ -1486,7 +1486,7 @@ ZEND_API void execute_internal(zend_execute_data *execute_data_ptr, zend_fcall_i
 		zval **return_value_ptr = &EX_TMP_VAR(execute_data_ptr, execute_data_ptr->opline->result.var)->var.ptr;
 		((zend_internal_function *) execute_data_ptr->function_state.function)->handler(execute_data_ptr->opline->extended_value, *return_value_ptr,
 					(execute_data_ptr->function_state.function->common.fn_flags & ZEND_ACC_RETURN_REFERENCE)?return_value_ptr:NULL,
-					execute_data_ptr->object, return_value_used TSRMLS_CC);
+					execute_data_ptr->call->object, return_value_used TSRMLS_CC);
 	}
 }
 
@@ -1638,12 +1638,10 @@ static zend_always_inline zend_execute_data *i_create_execute_data_from_op_array
 
 	EX(call_slots) = (call_slot*)((char *)execute_data + execute_data_size + CVs_size);
 
-
 	EX(op_array) = op_array;
 
 	EG(argument_stack)->top = zend_vm_stack_frame_base(execute_data);
 
-	EX(object) = NULL;
 	EX(current_this) = NULL;
 	EX(old_error_reporting) = NULL;
 	EX(symbol_table) = EG(active_symbol_table);

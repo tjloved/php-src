@@ -744,6 +744,7 @@ int zend_call_function(zend_fcall_info *fci, zend_fcall_info_cache *fci_cache TS
 	zval *current_this;
 	zend_execute_data execute_data;
 	zend_fcall_info_cache fci_cache_local;
+	call_slot call_slot_for_object;
 
 	*fci->retval_ptr_ptr = NULL;
 
@@ -768,7 +769,6 @@ int zend_call_function(zend_fcall_info *fci, zend_fcall_info_cache *fci_cache TS
 		execute_data = *EG(current_execute_data);
 		EX(op_array) = NULL;
 		EX(opline) = NULL;
-		EX(object) = NULL;
 	} else {
 		/* This only happens when we're called outside any execute()'s
 		 * It shouldn't be strictly necessary to NULL execute_data out,
@@ -809,7 +809,11 @@ int zend_call_function(zend_fcall_info *fci, zend_fcall_info_cache *fci_cache TS
 	calling_scope = fci_cache->calling_scope;
 	called_scope = fci_cache->called_scope;
 	fci->object_ptr = fci_cache->object_ptr;
-	EX(object) = fci->object_ptr;
+
+	EX(call_slots) = &call_slot_for_object;
+	EX(call) = EX(call_slots);
+	EX(call)->object = fci->object_ptr;
+
 	if (fci->object_ptr && Z_TYPE_P(fci->object_ptr) == IS_OBJECT &&
 	    (!EG(objects_store).object_buckets || !EG(objects_store).object_buckets[Z_OBJ_HANDLE_P(fci->object_ptr)].valid)) {
 		return FAILURE;

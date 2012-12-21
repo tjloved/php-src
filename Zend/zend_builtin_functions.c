@@ -2082,14 +2082,15 @@ ZEND_FUNCTION(debug_print_backtrace)
 		function_name = ptr->function_state.function->common.function_name;
 
 		if (function_name) {
-			if (ptr->object) {
+			zval *object = ptr->call ? ptr->call->object : NULL;
+			if (object) {
 				if (ptr->function_state.function->common.scope) {
 					class_name = ptr->function_state.function->common.scope->name;
 				} else {
 					zend_uint class_name_len;
 					int dup;
 
-					dup = zend_get_object_classname(ptr->object, &class_name, &class_name_len TSRMLS_CC);
+					dup = zend_get_object_classname(object, &class_name, &class_name_len TSRMLS_CC);
 					if(!dup) {
 						free_class_name = class_name;
 					}
@@ -2263,22 +2264,24 @@ ZEND_API void zend_fetch_debug_backtrace(zval *return_value, int skip_last, int 
 		function_name = ptr->function_state.function->common.function_name;
 
 		if (function_name) {
+			zval *object = ptr->call ? ptr->call->object : NULL;
+
 			add_assoc_string_ex(stack_frame, "function", sizeof("function"), (char*)function_name, 1);
 
-			if (ptr->object && Z_TYPE_P(ptr->object) == IS_OBJECT) {
+			if (object && Z_TYPE_P(object) == IS_OBJECT) {
 				if (ptr->function_state.function->common.scope) {
 					add_assoc_string_ex(stack_frame, "class", sizeof("class"), (char*)ptr->function_state.function->common.scope->name, 1);
 				} else {
 					zend_uint class_name_len;
 					int dup;
 
-					dup = zend_get_object_classname(ptr->object, &class_name, &class_name_len TSRMLS_CC);
+					dup = zend_get_object_classname(object, &class_name, &class_name_len TSRMLS_CC);
 					add_assoc_string_ex(stack_frame, "class", sizeof("class"), (char*)class_name, dup);
 					
 				}
 				if ((options & DEBUG_BACKTRACE_PROVIDE_OBJECT) != 0) {
-					add_assoc_zval_ex(stack_frame, "object", sizeof("object"), ptr->object);
-					Z_ADDREF_P(ptr->object);
+					add_assoc_zval_ex(stack_frame, "object", sizeof("object"), object);
+					Z_ADDREF_P(object);
 				}
 
 				add_assoc_string_ex(stack_frame, "type", sizeof("type"), "->", 1);

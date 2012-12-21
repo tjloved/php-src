@@ -1934,9 +1934,9 @@ ZEND_VM_HELPER(zend_do_fcall_common_helper, ANY, ANY)
 	USE_OPLINE
 	zend_bool should_change_scope = 0;
 	zend_function *fbc = EX(function_state).function;
+	zval *object = EX(call)->object;
 
 	SAVE_OPLINE();
-	EX(object) = EX(call)->object;
 	if (UNEXPECTED((fbc->common.fn_flags & (ZEND_ACC_ABSTRACT|ZEND_ACC_DEPRECATED)) != 0)) {
 		if (UNEXPECTED((fbc->common.fn_flags & ZEND_ACC_ABSTRACT) != 0)) {
 			zend_error_noreturn(E_ERROR, "Cannot call abstract method %s::%s()", fbc->common.scope->name, fbc->common.function_name);
@@ -1952,7 +1952,7 @@ ZEND_VM_HELPER(zend_do_fcall_common_helper, ANY, ANY)
 	}
 	if (fbc->common.scope &&
 		!(fbc->common.fn_flags & ZEND_ACC_STATIC) &&
-		!EX(object)) {
+		!object) {
 
 		if (fbc->common.fn_flags & ZEND_ACC_ALLOW_STATIC) {
 			/* FIXME: output identifiers properly */
@@ -1969,8 +1969,8 @@ ZEND_VM_HELPER(zend_do_fcall_common_helper, ANY, ANY)
 		EX(current_this) = EG(This);
 		EX(current_scope) = EG(scope);
 		EX(current_called_scope) = EG(called_scope);
-		EG(This) = EX(object);
-		EG(scope) = (fbc->type == ZEND_USER_FUNCTION || !EX(object)) ? fbc->common.scope : NULL;
+		EG(This) = object;
+		EG(scope) = (fbc->type == ZEND_USER_FUNCTION || !object) ? fbc->common.scope : NULL;
 		EG(called_scope) = EX(call)->called_scope;
 	}
 
@@ -1999,7 +1999,7 @@ ZEND_VM_HELPER(zend_do_fcall_common_helper, ANY, ANY)
 
 		if (!zend_execute_internal) {
 			/* saves one function call if zend_execute_internal is not used */
-			fbc->internal_function.handler(opline->extended_value, ret->var.ptr, (fbc->common.fn_flags & ZEND_ACC_RETURN_REFERENCE) ? &ret->var.ptr : NULL, EX(object), RETURN_VALUE_USED(opline) TSRMLS_CC);
+			fbc->internal_function.handler(opline->extended_value, ret->var.ptr, (fbc->common.fn_flags & ZEND_ACC_RETURN_REFERENCE) ? &ret->var.ptr : NULL, object, RETURN_VALUE_USED(opline) TSRMLS_CC);
 		} else {
 			zend_execute_internal(execute_data, NULL, RETURN_VALUE_USED(opline) TSRMLS_CC);
 		}
@@ -2045,8 +2045,8 @@ ZEND_VM_HELPER(zend_do_fcall_common_helper, ANY, ANY)
 		ZVAL_NULL(EX_T(opline->result.var).var.ptr);
 
 		/* Not sure what should be done here if it's a static method */
-		if (EXPECTED(EX(object) != NULL)) {
-			Z_OBJ_HT_P(EX(object))->call_method(fbc->common.function_name, opline->extended_value, EX_T(opline->result.var).var.ptr, &EX_T(opline->result.var).var.ptr, EX(object), RETURN_VALUE_USED(opline) TSRMLS_CC);
+		if (EXPECTED(object != NULL)) {
+			Z_OBJ_HT_P(object)->call_method(fbc->common.function_name, opline->extended_value, EX_T(opline->result.var).var.ptr, &EX_T(opline->result.var).var.ptr, object, RETURN_VALUE_USED(opline) TSRMLS_CC);
 		} else {
 			zend_error_noreturn(E_ERROR, "Cannot call overloaded function for non-object");
 		}
@@ -3830,7 +3830,6 @@ ZEND_VM_HANDLER(73, ZEND_INCLUDE_OR_EVAL, CONST|TMP|VAR|CV, ANY)
 		}
 
 		EX(function_state).function = (zend_function *) new_op_array;
-		EX(object) = NULL;
 
 		if (!EG(active_symbol_table)) {
 			zend_rebuild_symbol_table(TSRMLS_C);
