@@ -86,11 +86,10 @@ static zend_always_inline void zend_pzval_unlock_func(zval *z, zend_free_op *sho
 static zend_always_inline void zend_pzval_unlock_free_func(zval *z TSRMLS_DC)
 {
 	if (!Z_DELREF_P(z)) {
-		if (z != &EG(uninitialized_zval)) {
-			GC_REMOVE_ZVAL_FROM_BUFFER(z);
-			zval_dtor(z);
-			efree(z);
-		}
+		ZEND_ASSERT(z != &EG(uninitialized_zval));
+		GC_REMOVE_ZVAL_FROM_BUFFER(z);
+		zval_dtor(z);
+		efree(z);
 	}
 }
 
@@ -1607,8 +1606,8 @@ static zend_always_inline zend_execute_data *i_create_execute_data_from_op_array
 	 * a copy of previous execute_data and passed parameters.
 	 */
 	if (UNEXPECTED((op_array->fn_flags & ZEND_ACC_GENERATOR) != 0)) {
-		/* Prepend the regular stack frame with copy on prev_execute_data
-		 * and passed arguments
+		/* Prepend the regular stack frame with a copy of prev_execute_data
+		 * and the passed arguments
 		 */
 		int args_count = zend_vm_stack_get_args_count_ex(EG(current_execute_data));
 		size_t args_size = ZEND_MM_ALIGNED_SIZE(sizeof(zval*)) * (args_count + 1);
@@ -1625,7 +1624,7 @@ static zend_always_inline zend_execute_data *i_create_execute_data_from_op_array
 		EX(prev_execute_data)->function_state.function = (zend_function*)op_array;
 		EX(prev_execute_data)->function_state.arguments = (void**)((char*)ZEND_VM_STACK_ELEMETS(EG(argument_stack)) + ZEND_MM_ALIGNED_SIZE(sizeof(zval*)) * args_count);
 
-		/* copy arguemnts */
+		/* copy arguments */
 		*EX(prev_execute_data)->function_state.arguments = (void*)(zend_uintptr_t)args_count;
 		if (args_count > 0) {
 			zval **arg_src = (zval**)zend_vm_stack_get_arg_ex(EG(current_execute_data), 1);
