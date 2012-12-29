@@ -245,9 +245,6 @@ typedef struct _zend_try_catch_element {
 #define ZEND_FNP_PROP_ISSETTER			3		/* Special purpose accessor: issetter */
 #define ZEND_FNP_PROP_UNSETTER			4		/* Special purpose accessor: unsetter */
 
-char *zend_visibility_string(zend_uint fn_flags);
-char *zend_fn_purpose_string(zend_uchar purpose);
-
 
 typedef struct _zend_property_info {
 	zend_uint flags;
@@ -701,6 +698,8 @@ const char *zend_get_accessor_name_from_function(const zend_function *func TSRML
 const char *zend_get_accessor_name_from_accessor_info(const zend_accessor_info *ai TSRMLS_DC);
 zend_accessor_info *zend_get_accessor_info_from_function(const zend_function *func TSRMLS_DC);
 zend_accessor_info *zend_get_accessor_from_init_static_method_call(zend_op_array *op_array, zend_op *opline, const char **context_name_out TSRMLS_DC);
+char *zend_visibility_string(zend_uint fn_flags);
+char *zend_fn_purpose_string(zend_function *function);
 
 
 ZEND_API void function_add_ref(zend_function *function);

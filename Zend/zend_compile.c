@@ -1855,7 +1855,7 @@ void zend_do_end_accessor_declaration(znode *function_token, znode *var_name, zn
 		efree(int_var_name);
 		CG(compiler_options) = original_compiler_options;
 	} else if(body != NULL && (CG(active_class_entry)->ce_flags & ZEND_ACC_INTERFACE) == ZEND_ACC_INTERFACE) {
-		zend_error(E_WARNING, "Interface %s::$%s %ster cannot have implementation defined, implementation ignored.", CG(active_class_entry)->name, Z_STRVAL(var_name->u.constant), zend_fn_purpose_string(CG(active_op_array)->purpose));
+		zend_error(E_WARNING, "Interface %s::$%s %ster cannot have implementation defined, implementation ignored.", CG(active_class_entry)->name, Z_STRVAL(var_name->u.constant), zend_fn_purpose_string(CG(active_op_array)));
 	}
 
 	zend_do_end_function_declaration(function_token TSRMLS_CC);
@@ -3425,15 +3425,15 @@ char *zend_visibility_string(zend_uint fn_flags) /* {{{ */
 }
 /* }}} */
 
-char *zend_fn_purpose_string(zend_uchar purpose) /* {{{ */
+char *zend_fn_purpose_string(zend_function *function) /* {{{ */
 {
-	if (purpose == ZEND_FNP_PROP_GETTER) {
+	if (function->common.purpose == ZEND_FNP_PROP_GETTER) {
 		return "get";
-	} else if (purpose == ZEND_FNP_PROP_SETTER) {
+	} else if (function->common.purpose == ZEND_FNP_PROP_SETTER) {
 		return "set";
-	} else if (purpose == ZEND_FNP_PROP_ISSETTER) {
+	} else if (function->common.purpose == ZEND_FNP_PROP_ISSETTER) {
 		return "isset";
-	} else if (purpose == ZEND_FNP_PROP_UNSETTER) {
+	} else if (function->common.purpose == ZEND_FNP_PROP_UNSETTER) {
 		return "unset";
 	}
 	return "access";
@@ -3758,7 +3758,7 @@ static void do_inheritance_check_on_method(zend_function *child, zend_function *
 
 	if (parent_flags & ZEND_ACC_FINAL) {
 		if (IS_ACCESSOR_FN(parent)) {
-			zend_error(E_COMPILE_ERROR, "Cannot override final property %ster %s::$%s", zend_fn_purpose_string(child->common.purpose), ZEND_FN_SCOPE_NAME(parent), ZEND_ACC_NAME(child));
+			zend_error(E_COMPILE_ERROR, "Cannot override final property %ster %s::$%s", zend_fn_purpose_string(child), ZEND_FN_SCOPE_NAME(parent), ZEND_ACC_NAME(child));
 		} else {
 			zend_error(E_COMPILE_ERROR, "Cannot override final method %s::%s()", ZEND_FN_SCOPE_NAME(parent), child->common.function_name);
 		}
@@ -3795,7 +3795,7 @@ static void do_inheritance_check_on_method(zend_function *child, zend_function *
 		 */
 		if ((child_flags & ZEND_ACC_PPP_MASK) > (parent_flags & ZEND_ACC_PPP_MASK)) {
 			if (IS_ACCESSOR_FN(child)) {
-				zend_error(E_COMPILE_ERROR, "Access level to %ster %s::$%s must be %s (as in class %s)%s", zend_fn_purpose_string(child->common.purpose), ZEND_FN_SCOPE_NAME(child), ZEND_ACC_NAME(child), zend_visibility_string(parent_flags), ZEND_FN_SCOPE_NAME(parent), (parent_flags&ZEND_ACC_PUBLIC) ? "" : " or weaker");
+				zend_error(E_COMPILE_ERROR, "Access level to %ster %s::$%s must be %s (as in class %s)%s", zend_fn_purpose_string(child), ZEND_FN_SCOPE_NAME(child), ZEND_ACC_NAME(child), zend_visibility_string(parent_flags), ZEND_FN_SCOPE_NAME(parent), (parent_flags&ZEND_ACC_PUBLIC) ? "" : " or weaker");
 			} else {
 				zend_error(E_COMPILE_ERROR, "Access level to %s::%s() must be %s (as in class %s)%s", ZEND_FN_SCOPE_NAME(child), child->common.function_name, zend_visibility_string(parent_flags), ZEND_FN_SCOPE_NAME(parent), (parent_flags&ZEND_ACC_PUBLIC) ? "" : " or weaker");
 			}

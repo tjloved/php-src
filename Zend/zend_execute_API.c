@@ -1615,7 +1615,7 @@ zend_class_entry *zend_fetch_class_by_name(const char *class_name, uint class_na
 	ai.afn[idx] && ai.afn[idx + 1] ? ", " : (ai.afn[idx] && ai.afn_cnt > MAX_ABSTRACT_INFO_CNT ? ", ..." : "")
 
 #define DISPLAY_ABS_ACCESSOR_FN(idx) \
-	ai.abs_acc[idx] ? zend_fn_purpose_string(ai.abs_acc[idx]->common.purpose) : "", \
+	ai.abs_acc[idx] ? zend_fn_purpose_string(ai.abs_acc[idx]) : "", \
 	ai.abs_acc[idx] ? " " : "", \
 	ai.abs_acc[idx] ? ZEND_FN_SCOPE_NAME(ai.abs_acc[idx]) : "", \
 	ai.abs_acc[idx] ? "::$" : "", \
