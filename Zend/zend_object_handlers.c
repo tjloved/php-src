@@ -1109,7 +1109,7 @@ static union _zend_function *zend_std_get_method(zval **object_ptr, char *method
 			if (zobj->ce->__call) {
 				fbc = zend_get_user_call_function(zobj->ce, method_name, method_len);
 			} else {
-				if(IS_ACCESSOR(fbc->op_array.purpose)) {
+				if(IS_ACCESSOR_FN(fbc)) {
 					zend_error_noreturn(E_ERROR, "Cannot %s %s property %s::$%s from context '%s'", zend_fn_purpose_string(fbc->op_array.purpose), zend_visibility_string(fbc->common.fn_flags), ZEND_FN_SCOPE_NAME(fbc), ZEND_ACC_NAME(fbc), EG(scope) ? EG(scope)->name : "");
 				} else {
 					zend_error_noreturn(E_ERROR, "Call to %s method %s::%s() from context '%s'", zend_visibility_string(fbc->common.fn_flags), ZEND_FN_SCOPE_NAME(fbc), method_name, EG(scope) ? EG(scope)->name : "");
@@ -1139,7 +1139,7 @@ static union _zend_function *zend_std_get_method(zval **object_ptr, char *method
 				if (zobj->ce->__call) {
 					fbc = zend_get_user_call_function(zobj->ce, method_name, method_len);
 				} else {
-					if(IS_ACCESSOR(fbc->op_array.purpose)) {
+					if(IS_ACCESSOR_FN(fbc)) {
 						zend_error_noreturn(E_ERROR, "Cannot %s %s property %s::$%s from context '%s'", zend_fn_purpose_string(fbc->common.purpose), zend_visibility_string(fbc->common.fn_flags), ZEND_FN_SCOPE_NAME(fbc), ZEND_ACC_NAME(fbc), EG(scope) ? EG(scope)->name : "");
 					} else {
 						zend_error_noreturn(E_ERROR, "Call to %s method %s::%s() from context '%s'", zend_visibility_string(fbc->common.fn_flags), ZEND_FN_SCOPE_NAME(fbc), method_name, EG(scope) ? EG(scope)->name : "");
@@ -1284,7 +1284,7 @@ ZEND_API zend_function *zend_std_get_static_method(zend_class_entry *ce, const c
 			if (ce->__callstatic) {
 				fbc = zend_get_user_callstatic_function(ce, function_name_strval, function_name_strlen);
 			} else {
-				if(IS_ACCESSOR(fbc->op_array.purpose)) {
+				if(IS_ACCESSOR_FN(fbc)) {
 					zend_error_noreturn(E_ERROR, "Cannot %s %s property %s::$%s from context '%s'", zend_fn_purpose_string(fbc->common.purpose), zend_visibility_string(fbc->common.fn_flags), ZEND_FN_SCOPE_NAME(fbc), ZEND_ACC_NAME(fbc), EG(scope) ? EG(scope)->name : "");
 				} else {
 					zend_error_noreturn(E_ERROR, "Call to %s method %s::%s() from context '%s'", zend_visibility_string(fbc->common.fn_flags), ZEND_FN_SCOPE_NAME(fbc), function_name_strval, EG(scope) ? EG(scope)->name : "");
@@ -1298,7 +1298,7 @@ ZEND_API zend_function *zend_std_get_static_method(zend_class_entry *ce, const c
 			if (ce->__callstatic) {
 				fbc = zend_get_user_callstatic_function(ce, function_name_strval, function_name_strlen);
 			} else {
-				if(IS_ACCESSOR(fbc->op_array.purpose)) {
+				if(IS_ACCESSOR_FN(fbc)) {
 					zend_error_noreturn(E_ERROR, "Cannot %s %s property %s::$%s from context '%s'", zend_fn_purpose_string(fbc->common.purpose), zend_visibility_string(fbc->common.fn_flags), ZEND_FN_SCOPE_NAME(fbc), ZEND_ACC_NAME(fbc), EG(scope) ? EG(scope)->name : "");
 				} else {
 					zend_error_noreturn(E_ERROR, "Call to %s method %s::%s() from context '%s'", zend_visibility_string(fbc->common.fn_flags), ZEND_FN_SCOPE_NAME(fbc), function_name_strval, EG(scope) ? EG(scope)->name : "");

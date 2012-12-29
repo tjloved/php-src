@@ -3757,7 +3757,7 @@ static void do_inheritance_check_on_method(zend_function *child, zend_function *
 	}
 
 	if (parent_flags & ZEND_ACC_FINAL) {
-		if (IS_ACCESSOR(parent->common.purpose)) {
+		if (IS_ACCESSOR_FN(parent)) {
 			zend_error(E_COMPILE_ERROR, "Cannot override final property %ster %s::$%s", zend_fn_purpose_string(child->common.purpose), ZEND_FN_SCOPE_NAME(parent), ZEND_ACC_NAME(child));
 		} else {
 			zend_error(E_COMPILE_ERROR, "Cannot override final method %s::%s()", ZEND_FN_SCOPE_NAME(parent), child->common.function_name);
@@ -3769,13 +3769,13 @@ static void do_inheritance_check_on_method(zend_function *child, zend_function *
 	 */
 	if ((child_flags & ZEND_ACC_STATIC) != (parent_flags & ZEND_ACC_STATIC)) {
 		if (child->common.fn_flags & ZEND_ACC_STATIC) {
-			if(IS_ACCESSOR(child->common.purpose)) {
+			if(IS_ACCESSOR_FN(child)) {
 				zend_error(E_COMPILE_ERROR, "Cannot make non static accessor %s::$%s static in class %s", ZEND_FN_SCOPE_NAME(parent), ZEND_ACC_NAME(child), ZEND_FN_SCOPE_NAME(child));
 			} else {
 				zend_error(E_COMPILE_ERROR, "Cannot make non static method %s::%s() static in class %s", ZEND_FN_SCOPE_NAME(parent), child->common.function_name, ZEND_FN_SCOPE_NAME(child));
 			}
 		} else {
-			if(IS_ACCESSOR(child->common.purpose)) {
+			if(IS_ACCESSOR_FN(child)) {
 				zend_error(E_COMPILE_ERROR, "Cannot make static accessor %s::$%s non static in class %s", ZEND_FN_SCOPE_NAME(parent), ZEND_ACC_NAME(child), ZEND_FN_SCOPE_NAME(child));
 			} else {
 				zend_error(E_COMPILE_ERROR, "Cannot make static method %s::%s() non static in class %s", ZEND_FN_SCOPE_NAME(parent), child->common.function_name, ZEND_FN_SCOPE_NAME(child));
@@ -3794,7 +3794,7 @@ static void do_inheritance_check_on_method(zend_function *child, zend_function *
 		/* Prevent derived classes from restricting access that was available in parent classes
 		 */
 		if ((child_flags & ZEND_ACC_PPP_MASK) > (parent_flags & ZEND_ACC_PPP_MASK)) {
-			if (IS_ACCESSOR(child->common.purpose)) {
+			if (IS_ACCESSOR_FN(child)) {
 				zend_error(E_COMPILE_ERROR, "Access level to %ster %s::$%s must be %s (as in class %s)%s", zend_fn_purpose_string(child->common.purpose), ZEND_FN_SCOPE_NAME(child), ZEND_ACC_NAME(child), zend_visibility_string(parent_flags), ZEND_FN_SCOPE_NAME(parent), (parent_flags&ZEND_ACC_PUBLIC) ? "" : " or weaker");
 			} else {
 				zend_error(E_COMPILE_ERROR, "Access level to %s::%s() must be %s (as in class %s)%s", ZEND_FN_SCOPE_NAME(child), child->common.function_name, zend_visibility_string(parent_flags), ZEND_FN_SCOPE_NAME(parent), (parent_flags&ZEND_ACC_PUBLIC) ? "" : " or weaker");
@@ -3969,7 +3969,7 @@ static inline void zend_do_update_accessors(zend_class_entry *ce TSRMLS_DC) /* {
 	for (zend_hash_internal_pointer_reset(&ce->function_table);
 	zend_hash_get_current_data(&ce->function_table, (void *) &func) == SUCCESS;
 	zend_hash_move_forward(&ce->function_table)) {
-		if (IS_ACCESSOR(func->common.purpose)) {
+		if (IS_ACCESSOR_FN(func)) {
 			const char *varname = ZEND_ACC_NAME(func);
 			ulong hash_value = zend_hash_func(varname, strlen(varname)+1);
 
@@ -7638,7 +7638,7 @@ void zend_do_end_compilation(TSRMLS_D) /* {{{ */
 
 const char *zend_get_accessor_name_from_function(const zend_function *func TSRMLS_DC) /* {{{ */
 {
-	if(!func || !IS_ACCESSOR(func->common.purpose))
+	if(!func || !IS_ACCESSOR_FN(func))
 		return "Not an accessor";
 
 	switch(func->common.purpose) {
@@ -7682,7 +7682,7 @@ zend_accessor_info *zend_get_accessor_info_from_function(const zend_function *fu
 
 	zend_accessor_info		**aipp;
 
-	if(!func || !IS_ACCESSOR(func->common.purpose))
+	if(!func || !IS_ACCESSOR_FN(func))
 		return NULL;
 
 	switch(func->common.purpose) {

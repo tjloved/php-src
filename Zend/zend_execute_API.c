@@ -1635,7 +1635,7 @@ typedef struct _zend_abstract_info {
 static int zend_verify_abstract_class_function(zend_function *fn, zend_abstract_info *ai TSRMLS_DC) /* {{{ */
 {
 	if (fn->common.fn_flags & ZEND_ACC_ABSTRACT) {
-		if(IS_ACCESSOR(fn->common.purpose)) {
+		if(IS_ACCESSOR_FN(fn)) {
 			if (ai->abs_acc_count < MAX_ABSTRACT_INFO_CNT) {
 				ai->abs_acc[ai->abs_acc_count] = fn;
 			}
