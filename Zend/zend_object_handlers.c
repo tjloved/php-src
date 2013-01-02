@@ -445,8 +445,10 @@ zval *zend_std_read_property(zval *object, zval *member, int type, const zend_li
 				guard->in_get = 1;
 				zend_call_method_with_0_params(&object, zobj->ce, &getter, getter->common.function_name, &rv);
 				guard->in_get = 0;
-				if(rv) {
+				if (rv) {
 					Z_DELREF_P(rv);
+				} else {
+					rv = &EG(uninitialized_zval_ptr);
 				}
 				return rv;
 			}

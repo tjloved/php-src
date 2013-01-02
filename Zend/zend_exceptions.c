@@ -502,9 +502,18 @@ static int _build_trace_string(zval **frame TSRMLS_DC, int num_args, va_list arg
 	} else {
 		TRACE_APPEND_STR("[internal function]: ");
 	}
+
 	TRACE_APPEND_KEY("class");
 	TRACE_APPEND_KEY("type");
-	TRACE_APPEND_KEY("function");
+
+	if (zend_hash_exists(ht, "property", sizeof("property"))) {
+		TRACE_APPEND_KEY("property");
+		TRACE_APPEND_STR("->");
+		TRACE_APPEND_KEY("accessor");
+	} else {
+		TRACE_APPEND_KEY("function");
+	}
+
 	TRACE_APPEND_CHR('(');
 	if (zend_hash_find(ht, "args", sizeof("args"), (void**)&tmp) == SUCCESS) {
 		if (Z_TYPE_PP(tmp) == IS_ARRAY) {

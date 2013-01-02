@@ -2194,6 +2194,7 @@ ZEND_FUNCTION(debug_print_backtrace)
 ZEND_API void zend_fetch_debug_backtrace(zval *return_value, int skip_last, int options, int limit TSRMLS_DC)
 {
 	zend_execute_data *ptr, *skip;
+	zend_function *fbc;
 	int lineno, frameno = 0;
 	const char *function_name;
 	const char *filename;
@@ -2260,14 +2261,26 @@ ZEND_API void zend_fetch_debug_backtrace(zval *return_value, int skip_last, int 
 			filename = NULL;
 		}
 
-		function_name = ptr->function_state.function->common.function_name;
+		fbc = ptr->function_state.function;
+		function_name = fbc->common.function_name;
 
 		if (function_name) {
-			add_assoc_string_ex(stack_frame, "function", sizeof("function"), (char*)function_name, 1);
+			if (IS_ACCESSOR_FN(fbc)) {
+				add_assoc_string_ex(
+					stack_frame, "property", sizeof("property"),
+					zend_get_accessor_name_from_function(fbc TSRMLS_CC), 1
+				);
+				add_assoc_string_ex(
+					stack_frame, "accessor", sizeof("accessor"),
+					zend_fn_purpose_string(fbc), 1
+				);
+			} else {
+				add_assoc_string_ex(stack_frame, "function", sizeof("function"), (char*)function_name, 1);
+			}
 
 			if (ptr->object && Z_TYPE_P(ptr->object) == IS_OBJECT) {
-				if (ptr->function_state.function->common.scope) {
-					add_assoc_string_ex(stack_frame, "class", sizeof("class"), (char*)ptr->function_state.function->common.scope->name, 1);
+				if (fbc->common.scope) {
+					add_assoc_string_ex(stack_frame, "class", sizeof("class"), (char*) fbc->common.scope->name, 1);
 				} else {
 					zend_uint class_name_len;
 					int dup;
@@ -2282,8 +2295,8 @@ ZEND_API void zend_fetch_debug_backtrace(zval *return_value, int skip_last, int 
 				}
 
 				add_assoc_string_ex(stack_frame, "type", sizeof("type"), "->", 1);
-			} else if (ptr->function_state.function->common.scope) {
-				add_assoc_string_ex(stack_frame, "class", sizeof("class"), (char*)ptr->function_state.function->common.scope->name, 1);
+			} else if (fbc->common.scope) {
+				add_assoc_string_ex(stack_frame, "class", sizeof("class"), (char*)fbc->common.scope->name, 1);
 				add_assoc_string_ex(stack_frame, "type", sizeof("type"), "::", 1);
 			}
 
