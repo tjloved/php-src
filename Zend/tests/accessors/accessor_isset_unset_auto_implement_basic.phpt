@@ -31,6 +31,7 @@ $o->b: 3600
 Getting $b
 is_null($o->b): 0
 Getting $b
+Getting $b
 isset($o->b): 1
 Unsetting $o->b
 Setting $b

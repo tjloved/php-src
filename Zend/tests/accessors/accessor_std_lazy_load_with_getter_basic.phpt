@@ -11,10 +11,11 @@ class TimePeriod {
 	public $Hours {
 		get {
 			echo "Get Hours Called\n";
-			return $this->Hours = 1;	/* Calls Setter */
+			return $this->Hours ?: $this->Hours = 2;		/* Calls Setter */
 		}
 		set {
-			$this->Hours = 1;			/* Sets an anonymous property due to guard allowing lazy load */ 
+			echo "Set Hours Called ({$value})\n";
+			$this->Hours = $value; 
 		}
 	}
 }
@@ -24,8 +25,16 @@ $o = new TimePeriod();
 echo $o->Hours."\n";
 echo $o->Hours."\n";
 $o->Hours = 4;
+echo $o->Hours."\n";
+echo "Done\n";
 ?>
 --EXPECTF--
 Get Hours Called
-1
-1
+Set Hours Called (2)
+2
+Get Hours Called
+2
+Set Hours Called (4)
+Get Hours Called
+4
+Done

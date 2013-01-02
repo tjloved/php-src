@@ -13,4 +13,4 @@ $o = new AccessorTest();
 $o->b = 10;
 ?>
 --EXPECTF--
-Fatal error: Cannot set property AccessorTest::$b, no setter defined. in %s on line %d
+Warning: Cannot set property AccessorTest::$b, no setter defined in %s on line %d

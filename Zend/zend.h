@@ -480,7 +480,6 @@ struct _zend_class_entry {
 
 	HashTable function_table;
 	HashTable properties_info;
-	HashTable accessors;
 
 	zval **default_properties_table;
 	zval **default_static_members_table;

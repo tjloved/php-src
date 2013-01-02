@@ -15,4 +15,6 @@ echo "\$o->b: ".$o->b."\n";
 echo "Done\n";
 ?>
 --EXPECTF--
-Fatal error: Cannot get property AccessorTest::$b, no getter defined. in %s on line %d
+Warning: Cannot get property AccessorTest::$b, no getter defined in %s on line %d
+$o->b: 
+Done

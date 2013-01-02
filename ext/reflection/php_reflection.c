@@ -188,12 +188,6 @@ typedef struct _property_reference {
 	zend_property_info prop;
 } property_reference;
 
-/* Struct for properties */
-typedef struct _property_accessor_reference {
-	zend_class_entry *ce;
-	zend_accessor_info ai;
-} property_accessor_reference;
-
 /* Struct for parameters */
 typedef struct _parameter_reference {
 	zend_uint offset;
@@ -1419,22 +1413,15 @@ static void reflection_property_factory(zend_class_entry *ce, zend_property_info
 /* }}} */
 
 /* {{{ reflection_property_accessor_factory */
-static void reflection_property_accessor_factory(zend_class_entry *ce, zend_accessor_info *ai, zval *object TSRMLS_DC)
+static void reflection_property_accessor_factory(zend_class_entry *ce, zend_property_info *property_info, zval *object TSRMLS_DC)
 {
 	reflection_object *intern;
 	zval *name;
 	zval *classname;
-	property_accessor_reference *reference;
-	const char *prop_name = NULL;
+	property_reference *reference;
+	const char *class_name, *prop_name;
 
-	zend_function *func;
-
-	if(ai->getter) {
-		func = ai->getter;
-	} else {
-		func = ai->setter;
-	}
-	prop_name = ZEND_ACC_NAME(func);
+	zend_unmangle_property_name(property_info->name, property_info->name_length, &class_name, &prop_name);
 
 	MAKE_STD_ZVAL(name);
 	MAKE_STD_ZVAL(classname);
@@ -1443,9 +1430,9 @@ static void reflection_property_accessor_factory(zend_class_entry *ce, zend_acce
 
 	reflection_instantiate(reflection_property_accessor_ptr, object TSRMLS_CC);
 	intern = (reflection_object *) zend_object_store_get_object(object TSRMLS_CC);
-	reference = (property_accessor_reference*) emalloc(sizeof(property_accessor_reference));
+	reference = (property_reference*) emalloc(sizeof(property_reference));
 	reference->ce = ce;
-	reference->ai = *ai;
+	reference->prop = *property_info;
 	intern->ptr = reference;
 	intern->ref_type = REF_TYPE_PROPERTY_ACCESSOR;
 	intern->ce = ce;
@@ -4014,7 +4001,10 @@ static int _addproperty(zend_property_info *pptr TSRMLS_DC, int num_args, va_lis
 
 	if (pptr->flags	& filter) {
 		ALLOC_ZVAL(property);
-		reflection_property_factory(ce, pptr, property TSRMLS_CC);
+		if(pptr->ai != NULL)
+			reflection_property_accessor_factory(ce, pptr, property TSRMLS_CC);
+		else
+			reflection_property_factory(ce, pptr, property TSRMLS_CC);
 		add_next_index_zval(retval, property);
 	}
 	return 0;
@@ -4050,52 +4040,6 @@ static int _adddynproperty(zval **pptr TSRMLS_DC, int num_args, va_list args, ze
 }
 /* }}} */
 
-/* {{{ _addaccessors */
-static int _addaccessors(zend_accessor_info **pptr TSRMLS_DC, int num_args, va_list args, zend_hash_key *hash_key)
-{
-
-	/* If there is not already a property for the given name */
-
-	zend_class_entry *ce = *va_arg(args, zend_class_entry**);
-	zval *retval = va_arg(args, zval*);
-	zend_accessor_info *ai = *pptr;
-	zend_function *func = NULL;
-
-	if(ai->getter) {
-		func = ai->getter;
-	} else {
-		func = ai->setter;
-	}
-
-	if(func) {
-		HashPosition pos;
-		const char *name = ZEND_ACC_NAME(func);
-		zval member;
-		zval **entry, *result;
-		zval *property;
-
-		ZVAL_STRINGL(&member, "name", 4, 0);
-
-		/* Search existing values to ensure we don't already have a property defined by name */
-		zend_hash_internal_pointer_reset_ex(Z_ARRVAL_P(retval), &pos);
-		while (zend_hash_get_current_data_ex(Z_ARRVAL_P(retval), (void **)&entry, &pos) == SUCCESS) {
-			result = zend_std_read_property(*entry, &member, 0, (const zend_literal *)NULL TSRMLS_CC );
-			if(result != NULL && result->type == IS_STRING && strncmp(Z_STRVAL_P(result), name, strlen(name)) == 0)
-				return 0;	/* Already have property named name defined */
-
-			zend_hash_move_forward_ex(Z_ARRVAL_P(retval), &pos);
-		}
-
-		MAKE_STD_ZVAL(property);
-		reflection_property_accessor_factory(ce, ai, property TSRMLS_CC);
-
-		add_next_index_zval(retval, property);
-	}
-
-	return 0;
-}
-/* }}} */
-
 /* {{{ proto public ReflectionProperty[] ReflectionClass::getProperties([long $filter])
    Returns an array of this class' properties */
 ZEND_METHOD(reflection_class, getProperties)
@@ -4124,8 +4068,6 @@ ZEND_METHOD(reflection_class, getProperties)
 		HashTable *properties = Z_OBJ_HT_P(intern->obj)->get_properties(intern->obj TSRMLS_CC);
 		zend_hash_apply_with_arguments(properties TSRMLS_CC, (apply_func_args_t) _adddynproperty, 2, &ce, return_value);
 	}
-
-	zend_hash_apply_with_arguments(&ce->accessors TSRMLS_CC, (apply_func_args_t) _addaccessors, 2, &ce, return_value);
 }
 /* }}} */
 
@@ -5303,9 +5245,8 @@ ZEND_METHOD(reflection_property_accessor, __construct)
 	reflection_object *intern;
 	zend_class_entry **pce;
 	zend_class_entry *ce;
-	zend_accessor_info *ai = NULL, **aipp;
-	property_accessor_reference *reference;
-	zend_function *func = NULL;
+	zend_property_info *property_info = NULL;
+	property_reference *reference;
 
 	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "zs", &classname, &name_str, &name_len) == FAILURE) {
 		return;
@@ -5337,30 +5278,26 @@ ZEND_METHOD(reflection_property_accessor, __construct)
 			/* returns out of this function */
 	}
 
-	if (zend_hash_find(&ce->accessors, name_str, name_len + 1, (void **) &aipp) == FAILURE) {
+	if(zend_hash_find(&ce->properties_info, name_str, name_len+1, (void **) &property_info)==SUCCESS && property_info->ai != NULL) {
+		MAKE_STD_ZVAL(classname);
+		MAKE_STD_ZVAL(propname);
+
+		ZVAL_STRINGL(classname, ce->name, ce->name_length, 1);
+		ZVAL_STRINGL(propname, property_info->name, property_info->name_length, 1);
+
+		reflection_update_property(object, "class", classname);
+		reflection_update_property(object, "name", propname);
+
+		reference = (property_reference*) emalloc(sizeof(property_reference));
+		reference->prop = *property_info;
+		reference->ce = ce;
+		intern->ptr = reference;
+		intern->ref_type = REF_TYPE_PROPERTY_ACCESSOR;
+		intern->ce = ce;
+		intern->ignore_visibility = 0;
+	} else {
 		zend_throw_exception_ex(reflection_exception_ptr, 0 TSRMLS_CC, "Accessor %s::$%s does not exist", ce->name, name_str);
-		return;
 	}
-	ai = *aipp;
-
-	MAKE_STD_ZVAL(classname);
-	MAKE_STD_ZVAL(propname);
-
-	func = ai->getter ? ai->getter : ai->setter;
-
-	ZVAL_STRINGL(classname, func->common.scope->name, func->common.scope->name_length, 1);
-	ZVAL_STRING(propname, ZEND_ACC_NAME(func), 1);
-
-	reflection_update_property(object, "class", classname);
-	reflection_update_property(object, "name", propname);
-
-	reference = (property_accessor_reference*) emalloc(sizeof(property_accessor_reference));
-	reference->ai = *ai;
-	reference->ce = ce;
-	intern->ptr = reference;
-	intern->ref_type = REF_TYPE_PROPERTY_ACCESSOR;
-	intern->ce = ce;
-	intern->ignore_visibility = 0;
 }
 /* }}} */
 
@@ -5369,13 +5306,13 @@ ZEND_METHOD(reflection_property_accessor, __construct)
 ZEND_METHOD(reflection_property_accessor, getGetter)
 {
 	reflection_object *intern;
-	property_accessor_reference *ref;
+	property_reference *ref;
 
 	METHOD_NOTSTATIC(reflection_property_accessor_ptr);
 	GET_REFLECTION_OBJECT_PTR(ref);
 
-	if(ref->ai.getter) {
-		reflection_method_factory(ref->ce, ref->ai.getter, NULL, return_value TSRMLS_CC);
+	if(ref->prop.ai->getter) {
+		reflection_method_factory(ref->ce, ref->prop.ai->getter, NULL, return_value TSRMLS_CC);
 		return;
 	}
 	RETURN_FALSE
@@ -5387,13 +5324,13 @@ ZEND_METHOD(reflection_property_accessor, getGetter)
 ZEND_METHOD(reflection_property_accessor, getSetter)
 {
 	reflection_object *intern;
-	property_accessor_reference *ref;
+	property_reference *ref;
 
 	METHOD_NOTSTATIC(reflection_property_accessor_ptr);
 	GET_REFLECTION_OBJECT_PTR(ref);
 
-	if(ref->ai.setter) {
-		reflection_method_factory(ref->ce, ref->ai.setter, NULL, return_value TSRMLS_CC);
+	if(ref->prop.ai->setter) {
+		reflection_method_factory(ref->ce, ref->prop.ai->setter, NULL, return_value TSRMLS_CC);
 		return;
 	}
 	RETURN_FALSE
@@ -5403,13 +5340,13 @@ ZEND_METHOD(reflection_property_accessor, getSetter)
 static void _property_accessor_check_flag(INTERNAL_FUNCTION_PARAMETERS, int mask) /* {{{ */
 {
 	reflection_object *intern;
-	property_accessor_reference *ref;
+	property_reference *ref;
 
 	if (zend_parse_parameters_none() == FAILURE) {
 		return;
 	}
 	GET_REFLECTION_OBJECT_PTR(ref);
-	RETURN_BOOL(ref->ai.flags & mask);
+	RETURN_BOOL(ref->prop.ai->flags & mask);
 }
 /* }}} */
 
@@ -5458,14 +5395,14 @@ ZEND_METHOD(reflection_property_accessor, isDefault)
 ZEND_METHOD(reflection_property_accessor, getModifiers)
 {
 	reflection_object *intern;
-	property_accessor_reference *ref;
+	property_reference *ref;
 
 	if (zend_parse_parameters_none() == FAILURE) {
 		return;
 	}
 	GET_REFLECTION_OBJECT_PTR(ref);
 
-	RETURN_LONG(ref->ai.flags);
+	RETURN_LONG(ref->prop.ai->flags);
 }
 /* }}} */
 
@@ -5474,17 +5411,17 @@ ZEND_METHOD(reflection_property_accessor, getModifiers)
 ZEND_METHOD(reflection_property_accessor, getDeclaringClass)
 {
 	reflection_object *intern;
-	property_accessor_reference *ref;
+	property_reference *ref;
 
 	if (zend_parse_parameters_none() == FAILURE) {
 		return;
 	}
 	GET_REFLECTION_OBJECT_PTR(ref);
 
-	if(ref->ai.getter) {
-		zend_reflection_class_factory(ref->ai.getter->common.scope, return_value TSRMLS_CC);
-	} else if(ref->ai.setter) {
-		zend_reflection_class_factory(ref->ai.setter->common.scope, return_value TSRMLS_CC);
+	if(ref->prop.ai->getter) {
+		zend_reflection_class_factory(ref->prop.ai->getter->common.scope, return_value TSRMLS_CC);
+	} else if(ref->prop.ai->setter) {
+		zend_reflection_class_factory(ref->prop.ai->setter->common.scope, return_value TSRMLS_CC);
 	} else {
 		RETURN_FALSE;
 	}
@@ -5497,15 +5434,15 @@ ZEND_METHOD(reflection_property_accessor, getDeclaringClass)
 ZEND_METHOD(reflection_property_accessor, getDocComment)
 {
 	reflection_object *intern;
-	property_accessor_reference *ref;
+	property_reference *ref;
 
 	if (zend_parse_parameters_none() == FAILURE) {
 		return;
 	}
 	GET_REFLECTION_OBJECT_PTR(ref);
 
-	if(ref->ai.doc_comment) {
-		RETURN_STRINGL(ref->ai.doc_comment, ref->ai.doc_comment_len, 1);
+	if(ref->prop.doc_comment) {
+		RETURN_STRINGL(ref->prop.doc_comment, ref->prop.doc_comment_len, 1);
 	}
 	RETURN_FALSE;
 }
@@ -5537,21 +5474,21 @@ ZEND_METHOD(reflection_property_accessor, setAccessible)
 ZEND_METHOD(reflection_property_accessor, getValue)
 {
 	reflection_object *intern;
-	property_accessor_reference *ref;
+	property_reference *ref;
 	zval *object, name;
 	zval *retval = NULL;
 
 	METHOD_NOTSTATIC(reflection_property_accessor_ptr);
 	GET_REFLECTION_OBJECT_PTR(ref);
 
-	if(!ref->ai.getter) {
+	if(!ref->prop.ai->getter) {
 		_default_get_entry(getThis(), "name", sizeof("name"), &name TSRMLS_CC);
 		zend_throw_exception_ex(reflection_exception_ptr, 0 TSRMLS_CC, "No getter defined for property accessor %s::%s", intern->ce->name, Z_STRVAL(name));
 		zval_dtor(&name);
 		return;
 	}
 
-	if (!(ref->ai.getter->common.fn_flags & (ZEND_ACC_PUBLIC | ZEND_ACC_IMPLICIT_PUBLIC)) && intern->ignore_visibility == 0) {
+	if (!(ref->prop.ai->getter->common.fn_flags & (ZEND_ACC_PUBLIC | ZEND_ACC_IMPLICIT_PUBLIC)) && intern->ignore_visibility == 0) {
 		_default_get_entry(getThis(), "name", sizeof("name"), &name TSRMLS_CC);
 		zend_throw_exception_ex(reflection_exception_ptr, 0 TSRMLS_CC,
 			"Cannot access non-public getter %s::%s", intern->ce->name, Z_STRVAL(name));
@@ -5563,7 +5500,7 @@ ZEND_METHOD(reflection_property_accessor, getValue)
 		return;
 	}
 
-	zend_call_method_with_0_params(&object, ref->ai.getter->common.scope, &ref->ai.getter, ref->ai.getter->common.function_name, &retval);
+	zend_call_method_with_0_params(&object, ref->prop.ai->getter->common.scope, &ref->prop.ai->getter, ref->prop.ai->getter->common.function_name, &retval);
 	MAKE_COPY_ZVAL(&retval, return_value);
 	if (retval != EG(uninitialized_zval_ptr)) {
 		zval_ptr_dtor(&retval);
@@ -5576,7 +5513,7 @@ ZEND_METHOD(reflection_property_accessor, getValue)
 ZEND_METHOD(reflection_property_accessor, setValue)
 {
 	reflection_object *intern;
-	property_accessor_reference *ref;
+	property_reference *ref;
 	zval *object, name;
 	zval *value;
 	zval *retval = NULL;
@@ -5584,7 +5521,7 @@ ZEND_METHOD(reflection_property_accessor, setValue)
 	METHOD_NOTSTATIC(reflection_property_accessor_ptr);
 	GET_REFLECTION_OBJECT_PTR(ref);
 
-	if(!ref->ai.setter) {
+	if(!ref->prop.ai->setter) {
 		_default_get_entry(getThis(), "name", sizeof("name"), &name TSRMLS_CC);
 		zend_throw_exception_ex(reflection_exception_ptr, 0 TSRMLS_CC, "No setter defined for property accessor %s::%s", intern->ce->name, Z_STRVAL(name));
 		zval_dtor(&name);
@@ -5595,7 +5532,7 @@ ZEND_METHOD(reflection_property_accessor, setValue)
 		return;
 	}
 
-	zend_call_method_with_1_params(&object, ref->ai.setter->common.scope, &ref->ai.setter, ref->ai.setter->common.function_name, &retval, value);
+	zend_call_method_with_1_params(&object, ref->prop.ai->setter->common.scope, &ref->prop.ai->setter, ref->prop.ai->setter->common.function_name, &retval, value);
 
 	if (retval) {
 		zval_ptr_dtor(&retval);
@@ -5618,7 +5555,7 @@ ZEND_METHOD(reflection_property_accessor, getName)
 ZEND_METHOD(reflection_property_accessor, __toString)
 {
 	reflection_object *intern;
-	property_accessor_reference *ref;
+	property_reference *ref;
 	string str;
 
 	if (zend_parse_parameters_none() == FAILURE) {
@@ -5626,7 +5563,7 @@ ZEND_METHOD(reflection_property_accessor, __toString)
 	}
 	GET_REFLECTION_OBJECT_PTR(ref);
 	string_init(&str);
-	_property_accessor_string(&str, &ref->ai, "" TSRMLS_CC);
+	_property_accessor_string(&str, ref->prop.ai, "" TSRMLS_CC);
 	RETURN_STRINGL(str.string, str.len - 1, 0);
 }
 /* }}} */

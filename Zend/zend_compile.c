@@ -108,19 +108,31 @@ ZEND_API zend_executor_globals executor_globals;
 
 static void zend_duplicate_property_info(zend_property_info *property_info) /* {{{ */
 {
+	zend_accessor_info *parent_ai = property_info->ai;
+
 	if (!IS_INTERNED(property_info->name)) {
 		property_info->name = estrndup(property_info->name, property_info->name_length);
 	}
 	if (property_info->doc_comment) {
 		property_info->doc_comment = estrndup(property_info->doc_comment, property_info->doc_comment_len);
 	}
+	if(parent_ai) {
+		property_info->ai = ecalloc(1, sizeof(zend_accessor_info));
+		property_info->ai->flags = parent_ai->flags;
+	}
 }
 /* }}} */
 
 static void zend_duplicate_property_info_internal(zend_property_info *property_info) /* {{{ */
 {
+	zend_accessor_info *parent_ai = property_info->ai;
+
 	if (!IS_INTERNED(property_info->name)) {
 		property_info->name = zend_strndup(property_info->name, property_info->name_length);
+	}
+	if(parent_ai) {
+		property_info->ai = ecalloc(1, sizeof(zend_accessor_info));
+		property_info->ai->flags = parent_ai->flags;
 	}
 }
 /* }}} */
@@ -130,6 +142,10 @@ static void zend_destroy_property_info(zend_property_info *property_info) /* {{{
 	str_efree(property_info->name);
 	if (property_info->doc_comment) {
 		efree((char*)property_info->doc_comment);
+	}
+	if(property_info->ai) {
+		efree(property_info->ai);
+		property_info->ai = NULL;
 	}
 }
 /* }}} */
@@ -730,14 +746,14 @@ void zend_do_fetch_static_member(znode *result, znode *class_name TSRMLS_DC) /* 
 		zend_do_fetch_class(&class_node, class_name TSRMLS_CC);
 	}
 
-	if(result->op_type == IS_CV) {
-		/* Handle self::$Area accessors (normal and static) */
+/*	if(result->op_type == IS_CV) {
+		 Handle self::$Area accessors (normal and static)
 		if(class_node.op_type == IS_VAR && class_node.EA == ZEND_FETCH_CLASS_SELF && CG(active_class_entry)) {
 
 			const char *member_name = CG(active_op_array)->vars[result->u.op.var].name;
 			zend_accessor_info **aipp;
 
-			/* If the member_name is an accessor */
+			 If the member_name is an accessor
 			if(zend_hash_find((const HashTable *)&CG(active_class_entry)->accessors, member_name, strlen(member_name)+1, (void**)&aipp) == SUCCESS) {
 				znode zn_self, zn_func, zn_arg_list;
 				size_t member_name_len = strlen(member_name);
@@ -750,20 +766,20 @@ void zend_do_fetch_static_member(znode *result, znode *class_name TSRMLS_DC) /* 
 				MAKE_ZNODEL(zn_func, fname, 5 + member_name_len);
 				efree(fname);
 
-				/* We assume we will be used as a getter, if zend_do_assign() is called, it will backpatch as calling a setter */
+				 We assume we will be used as a getter, if zend_do_assign() is called, it will backpatch as calling a setter
 				zend_do_begin_class_member_function_call(&zn_self, &zn_func TSRMLS_CC);
 				zend_do_end_function_call(&zn_func, result, &zn_arg_list, 1, 0 TSRMLS_CC);
 				zend_do_extended_fcall_end(TSRMLS_C);
 				return;
 			}
 		}
-		/* Handle parent::$Area accessors (normal and static) */
+		 Handle parent::$Area accessors (normal and static)
 		if(class_node.op_type == IS_VAR && class_node.EA == ZEND_FETCH_CLASS_PARENT && CG(active_class_entry) && CG(active_class_entry)->parent) {
 
 			const char *member_name = CG(active_op_array)->vars[result->u.op.var].name;
 			zend_accessor_info **aipp;
 
-			/* If the member_name is an accessor */
+			 If the member_name is an accessor
 			if(zend_hash_find((const HashTable *)&CG(active_class_entry)->parent->accessors, member_name, strlen(member_name)+1, (void**)&aipp) == SUCCESS) {
 				znode zn_parent, zn_func, zn_arg_list;
 				size_t member_name_len = strlen(member_name);
@@ -776,14 +792,14 @@ void zend_do_fetch_static_member(znode *result, znode *class_name TSRMLS_DC) /* 
 				MAKE_ZNODEL(zn_func, fname, 5 + member_name_len);
 				efree(fname);
 
-				/* We assume we will be used as a getter, if zend_do_assign() is called, it will backpatch as calling a setter */
+				 We assume we will be used as a getter, if zend_do_assign() is called, it will backpatch as calling a setter
 				zend_do_begin_class_member_function_call(&zn_parent, &zn_func TSRMLS_CC);
 				zend_do_end_function_call(&zn_func, result, &zn_arg_list, 1, 0 TSRMLS_CC);
 				zend_do_extended_fcall_end(TSRMLS_C);
 				return;
 			}
 		}
-		/* Handle Shape::$Area static accessor */
+		 Handle Shape::$Area static accessor
 		if(class_node.op_type == IS_CONST) {
 			zend_class_entry	**classpp;
 			char 				*lcname = zend_str_tolower_dup(Z_STRVAL(class_node.u.constant), Z_STRLEN(class_node.u.constant));
@@ -811,7 +827,7 @@ void zend_do_fetch_static_member(znode *result, znode *class_name TSRMLS_DC) /* 
 					Z_STRVAL(zn_func.u.constant)[2] = 'g';
 					ZVAL_LONG(&zn_arg_list.u.constant, 0);
 
-					/* We assume we will be used as a getter, if zend_do_assign() is called, it will backpatch as calling a setter */
+					 We assume we will be used as a getter, if zend_do_assign() is called, it will backpatch as calling a setter
 					zend_do_begin_class_member_function_call(&zn_class, &zn_func TSRMLS_CC);
 					zend_do_end_function_call(&zn_func, result, &zn_arg_list, 1, 0 TSRMLS_CC);
 					zend_do_extended_fcall_end(TSRMLS_C);
@@ -821,7 +837,7 @@ void zend_do_fetch_static_member(znode *result, znode *class_name TSRMLS_DC) /* 
 			}
 			efree(lcname);
 		}
-	}
+	}*/
 
 
 	zend_stack_top(&CG(bp_stack), (void **) &fetch_list_ptr);
@@ -1654,110 +1670,114 @@ int zend_do_verify_access_types(const znode *current_access_type, const znode *n
 /* }}} */
 
 void zend_declare_accessor(znode *var_name TSRMLS_DC) { /* {{{ */
-	/* Generate Hash Value for Variable */
-	ulong hash_value = zend_hash_func(Z_STRVAL(var_name->u.constant), Z_STRLEN(var_name->u.constant)+1);
-	zend_accessor_info **aipp, *ai;
+	zend_property_info	*property_info;
+	char				*vn_copy = NULL;
+	zend_uint			orig_ce_flags = CG(active_class_entry)->ce_flags;
 
-	/* Locate or create accessor_info structure */
-	if(zend_hash_quick_find(&CG(active_class_entry)->accessors, Z_STRVAL(var_name->u.constant), Z_STRLEN(var_name->u.constant)+1, hash_value, (void**) &aipp) != SUCCESS) {
-		ai = ecalloc(1, sizeof(zend_accessor_info));
-		ai->flags = CG(access_type);
-		ai->doc_comment = CG(doc_comment);
-		ai->doc_comment_len = CG(doc_comment_len);
-		CG(doc_comment) = NULL;
-		CG(doc_comment_len) = 0;
-		zend_hash_quick_update(&CG(active_class_entry)->accessors, Z_STRVAL(var_name->u.constant), Z_STRLEN(var_name->u.constant)+1, hash_value, (void**)&ai, sizeof(zend_accessor_info*), NULL);
+	// Hide that we're working with an interface during property accessor declaration
+	CG(active_class_entry)->ce_flags &= ~ZEND_ACC_INTERFACE;
+
+	/* zend_do_declare_property free's the string, we still need it later on, so copy and put back in place */
+	vn_copy = (char *) estrndup(Z_STRVAL(var_name->u.constant), Z_STRLEN(var_name->u.constant));
+	zend_do_declare_property(var_name, NULL, CG(access_type) & ~(ZEND_ACC_FINAL) TSRMLS_CC);
+	Z_STRVAL(var_name->u.constant) = vn_copy;
+	CG(active_class_entry)->ce_flags = orig_ce_flags;
+
+	if(zend_hash_find(&CG(active_class_entry)->properties_info, Z_STRVAL(var_name->u.constant), Z_STRLEN(var_name->u.constant)+1, (void **) &property_info)==SUCCESS) {
+		if(property_info->ai != NULL) {
+			zend_error_noreturn(E_COMPILE_ERROR, "property_info for %s::$%s already has accessor_info created, should not happen in zend_declare_accessor()", CG(active_class_entry)->name, Z_STRVAL(var_name->u.constant));
+		}
+
+		property_info->ai = ecalloc(1, sizeof(zend_accessor_info));
+		property_info->ai->flags = CG(access_type);
+	} else {
+		zend_error_noreturn(E_COMPILE_ERROR, "Property_info for %s::$%s is not present, should not happen in zend_declare_accessor()", CG(active_class_entry)->name, Z_STRVAL(var_name->u.constant));
 	}
 }
 /* }}} */
 
 void zend_do_begin_accessor_declaration(znode *function_token, znode *var_name, znode *modifiers, int return_reference, int has_params TSRMLS_DC) /* {{{ */
 {
-	/* Generate Hash Value for Variable */
-	ulong hash_value = zend_hash_func(Z_STRVAL(var_name->u.constant), Z_STRLEN(var_name->u.constant)+1);
-	zend_accessor_info **aipp, *ai;
+	zend_property_info *property_info;
 	zend_function *func = NULL;
 
-	/* Locate or create accessor_info structure */
-	if(zend_hash_quick_find(&CG(active_class_entry)->accessors, Z_STRVAL(var_name->u.constant), Z_STRLEN(var_name->u.constant)+1, hash_value, (void**) &aipp) == SUCCESS) {
-		ai = *aipp;
+	if(zend_hash_find(&CG(active_class_entry)->properties_info, Z_STRVAL(var_name->u.constant), Z_STRLEN(var_name->u.constant)+1, (void **) &property_info)==SUCCESS) {
+		/* Inherit flags from outer accessor definition */
+		Z_LVAL(modifiers->u.constant) |= (property_info->ai->flags & ZEND_ACC_STATIC);
+
+		if(Z_TYPE(function_token->u.constant) == IS_STRING && strcasecmp("get", Z_STRVAL(function_token->u.constant)) == 0) {
+			/* Convert type and variable name to __getHours() */
+			char *tmp = strcatalloc("__get", 5, Z_STRVAL(var_name->u.constant), Z_STRLEN(var_name->u.constant) TSRMLS_CC);
+			efree(Z_STRVAL(function_token->u.constant));
+			ZVAL_STRINGL(&function_token->u.constant, tmp, 5 + Z_STRLEN(var_name->u.constant), 0);
+
+			if(has_params) {
+				zend_error(E_COMPILE_ERROR, "Getters do not accept parameters for variable %s::$%s", CG(active_class_entry)->name, Z_STRVAL(var_name->u.constant));
+			}
+
+			/* Declare Function */
+			zend_do_begin_function_declaration(function_token, function_token, 1, return_reference, modifiers, ZEND_FNP_PROP_GETTER TSRMLS_CC);
+		} else if(Z_TYPE(function_token->u.constant) == IS_STRING && strcasecmp("set", Z_STRVAL(function_token->u.constant)) == 0) {
+			/* Convert type and variable name to __setHours() */
+			char *tmp = strcatalloc("__set", 5, Z_STRVAL(var_name->u.constant), Z_STRLEN(var_name->u.constant) TSRMLS_CC);
+			znode unused_node, unused_node2, value_node;
+
+			efree(Z_STRVAL(function_token->u.constant));
+			ZVAL_STRINGL(&function_token->u.constant, tmp, 5 + Z_STRLEN(var_name->u.constant), 0);
+
+			if(return_reference) {
+				zend_error(E_WARNING, "Property setter %s::$%s indicates a return reference with '&', setters do not return values, ignored.", CG(active_class_entry)->name, Z_STRVAL(var_name->u.constant));
+			}
+			/* Declare Function */
+			zend_do_begin_function_declaration(function_token, function_token, 1, ZEND_RETURN_VAL, modifiers, ZEND_FNP_PROP_SETTER TSRMLS_CC);
+
+			if(!has_params) {
+				/* Add $value parameter to __setHours() */
+				unused_node.op_type = unused_node2.op_type = IS_UNUSED;
+				unused_node.u.op.num = unused_node2.u.op.num = 1;
+
+				ZVAL_STRINGL(&value_node.u.constant, "value", 5, 1);
+
+				zend_do_receive_arg(ZEND_RECV, &value_node, &unused_node, NULL, &unused_node2, 0 TSRMLS_CC);
+			}
+		} else if(Z_TYPE(function_token->u.constant) == IS_LONG && Z_LVAL(function_token->u.constant) == T_ISSET) {
+			/* Convert type and variable name to __issetHours() */
+			char *tmp = strcatalloc("__isset", 7, Z_STRVAL(var_name->u.constant), Z_STRLEN(var_name->u.constant) TSRMLS_CC);
+			ZVAL_STRINGL(&function_token->u.constant, tmp, 7 + Z_STRLEN(var_name->u.constant), 0);
+
+			if(has_params) {
+				zend_error(E_COMPILE_ERROR, "Issetters do not accept parameters for variable %s::$%s", CG(active_class_entry)->name, Z_STRVAL(var_name->u.constant));
+			}
+
+			/* Declare Function */
+			zend_do_begin_function_declaration(function_token, function_token, 1, ZEND_RETURN_VAL, modifiers, ZEND_FNP_PROP_ISSETTER TSRMLS_CC);
+		} else if(Z_TYPE(function_token->u.constant) == IS_LONG && Z_LVAL(function_token->u.constant) == T_UNSET) {
+			/* Convert type and variable name to __unsetHours() */
+			char *tmp = strcatalloc("__unset", 7, Z_STRVAL(var_name->u.constant), Z_STRLEN(var_name->u.constant) TSRMLS_CC);
+			ZVAL_STRINGL(&function_token->u.constant, tmp, 7 + Z_STRLEN(var_name->u.constant), 0);
+
+			if(has_params) {
+				zend_error(E_COMPILE_ERROR, "Unsetters do not accept parameters for variable %s::$%s", CG(active_class_entry)->name, Z_STRVAL(var_name->u.constant));
+			}
+
+			/* Declare Function */
+			zend_do_begin_function_declaration(function_token, function_token, 1, ZEND_RETURN_VAL, modifiers, ZEND_FNP_PROP_UNSETTER TSRMLS_CC);
+		} else {
+			zend_error(E_COMPILE_ERROR, "Unknown accessor '%s', expecting get or set for variable $%s", Z_STRVAL(function_token->u.constant), Z_STRVAL(var_name->u.constant));
+		}
+		func = (zend_function*)CG(active_op_array);
+
+		if (func->common.purpose == ZEND_FNP_PROP_GETTER) {
+			property_info->ai->getter = func;
+		} else if(func->common.purpose == ZEND_FNP_PROP_SETTER) {
+			property_info->ai->setter = func;
+		} else if(func->common.purpose == ZEND_FNP_PROP_ISSETTER) {
+			property_info->ai->isset = func;
+		} else if(func->common.purpose == ZEND_FNP_PROP_UNSETTER) {
+			property_info->ai->unset = func;
+		}
 	} else {
-		zend_error(E_COMPILE_ERROR, "Unable to locate accessor structure '%s', please report this to php-internals.", Z_STRVAL(var_name->u.constant));
-	}
-
-	/* Inherit flags from outer accessor definition */
-	Z_LVAL(modifiers->u.constant) |= (ai->flags & ZEND_ACC_STATIC);
-
-	if(Z_TYPE(function_token->u.constant) == IS_STRING && strcasecmp("get", Z_STRVAL(function_token->u.constant)) == 0) {
-		/* Convert type and variable name to __getHours() */
-		char *tmp = strcatalloc("__get", 5, Z_STRVAL(var_name->u.constant), Z_STRLEN(var_name->u.constant) TSRMLS_CC);
-		efree(Z_STRVAL(function_token->u.constant));
-		ZVAL_STRINGL(&function_token->u.constant, tmp, 5 + Z_STRLEN(var_name->u.constant), 0);
-
-		if(has_params) {
-			zend_error(E_COMPILE_ERROR, "Getters do not accept parameters for variable %s::$%s", CG(active_class_entry)->name, Z_STRVAL(var_name->u.constant));
-		}
-
-		/* Declare Function */
-		zend_do_begin_function_declaration(function_token, function_token, 1, return_reference, modifiers, ZEND_FNP_PROP_GETTER TSRMLS_CC);
-	} else if(Z_TYPE(function_token->u.constant) == IS_STRING && strcasecmp("set", Z_STRVAL(function_token->u.constant)) == 0) {
-		/* Convert type and variable name to __setHours() */
-		char *tmp = strcatalloc("__set", 5, Z_STRVAL(var_name->u.constant), Z_STRLEN(var_name->u.constant) TSRMLS_CC);
-		znode unused_node, unused_node2, value_node;
-
-		efree(Z_STRVAL(function_token->u.constant));
-		ZVAL_STRINGL(&function_token->u.constant, tmp, 5 + Z_STRLEN(var_name->u.constant), 0);
-
-		if(return_reference) {
-			zend_error(E_WARNING, "Property setter %s::$%s indicates a return reference with '&', setters do not return values, ignored.", CG(active_class_entry)->name, Z_STRVAL(var_name->u.constant));
-		}
-		/* Declare Function */
-		zend_do_begin_function_declaration(function_token, function_token, 1, ZEND_RETURN_VAL, modifiers, ZEND_FNP_PROP_SETTER TSRMLS_CC);
-
-		if(!has_params) {
-			/* Add $value parameter to __setHours() */
-			unused_node.op_type = unused_node2.op_type = IS_UNUSED;
-			unused_node.u.op.num = unused_node2.u.op.num = 1;
-
-			ZVAL_STRINGL(&value_node.u.constant, "value", 5, 1);
-
-			zend_do_receive_arg(ZEND_RECV, &value_node, &unused_node, NULL, &unused_node2, 0 TSRMLS_CC);
-		}
-	} else if(Z_TYPE(function_token->u.constant) == IS_LONG && Z_LVAL(function_token->u.constant) == T_ISSET) {
-		/* Convert type and variable name to __issetHours() */
-		char *tmp = strcatalloc("__isset", 7, Z_STRVAL(var_name->u.constant), Z_STRLEN(var_name->u.constant) TSRMLS_CC);
-		ZVAL_STRINGL(&function_token->u.constant, tmp, 7 + Z_STRLEN(var_name->u.constant), 0);
-
-		if(has_params) {
-			zend_error(E_COMPILE_ERROR, "Issetters do not accept parameters for variable %s::$%s", CG(active_class_entry)->name, Z_STRVAL(var_name->u.constant));
-		}
-
-		/* Declare Function */
-		zend_do_begin_function_declaration(function_token, function_token, 1, ZEND_RETURN_VAL, modifiers, ZEND_FNP_PROP_ISSETTER TSRMLS_CC);
-	} else if(Z_TYPE(function_token->u.constant) == IS_LONG && Z_LVAL(function_token->u.constant) == T_UNSET) {
-		/* Convert type and variable name to __unsetHours() */
-		char *tmp = strcatalloc("__unset", 7, Z_STRVAL(var_name->u.constant), Z_STRLEN(var_name->u.constant) TSRMLS_CC);
-		ZVAL_STRINGL(&function_token->u.constant, tmp, 7 + Z_STRLEN(var_name->u.constant), 0);
-
-		if(has_params) {
-			zend_error(E_COMPILE_ERROR, "Unsetters do not accept parameters for variable %s::$%s", CG(active_class_entry)->name, Z_STRVAL(var_name->u.constant));
-		}
-
-		/* Declare Function */
-		zend_do_begin_function_declaration(function_token, function_token, 1, ZEND_RETURN_VAL, modifiers, ZEND_FNP_PROP_UNSETTER TSRMLS_CC);
-	} else {
-		zend_error(E_COMPILE_ERROR, "Unknown accessor '%s', expecting get or set for variable $%s", Z_STRVAL(function_token->u.constant), Z_STRVAL(var_name->u.constant));
-	}
-	func = (zend_function*)CG(active_op_array);
-
-	if (func->common.purpose == ZEND_FNP_PROP_GETTER) {
-		ai->getter = func;
-	} else if(func->common.purpose == ZEND_FNP_PROP_SETTER) {
-		ai->setter = func;
-	} else if(func->common.purpose == ZEND_FNP_PROP_ISSETTER) {
-		ai->isset = func;
-	} else if(func->common.purpose == ZEND_FNP_PROP_UNSETTER) {
-		ai->unset = func;
+		zend_error_noreturn(E_COMPILE_ERROR, "Property_info for %s::$%s is not present, should not happen in zend_do_begin_accessor_declaration()", CG(active_class_entry)->name, Z_STRVAL(var_name->u.constant));
 	}
 }
 /* }}} */
@@ -1766,55 +1786,39 @@ void zend_do_end_accessor_declaration(znode *function_token, znode *var_name, zn
 {
 	/* If we have no function body, create an automatic body */
 	if(body == NULL && (CG(active_class_entry)->ce_flags & ZEND_ACC_INTERFACE) == 0) {
-		char *int_var_name = strcatalloc("__", 2, Z_STRVAL(var_name->u.constant), Z_STRLEN(var_name->u.constant) TSRMLS_CC);
-
-		zend_property_info **zpi;
-
 		zval eval_php_code;
 		zend_uint original_compiler_options = CG(compiler_options);
 
 		CG(compiler_options) = ZEND_COMPILE_DEFAULT_FOR_EVAL;
 
 		if(CG(active_op_array)->purpose == ZEND_FNP_PROP_GETTER) {
-			/* Equivalent to:  	return $this->__Property;  or static equivalent */
+			/* Equivalent to:  	return $this->Property;  or static equivalent */
 
 			zend_uint		bufsize = 16 + Z_STRLEN(var_name->u.constant) + 1 + 1;
 			char			*buffer = emalloc(bufsize);
 
-			if(zend_hash_find(&CG(active_class_entry)->properties_info, int_var_name, Z_STRLEN(var_name->u.constant)+3, (void**) &zpi) != SUCCESS) {
-				znode zn_prop;
-				MAKE_ZNODEL(zn_prop, int_var_name, 2 + Z_STRLEN(var_name->u.constant));
-				zend_do_declare_property(&zn_prop, NULL, ZEND_ACC_PROTECTED | (Z_LVAL(modifiers->u.constant) & ZEND_ACC_STATIC) TSRMLS_CC);
-			}
-
 			Z_STRVAL(eval_php_code) = buffer;
 			Z_TYPE(eval_php_code) = IS_STRING;
 			if((Z_LVAL(modifiers->u.constant) & ZEND_ACC_STATIC)) {
-				Z_STRLEN(eval_php_code) = snprintf(Z_STRVAL(eval_php_code), bufsize, "return self::$__%s;", Z_STRVAL(var_name->u.constant));
+				Z_STRLEN(eval_php_code) = snprintf(Z_STRVAL(eval_php_code), bufsize, "return self::$%s;", Z_STRVAL(var_name->u.constant));
 			} else {
-				Z_STRLEN(eval_php_code) = snprintf(Z_STRVAL(eval_php_code), bufsize, "return $this->__%s;", Z_STRVAL(var_name->u.constant));
+				Z_STRLEN(eval_php_code) = snprintf(Z_STRVAL(eval_php_code), bufsize, "return $this->%s;", Z_STRVAL(var_name->u.constant));
 			}
 			zend_compile_string_inline(&eval_php_code, (char*)CG(active_op_array)->filename TSRMLS_CC);
 			efree(buffer);
 			zend_do_extended_info(TSRMLS_C);
 
 		} else if(CG(active_op_array)->purpose == ZEND_FNP_PROP_SETTER) {
-			/* Equivalent to: $this->__Property = $value; */
+			/* Equivalent to: $this->Property = $value; */
 			zend_uint		bufsize = 9 + Z_STRLEN(var_name->u.constant) + 10 + 1;
 			char			*buffer = emalloc(bufsize);
-
-			if(zend_hash_find(&CG(active_class_entry)->properties_info, int_var_name, Z_STRLEN(var_name->u.constant)+3, (void**) &zpi) != SUCCESS) {
-				znode zn_prop;
-				MAKE_ZNODEL(zn_prop, int_var_name, 2 + Z_STRLEN(var_name->u.constant));
-				zend_do_declare_property(&zn_prop, NULL, ZEND_ACC_PROTECTED | (Z_LVAL(modifiers->u.constant) & ZEND_ACC_STATIC) TSRMLS_CC);
-			}
 
 			Z_STRVAL(eval_php_code) = buffer;
 			Z_TYPE(eval_php_code) = IS_STRING;
 			if((Z_LVAL(modifiers->u.constant) & ZEND_ACC_STATIC)) {
-				Z_STRLEN(eval_php_code) = snprintf(Z_STRVAL(eval_php_code), bufsize, "self::$__%s = $value;", Z_STRVAL(var_name->u.constant));
+				Z_STRLEN(eval_php_code) = snprintf(Z_STRVAL(eval_php_code), bufsize, "self::$%s = $value;", Z_STRVAL(var_name->u.constant));
 			} else {
-				Z_STRLEN(eval_php_code) = snprintf(Z_STRVAL(eval_php_code), bufsize, "$this->__%s = $value;", Z_STRVAL(var_name->u.constant));
+				Z_STRLEN(eval_php_code) = snprintf(Z_STRVAL(eval_php_code), bufsize, "$this->%s = $value;", Z_STRVAL(var_name->u.constant));
 			}
 			zend_compile_string_inline(&eval_php_code, (char*)CG(active_op_array)->filename TSRMLS_CC);
 			efree(buffer);
@@ -1852,10 +1856,9 @@ void zend_do_end_accessor_declaration(znode *function_token, znode *var_name, zn
 			efree(buffer);
 			zend_do_extended_info(TSRMLS_C);
 		}
-		efree(int_var_name);
 		CG(compiler_options) = original_compiler_options;
 	} else if(body != NULL && (CG(active_class_entry)->ce_flags & ZEND_ACC_INTERFACE) == ZEND_ACC_INTERFACE) {
-		zend_error(E_WARNING, "Interface %s::$%s %ster cannot have implementation defined, implementation ignored.", CG(active_class_entry)->name, Z_STRVAL(var_name->u.constant), zend_fn_purpose_string(CG(active_op_array)));
+		zend_error(E_WARNING, "Interface %s::$%s %ster cannot have implementation defined, implementation ignored.", CG(active_class_entry)->name, Z_STRVAL(var_name->u.constant), zend_fn_purpose_string((zend_function*)CG(active_op_array)));
 	}
 
 	zend_do_end_function_declaration(function_token TSRMLS_CC);
@@ -1864,38 +1867,35 @@ void zend_do_end_accessor_declaration(znode *function_token, znode *var_name, zn
 
 
 void zend_finalize_accessor(znode *var_name TSRMLS_DC) { /* {{{ */
-	/* Generate Hash Value for Variable */
-	ulong hash_value = zend_hash_func(Z_STRVAL(var_name->u.constant), Z_STRLEN(var_name->u.constant)+1);
-	zend_accessor_info **aipp, *ai;
+	zend_property_info	*property_info;
 
-	/* Locate or create accessor_info structure */
-	if(zend_hash_quick_find(&CG(active_class_entry)->accessors, Z_STRVAL(var_name->u.constant), Z_STRLEN(var_name->u.constant)+1, hash_value, (void**) &aipp) == SUCCESS) {
-		ai = *aipp;
-		if(!ai->isset && ai->getter) {
+	if(zend_hash_find(&CG(active_class_entry)->properties_info, Z_STRVAL(var_name->u.constant), Z_STRLEN(var_name->u.constant)+1, (void **) &property_info)==SUCCESS) {
+		if(!property_info->ai->isset && property_info->ai->getter) {
 			znode zn_fntoken, zn_modifiers;
 			INIT_ZNODE(zn_fntoken);
 			ZVAL_LONG(&zn_fntoken.u.constant, T_ISSET);
 
 			/* Inherit flags accessor declaration */
 			INIT_ZNODE(zn_modifiers);
-			Z_LVAL(zn_modifiers.u.constant) = ai->flags;
+			Z_LVAL(zn_modifiers.u.constant) = property_info->ai->flags;
 
 			zend_do_begin_accessor_declaration(&zn_fntoken, var_name, &zn_modifiers, 0, 0 TSRMLS_CC);
 			zend_do_end_accessor_declaration(&zn_fntoken, var_name, &zn_modifiers, NULL TSRMLS_CC);
 		}
-		if(!ai->unset && ai->setter) {
+		if(!property_info->ai->unset && property_info->ai->setter) {
 			znode zn_fntoken, zn_modifiers;
 			INIT_ZNODE(zn_fntoken);
 			ZVAL_LONG(&zn_fntoken.u.constant, T_UNSET);
 
 			/* Inherit flags accessor declaration */
 			INIT_ZNODE(zn_modifiers);
-			Z_LVAL(zn_modifiers.u.constant) = ai->flags;
+			Z_LVAL(zn_modifiers.u.constant) = property_info->ai->flags;
 
 			zend_do_begin_accessor_declaration(&zn_fntoken, var_name, &zn_modifiers, 0, 0 TSRMLS_CC);
 			zend_do_end_accessor_declaration(&zn_fntoken, var_name, &zn_modifiers, NULL TSRMLS_CC);
 		}
-
+	} else {
+		zend_error_noreturn(E_COMPILE_ERROR, "Property_info for %s::$%s is not present, should not happen in zend_finalize_accessor()", CG(active_class_entry)->name, Z_STRVAL(var_name->u.constant));
 	}
 }
 /* }}} */
@@ -3970,33 +3970,22 @@ static inline void zend_do_update_accessors(zend_class_entry *ce TSRMLS_DC) /* {
 	zend_hash_get_current_data(&ce->function_table, (void *) &func) == SUCCESS;
 	zend_hash_move_forward(&ce->function_table)) {
 		if (IS_ACCESSOR_FN(func)) {
-			const char *varname = ZEND_ACC_NAME(func);
-			ulong hash_value = zend_hash_func(varname, strlen(varname)+1);
+			zend_property_info	*property_info;
+			const char *var_name = ZEND_ACC_NAME(func);
+			zend_uint	var_name_len = strlen(var_name);
 
-			zend_accessor_info **aipp, *ai;
-
-			if(zend_hash_quick_find(&ce->accessors, varname, strlen(varname)+1, hash_value, (void**) &aipp) != SUCCESS) {
-				zend_accessor_info **parent_aipp = NULL;
-
-				ai = emalloc(sizeof(zend_accessor_info));
-				memset(ai, 0, sizeof(zend_accessor_info));
-				zend_hash_quick_update(&ce->accessors, varname, strlen(varname)+1, hash_value, (void**)&ai, sizeof(zend_accessor_info*), NULL);
-
-				if(ce && ce->parent && zend_hash_quick_find(&ce->parent->accessors, varname, strlen(varname)+1, hash_value, (void**) &parent_aipp) == SUCCESS) {
-					ai->flags = (*parent_aipp)->flags;
+			if(zend_hash_find(&ce->properties_info, var_name, var_name_len+1, (void **) &property_info)==SUCCESS) {
+				if(func->common.purpose == ZEND_FNP_PROP_GETTER) {
+					property_info->ai->getter = func;
+				} else if(func->common.purpose == ZEND_FNP_PROP_SETTER) {
+					property_info->ai->setter = func;
+				} else if(func->common.purpose == ZEND_FNP_PROP_ISSETTER) {
+					property_info->ai->isset = func;
+				} else if(func->common.purpose == ZEND_FNP_PROP_UNSETTER) {
+					property_info->ai->unset = func;
 				}
 			} else {
-				ai = *aipp;
-			}
-
-			if(func->common.purpose == ZEND_FNP_PROP_GETTER) {
-				ai->getter = func;
-			} else if(func->common.purpose == ZEND_FNP_PROP_SETTER) {
-				ai->setter = func;
-			} else if(func->common.purpose == ZEND_FNP_PROP_ISSETTER) {
-				ai->isset = func;
-			} else if(func->common.purpose == ZEND_FNP_PROP_UNSETTER) {
-				ai->unset = func;
+				zend_error_noreturn(E_COMPILE_ERROR, "Property_info for %s::$%s is not present, should not happen in zend_do_update_accessors()", ce->name, var_name);
 			}
 		}
 	}
@@ -4681,7 +4670,7 @@ static void zend_do_traits_property_binding(zend_class_entry *ce TSRMLS_DC) /* {
 		for (zend_hash_internal_pointer_reset(&ce->traits[i]->properties_info);
 			 zend_hash_get_current_data(&ce->traits[i]->properties_info, (void *) &property_info) == SUCCESS;
 			 zend_hash_move_forward(&ce->traits[i]->properties_info)) {
-			/* first get the unmangeld name if necessary,
+			/* first get the unmangled name if necessary,
 			 * then check whether the property is already there
 			 */
 			flags = property_info->flags;
@@ -4753,6 +4742,13 @@ static void zend_do_traits_property_binding(zend_class_entry *ce TSRMLS_DC) /* {
 			zend_declare_property_ex(ce, prop_name, prop_name_length, 
 									 prop_value, flags, 
 								     doc_comment, property_info->doc_comment_len TSRMLS_CC);
+			if(property_info->ai) {
+				zend_property_info *created_property_info;
+				if(zend_hash_find(&ce->properties_info, prop_name, prop_name_length+1, (void**) &created_property_info) == SUCCESS) {
+					created_property_info->ai = ecalloc(1, sizeof(zend_accessor_info));
+					created_property_info->ai->flags = property_info->ai->flags;
+				}
+			}
 		}
 	}
 }
@@ -7299,7 +7295,6 @@ ZEND_API void zend_initialize_class_data(zend_class_entry *ce, zend_bool nullify
 	zend_hash_init_ex(&ce->properties_info, 0, NULL, (dtor_func_t) (persistent_hashes ? zend_destroy_property_info_internal : zend_destroy_property_info), persistent_hashes, 0);
 	zend_hash_init_ex(&ce->constants_table, 0, NULL, zval_ptr_dtor_func, persistent_hashes, 0);
 	zend_hash_init_ex(&ce->function_table, 0, NULL, ZEND_FUNCTION_DTOR, persistent_hashes, 0);
-	zend_hash_init_ex(&ce->accessors, 0, NULL, ZEND_ACCESSOR_DTOR, persistent_hashes, 0);
 
 	if (ce->type == ZEND_INTERNAL_CLASS) {
 #ifdef ZTS
@@ -7678,9 +7673,8 @@ zend_accessor_info *zend_get_accessor_info_from_function(const zend_function *fu
 {
 	const char 	*member_name 	= NULL;
 	zend_uint	member_name_len = 0;
-	ulong 		hash_value 		= 0;
 
-	zend_accessor_info		**aipp;
+	zend_property_info		*property_info;
 
 	if(!func || !IS_ACCESSOR_FN(func))
 		return NULL;
@@ -7697,10 +7691,8 @@ zend_accessor_info *zend_get_accessor_info_from_function(const zend_function *fu
 	}
 	member_name_len = strlen(member_name);
 
-	hash_value = zend_inline_hash_func(member_name, member_name_len+1);
-
-	if(zend_hash_quick_find(&func->common.scope->accessors, member_name, member_name_len+1, hash_value, (void**)&aipp) == SUCCESS) {
-		return *aipp;
+	if(zend_hash_find(&func->common.scope->properties_info, member_name, member_name_len+1, (void**)&property_info) == SUCCESS) {
+		return property_info->ai;
 	}
 	return NULL;
 }
@@ -7767,16 +7759,14 @@ zend_accessor_info *zend_get_accessor_from_init_static_method_call(zend_op_array
 			}
 		}
 		if(classpp) {
-			zend_accessor_info 	**aipp;
+			zend_property_info 	*property_info;
 			char 				*lcname2 = zend_str_tolower_dup(Z_STRVAL_P(op2zv)+5, Z_STRLEN_P(op2zv)-5);	/* strlen("__get") == 5 */
 
-			if(zend_hash_find(&(*classpp)->accessors, lcname2, Z_STRLEN_P(op2zv)-4, (void**)&aipp) == SUCCESS) {
+			if(zend_hash_find(&(*classpp)->properties_info, lcname2, Z_STRLEN_P(op2zv)-4, (void**)&property_info) == SUCCESS) {
 				efree(lcname2);
-
-				return *aipp;
-			} else {
-				efree(lcname2);
+				return property_info->ai;
 			}
+			efree(lcname2);
 		}
 	}
 	return NULL;
