@@ -745,101 +745,6 @@ void zend_do_fetch_static_member(znode *result, znode *class_name TSRMLS_DC) /* 
 	} else {
 		zend_do_fetch_class(&class_node, class_name TSRMLS_CC);
 	}
-
-/*	if(result->op_type == IS_CV) {
-		 Handle self::$Area accessors (normal and static)
-		if(class_node.op_type == IS_VAR && class_node.EA == ZEND_FETCH_CLASS_SELF && CG(active_class_entry)) {
-
-			const char *member_name = CG(active_op_array)->vars[result->u.op.var].name;
-			zend_accessor_info **aipp;
-
-			 If the member_name is an accessor
-			if(zend_hash_find((const HashTable *)&CG(active_class_entry)->accessors, member_name, strlen(member_name)+1, (void**)&aipp) == SUCCESS) {
-				znode zn_self, zn_func, zn_arg_list;
-				size_t member_name_len = strlen(member_name);
-
-				char *fname = strcatalloc("__get", 5, member_name, member_name_len TSRMLS_CC);
-
-				MAKE_ZNODEL(zn_self, "self", 4);
-				ZVAL_LONG(&zn_arg_list.u.constant, 0);
-
-				MAKE_ZNODEL(zn_func, fname, 5 + member_name_len);
-				efree(fname);
-
-				 We assume we will be used as a getter, if zend_do_assign() is called, it will backpatch as calling a setter
-				zend_do_begin_class_member_function_call(&zn_self, &zn_func TSRMLS_CC);
-				zend_do_end_function_call(&zn_func, result, &zn_arg_list, 1, 0 TSRMLS_CC);
-				zend_do_extended_fcall_end(TSRMLS_C);
-				return;
-			}
-		}
-		 Handle parent::$Area accessors (normal and static)
-		if(class_node.op_type == IS_VAR && class_node.EA == ZEND_FETCH_CLASS_PARENT && CG(active_class_entry) && CG(active_class_entry)->parent) {
-
-			const char *member_name = CG(active_op_array)->vars[result->u.op.var].name;
-			zend_accessor_info **aipp;
-
-			 If the member_name is an accessor
-			if(zend_hash_find((const HashTable *)&CG(active_class_entry)->parent->accessors, member_name, strlen(member_name)+1, (void**)&aipp) == SUCCESS) {
-				znode zn_parent, zn_func, zn_arg_list;
-				size_t member_name_len = strlen(member_name);
-
-				char *fname = strcatalloc("__get", 5, member_name, member_name_len TSRMLS_CC);
-
-				MAKE_ZNODEL(zn_parent, "parent", 6);
-				ZVAL_LONG(&zn_arg_list.u.constant, 0);
-
-				MAKE_ZNODEL(zn_func, fname, 5 + member_name_len);
-				efree(fname);
-
-				 We assume we will be used as a getter, if zend_do_assign() is called, it will backpatch as calling a setter
-				zend_do_begin_class_member_function_call(&zn_parent, &zn_func TSRMLS_CC);
-				zend_do_end_function_call(&zn_func, result, &zn_arg_list, 1, 0 TSRMLS_CC);
-				zend_do_extended_fcall_end(TSRMLS_C);
-				return;
-			}
-		}
-		 Handle Shape::$Area static accessor
-		if(class_node.op_type == IS_CONST) {
-			zend_class_entry	**classpp;
-			char 				*lcname = zend_str_tolower_dup(Z_STRVAL(class_node.u.constant), Z_STRLEN(class_node.u.constant));
-
-			if(zend_hash_find(CG(class_table), lcname, Z_STRLEN(class_node.u.constant)+1, (void**)&classpp) == SUCCESS) {
-				ulong 			hash_value;
-				zend_accessor_info **aipp;
-				const char		*member_name = CG(active_op_array)->vars[result->u.op.var].name;
-				uint			member_name_len = strlen(member_name);
-
-				hash_value = zend_hash_func(member_name, member_name_len+1);
-
-				if(zend_hash_quick_find(&(*classpp)->accessors, member_name, member_name_len+1, hash_value, (void**)&aipp) == SUCCESS
-						&& ( (*aipp)->getter || (*aipp)->setter ) ) {
-					znode zn_class, zn_func, zn_arg_list;
-
-					efree(lcname);
-
-					if(!((*aipp)->flags & ZEND_ACC_STATIC)) {
-						zend_error(E_COMPILE_ERROR, "Cannot access non-static accessor %s::$%s in a static manner.", (*classpp)->name, member_name);
-					}
-
-					MAKE_ZNODEL(zn_class, Z_STRVAL(class_node.u.constant), Z_STRLEN(class_node.u.constant));
-					MAKE_ZNODE(zn_func, ((*aipp)->getter ? (*aipp)->getter->common.function_name : (*aipp)->setter->common.function_name));
-					Z_STRVAL(zn_func.u.constant)[2] = 'g';
-					ZVAL_LONG(&zn_arg_list.u.constant, 0);
-
-					 We assume we will be used as a getter, if zend_do_assign() is called, it will backpatch as calling a setter
-					zend_do_begin_class_member_function_call(&zn_class, &zn_func TSRMLS_CC);
-					zend_do_end_function_call(&zn_func, result, &zn_arg_list, 1, 0 TSRMLS_CC);
-					zend_do_extended_fcall_end(TSRMLS_C);
-					zval_dtor(&class_node.u.constant);
-					return;
-				}
-			}
-			efree(lcname);
-		}
-	}*/
-
-
 	zend_stack_top(&CG(bp_stack), (void **) &fetch_list_ptr);
 	if (result->op_type == IS_CV) {
 		init_op(&opline TSRMLS_CC);
@@ -5458,8 +5363,6 @@ void zend_do_begin_class_declaration(const znode *class_token, znode *class_name
 	opline->op2_type = IS_CONST;
 
 	if (doing_inheritance) {
-		zend_op *fetch_class = NULL;
-
 		/* Make sure a trait does not try to extend a class */
 		if ((new_class_entry->ce_flags & ZEND_ACC_TRAIT) == ZEND_ACC_TRAIT) {
 			zend_error(E_COMPILE_ERROR, "A trait (%s) cannot extend a class. Traits can only be composed from other traits with the 'use' keyword. Error", new_class_entry->name);
@@ -5467,20 +5370,6 @@ void zend_do_begin_class_declaration(const znode *class_token, znode *class_name
 
 		opline->extended_value = parent_class_name->u.op.var;
 		opline->opcode = ZEND_DECLARE_INHERITED_CLASS;
-
-		/* Locate parent_class_name and parent_class_entry to assign */
-		fetch_class = find_previous_op(ZEND_FETCH_CLASS TSRMLS_CC);
-
-		if(fetch_class != NULL && fetch_class->op2_type == IS_CONST) {
-			zend_class_entry **parent_cepp = NULL;
-			zval *parent_class_zv = &CG(active_op_array)->literals[fetch_class->op2.constant].constant;
-			char *lc_parent_class = zend_str_tolower_dup(Z_STRVAL_P(parent_class_zv), Z_STRLEN_P(parent_class_zv));
-
-			if (zend_hash_find(CG(class_table), lc_parent_class, strlen(lc_parent_class)+1, (void **) &parent_cepp)==SUCCESS) {
-				new_class_entry->parent = *parent_cepp;
-			}
-			efree(lc_parent_class);
-		}
 	} else {
 		opline->opcode = ZEND_DECLARE_CLASS;
 	}
@@ -6559,47 +6448,6 @@ void zend_do_unset(const znode *variable TSRMLS_DC) /* {{{ */
 				last_op->opcode = ZEND_UNSET_OBJ;
 				SET_UNUSED(last_op->result);
 				break;
-			case ZEND_DO_FCALL_BY_NAME:
-				if((last_op-1)->opcode == ZEND_INIT_STATIC_METHOD_CALL) {
-					/* Capture unset() on static accessor call */
-
-					zend_op				*initop = last_op-1;
-
-					/* Capture isset() on static accessor call */
-					const char *context_name;	/* Does not need to be free'd */
-
-					zend_accessor_info *ai = zend_get_accessor_from_init_static_method_call(CG(active_op_array), initop, &context_name TSRMLS_CC);
-					if(ai) {
-						/* In the case of a getter, the getter call is not necessary, instead switch it to the name of the isset function, if present */
-						if(ai->unset) {
-							zval	zv_unsetter;
-							zend_op	*opline;
-							zend_del_literal(CG(active_op_array), initop->op2.constant+1);
-							zend_del_literal(CG(active_op_array), initop->op2.constant);
-
-							ZVAL_STRINGL(&zv_unsetter, ai->unset->common.function_name, strlen(ai->unset->common.function_name), 1);
-							initop->op2.constant = zend_add_func_name_literal(CG(active_op_array), &zv_unsetter TSRMLS_CC);
-							GET_CACHE_SLOT(initop->op2.constant);
-
-							/* Must free result of static __unsetHours() function call */
-							opline = get_next_op(CG(active_op_array) TSRMLS_CC);
-
-							opline->opcode = ZEND_FREE;
-							opline->op1_type = last_op->result_type;
-							if (last_op->result_type == IS_CONST) {
-								opline->op1.constant = zend_add_literal(CG(active_op_array), &last_op->result.literal->constant TSRMLS_CC);
-							} else {
-								opline->op1 = last_op->result;
-							}
-
-							SET_UNUSED(opline->op2);
-							return;
-						} else if(!ai->setter) {
-							zend_error(E_COMPILE_ERROR, "Cannot unset property %s::$%s, no setter defined.", context_name, ZEND_ACC_NAME_AI(ai));
-						}
-					}
-				}
-				break;
 		}
 	}
 }
@@ -6641,34 +6489,6 @@ void zend_do_isset_or_isempty(int type, znode *result, znode *variable TSRMLS_DC
 				break;
 			case ZEND_FETCH_OBJ_IS:
 				last_op->opcode = ZEND_ISSET_ISEMPTY_PROP_OBJ;
-				break;
-			case ZEND_DO_FCALL_BY_NAME:
-				if((last_op-1)->opcode == ZEND_INIT_STATIC_METHOD_CALL) {
-
-					/* Capture isset() on static accessor call */
-
-					zend_op				*initop = last_op-1;
-
-					/* Capture isset() on static accessor call */
-					const char *context_name;	/* Does not need to be free'd */
-
-					zend_accessor_info *ai = zend_get_accessor_from_init_static_method_call(CG(active_op_array), initop, &context_name TSRMLS_CC);
-					if(ai) {
-						/* In the case of a getter, the getter call is not necessary, instead switch it to the name of the isset function, if present */
-						if(ai->isset) {
-							zval	zv_issetter;
-							zend_del_literal(CG(active_op_array), initop->op2.constant+1);
-							zend_del_literal(CG(active_op_array), initop->op2.constant);
-
-							ZVAL_STRINGL(&zv_issetter, ai->isset->common.function_name, strlen(ai->isset->common.function_name), 1);
-							initop->op2.constant = zend_add_func_name_literal(CG(active_op_array), &zv_issetter TSRMLS_CC);
-							GET_CACHE_SLOT(initop->op2.constant);
-							return;
-						} else if(!ai->getter) {
-							zend_error(E_COMPILE_ERROR, "Cannot isset property %s::$%s, no getter defined.", context_name, ZEND_ACC_NAME_AI(ai));
-						}
-					}
-				}
 				break;
 		}
 	}
@@ -7697,81 +7517,6 @@ zend_accessor_info *zend_get_accessor_info_from_function(const zend_function *fu
 
 	if(zend_hash_find(&func->common.scope->properties_info, member_name, member_name_len+1, (void**)&property_info) == SUCCESS) {
 		return property_info->ai;
-	}
-	return NULL;
-}
-/* }}} */
-
-zend_accessor_info *zend_get_accessor_from_init_static_method_call(zend_op_array *op_array, zend_op *opline, const char **context_name_out TSRMLS_DC)  /* {{{ */
-{
-	zval *op1zv=NULL, *op2zv=NULL;
-
-	/* Unsure if we can rely on .zv to be resolved here already, normally resolved in pass_two on about line 597 */
-	if(!opline || !opline->opcode == ZEND_INIT_STATIC_METHOD_CALL) {
-		return NULL;
-	}
-
-	if (opline->op1_type == IS_CONST) {
-		if(opline->op2.constant < op_array->last_literal) {	/* constant may already be translated to zv by pass_two() */
-			op1zv = &op_array->literals[opline->op1.constant].constant;
-		} else {
-			op1zv = opline->op1.zv;
-		}
-	}
-	if (opline->op2_type == IS_CONST) {
-		if(opline->op2.constant < op_array->last_literal) {	/* constant may already be translated to zv by pass_two() */
-			op2zv = &op_array->literals[opline->op2.constant].constant;
-		} else {
-			op2zv = opline->op2.zv;
-		}
-	} else {
-		/* we only handle cases where op2_type == IS_CONST */
-		return NULL;
-	}
-
-
-	if(op2zv->type == IS_STRING && (memcmp(Z_STRVAL_P(op2zv),"__get", 5) == 0 || memcmp(Z_STRVAL_P(op2zv),"__set", 5) == 0)) {
-		zend_class_entry	**classpp = NULL;
-
-		if(opline->op1_type == IS_CONST) {
-			char 				*lcname = zend_str_tolower_dup(Z_STRVAL_P(op1zv), Z_STRLEN_P(op1zv));
-
-			if(zend_hash_find(CG(class_table), lcname, Z_STRLEN_P(op1zv)+1, (void**)&classpp) == SUCCESS) {
-				*context_name_out = (const char*)(*classpp)->name;
-			}
-
-			efree(lcname);
-		} else if(opline->op1_type == IS_VAR) {
-			switch(opline->extended_value) {
-				case ZEND_FETCH_CLASS_SELF:
-					if(!CG(active_class_entry)) {
-						zend_error_noreturn(E_ERROR, "Cannot access self:: when no class scope is active");
-					}
-					*context_name_out = "self";
-					classpp = &CG(active_class_entry);
-					break;
-				case ZEND_FETCH_CLASS_PARENT:
-					if(!CG(active_class_entry)) {
-						zend_error_noreturn(E_ERROR, "Cannot access parent:: when no class scope is active");
-					}
-					if(!CG(active_class_entry)->parent) {
-						zend_error_noreturn(E_ERROR, "Cannot access parent::%s, %s has no parent class.", Z_STRVAL_P(op2zv)+5, CG(active_class_entry)->name);
-					}
-					*context_name_out = "parent";
-					classpp = &CG(active_class_entry)->parent;
-					break;
-			}
-		}
-		if(classpp) {
-			zend_property_info 	*property_info;
-			char 				*lcname2 = zend_str_tolower_dup(Z_STRVAL_P(op2zv)+5, Z_STRLEN_P(op2zv)-5);	/* strlen("__get") == 5 */
-
-			if(zend_hash_find(&(*classpp)->properties_info, lcname2, Z_STRLEN_P(op2zv)-4, (void**)&property_info) == SUCCESS) {
-				efree(lcname2);
-				return property_info->ai;
-			}
-			efree(lcname2);
-		}
 	}
 	return NULL;
 }
