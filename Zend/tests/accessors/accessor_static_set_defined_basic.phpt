@@ -14,8 +14,18 @@ class AccessorTest {
 echo "AccessorTest::\$b = 12;\n";
 AccessorTest::$b = 12;
 echo "Done\n";
-?>
---EXPECTF--
+	
+	
+/*********************************************************************************
+ * Static accessors as a feature for first release was shelved, the lines below 
+ *	are what this test should output when static accessors are written:
+ *********************************************************************************
 AccessorTest::$b = 12;
 set AccessorTest::$b Called $value = 12.
 Done
+ */
+
+
+?>
+--EXPECTF--
+Fatal error: Cannot define static accessor %s, not supported at this time in %s on line %d

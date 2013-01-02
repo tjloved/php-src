@@ -55,15 +55,19 @@ class TestClass {
 		get { return $this->_a3; }
 		set { $this->_a3 = $value; }
 	}
+/*	Commented out until static accessors are supported
 	public static $a4 {
 		protected get { return $this->_a4; }
 		private set { $this->a5 = $value; }
 	}
+*/
 }
 reflectProperty("TestClass", "a1");
 reflectProperty("TestClass", "a2");
 reflectProperty("TestClass", "a3");
+/*	Commented out until static accessors are supported
 reflectProperty("TestClass", "a4");
+*/
 
 ?>
 --EXPECTF--
@@ -232,68 +236,5 @@ string(2) "b3"
 setValue("NewValue"):
 getValue() after a setValue():
 string(8) "NewValue"
-
-**********************************
-**********************************
-Reflecting on property TestClass::a4
-
-__toString():
-string(%d) "Accessor [ public static $a4 ] {
-    Method [ <user> static protected method __geta4 ] {
-      @@ %s %d - %d
-    }
-    Method [ <user> static private method __seta4 ] {
-      @@ %s %d - %d
-
-      - Parameters [1] {
-        Parameter #0 [ <required> $value ]
-      }
-    }
-}
- ]
-"
-export():
-string(%d) "Accessor [ public static $a4 ] {
-    Method [ <user> static protected method __geta4 ] {
-      @@ %s %d - %d
-    }
-    Method [ <user> static private method __seta4 ] {
-      @@ %s %d - %d
-
-      - Parameters [1] {
-        Parameter #0 [ <required> $value ]
-      }
-    }
-}
- ]
-"
-export():
-Accessor [ public static $a4 ] {
-    Method [ <user> static protected method __geta4 ] {
-      @@ %s %d - %d
-    }
-    Method [ <user> static private method __seta4 ] {
-      @@ %s %d - %d
-
-      - Parameters [1] {
-        Parameter #0 [ <required> $value ]
-      }
-    }
-}
- ]
-
-NULL
-getName():
-string(2) "a4"
-isPublic():
-bool(true)
-isPrivate():
-bool(false)
-isProtected():
-bool(false)
-isStatic():
-bool(true)
-isDefault():
-bool(true)
 
 **********************************

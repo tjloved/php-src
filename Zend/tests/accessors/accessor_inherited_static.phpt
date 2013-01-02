@@ -18,9 +18,16 @@ base::$z = 5;
 echo base::$z."\r\n";
 echo sub::$z."\r\n";
 
-echo "Done\n";
+/*********************************************************************************
+ * Static accessors as a feature for first release was shelved, the lines below 
+ *	are what this test should output when static accessors are written:
+ *********************************************************************************
+5
+5
+==DONE==
+ */
+
 ?>
+==DONE==
 --EXPECTF--
-5
-5
-Done
+Fatal error: Cannot define static accessor %s, not supported at this time in %s on line %d

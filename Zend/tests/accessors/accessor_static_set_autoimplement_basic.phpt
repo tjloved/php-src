@@ -26,10 +26,20 @@ AccessorTest::$b = 10;
 echo "AccessorTest::\$b = 10;\n";
 echo "AccessorTest::\$b: ".AccessorTest::getStaticValue()."\n";
 echo "Done\n";
-?>
---EXPECTF--
+	
+	
+/*********************************************************************************
+ * Static accessors as a feature for first release was shelved, the lines below 
+ *	are what this test should output when static accessors are written:
+ *********************************************************************************
 Protected static property: $__b exists.
 AccessorTest::$b: 
 AccessorTest::$b = 10;
 AccessorTest::$b: 10
 Done
+ */
+
+
+?>
+--EXPECTF--
+Fatal error: Cannot define static accessor %s, not supported at this time in %s on line %d

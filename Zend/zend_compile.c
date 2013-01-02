@@ -1674,6 +1674,10 @@ void zend_declare_accessor(znode *var_name TSRMLS_DC) { /* {{{ */
 	char				*vn_copy = NULL;
 	zend_uint			orig_ce_flags = CG(active_class_entry)->ce_flags;
 
+	if(CG(access_type) & ZEND_ACC_STATIC) {
+		zend_error_noreturn(E_COMPILE_ERROR, "Cannot define static accessor %s::$%s, not supported at this time", CG(active_class_entry)->name, Z_STRVAL(var_name->u.constant));
+	}
+
 	// Hide that we're working with an interface during property accessor declaration
 	CG(active_class_entry)->ce_flags &= ~ZEND_ACC_INTERFACE;
 

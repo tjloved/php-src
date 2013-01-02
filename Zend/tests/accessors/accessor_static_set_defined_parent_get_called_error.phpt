@@ -24,6 +24,16 @@ class AccessorTest extends ParentAccessorTest {
 }
 
 echo AccessorTest::$b;
+	
+	
+/*********************************************************************************
+ * Static accessors as a feature for first release was shelved, the lines below 
+ *	are what this test should output when static accessors are written:
+ *********************************************************************************
+Fatal error: Cannot get property parent::$a, no getter defined. in %s on line %d
+ */
+
+
 ?>
 --EXPECTF--
-Fatal error: Cannot get property parent::$a, no getter defined. in %s on line %d
+Fatal error: Cannot define static accessor %s, not supported at this time in %s on line %d
