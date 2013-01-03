@@ -3797,6 +3797,11 @@ static zend_bool do_inherit_property_access_check(HashTable *target_ht, zend_pro
 			ce->default_properties_table[parent_info->offset] = ce->default_properties_table[child_info->offset];
 			ce->default_properties_table[child_info->offset] = NULL;
 			child_info->offset = parent_info->offset;
+
+			if(parent_info->ai && !child_info->ai) {
+				child_info->ai = ecalloc(1, sizeof(zend_accessor_info));
+				child_info->ai->flags = parent_info->ai->flags;
+			}
 		}
 		return 0;	/* Don't copy from parent */
 	} else {
