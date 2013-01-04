@@ -34,7 +34,7 @@
 
 #define FREE_PNODE(znode)	zval_dtor(&znode->u.constant);
 
-#define IS_ACCESSOR_FN(fn) ( fn->common.purpose >= ZEND_FNP_PROP_GETTER && fn->common.purpose <= ZEND_FNP_PROP_UNSETTER )
+#define IS_ACCESSOR_FN(fn) ( (fn)->common.purpose >= ZEND_FNP_PROP_GETTER && (fn)->common.purpose <= ZEND_FNP_PROP_UNSETTER )
 
 #define INIT_ZNODE(zn) \
 	{															\

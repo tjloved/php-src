@@ -1,5 +1,7 @@
 --TEST--
 ZE2 Tests that access to a undefined self getter produces an error
+--XFAIL--
+No support for parent:: self:: static:: or Shape:: at the moment
 --FILE--
 <?php
 

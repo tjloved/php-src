@@ -1774,7 +1774,6 @@ void zend_do_end_accessor_declaration(znode *function_token, znode *var_name, zn
 }
 /* }}} */
 
-
 void zend_finalize_accessor(znode *var_name TSRMLS_DC) { /* {{{ */
 	zend_property_info	*property_info;
 
@@ -3745,6 +3744,16 @@ static zend_bool do_inherit_method_check(HashTable *child_function_table, zend_f
 	TSRMLS_FETCH();
 
 	if (zend_hash_quick_find(child_function_table, hash_key->arKey, hash_key->nKeyLength, hash_key->h, (void **) &child)==FAILURE) {
+		if(IS_ACCESSOR_FN(parent)) {
+			zend_property_info *property_info;
+			const char			*acc_name = ZEND_ACC_NAME(parent);
+			zend_uint			acc_name_len = strlen(acc_name);
+
+			if(zend_hash_find(&child_ce->properties_info, acc_name, acc_name_len+1, (void **) &property_info) == SUCCESS) {
+				if(!property_info->ai)
+					return 0; /* Do not copy */
+			}
+		}
 		if (parent_flags & (ZEND_ACC_ABSTRACT)) {
 			child_ce->ce_flags |= ZEND_ACC_IMPLICIT_ABSTRACT_CLASS;
 		}
@@ -4057,6 +4066,24 @@ static int do_interface_constant_check(zval **val TSRMLS_DC, int num_args, va_li
 }
 /* }}} */
 
+
+
+/*static int prune_dangling_accessors(zend_function *zf, zend_class_entry *ce TSRMLS_DC) {  {{{
+	if(IS_ACCESSOR_FN(zf)) {
+		zend_property_info *property_info;
+		const char			*acc_name = ZEND_ACC_NAME(zf);
+		zend_uint			acc_name_len = strlen(acc_name);
+
+		if(zend_hash_find(&ce->properties_info, acc_name, acc_name_len+1, (void **) &property_info) == SUCCESS) {
+			if(property_info->ai)
+				return ZEND_HASH_APPLY_KEEP;
+			return ZEND_HASH_APPLY_REMOVE;
+		}
+	}
+	return ZEND_HASH_APPLY_KEEP;
+}
+ }}} */
+
 ZEND_API void zend_do_implement_interface(zend_class_entry *ce, zend_class_entry *iface TSRMLS_DC) /* {{{ */
 {
 	zend_uint i, ignore = 0;
@@ -4093,6 +4120,8 @@ ZEND_API void zend_do_implement_interface(zend_class_entry *ce, zend_class_entry
 
 		do_implement_interface(ce, iface TSRMLS_CC);
 		zend_do_inherit_interfaces(ce, iface TSRMLS_CC);
+
+		//zend_hash_apply_with_argument(&ce->function_table, (apply_func_arg_t) prune_dangling_accessors, (void*)ce);
 	}
 }
 /* }}} */

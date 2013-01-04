@@ -1,5 +1,7 @@
 --TEST--
 ZE2 Tests that a getter/setter can access parent class getter/setter
+--XFAIL--
+No support for parent:: self:: static:: or Shape:: at the moment
 --FILE--
 <?php
 

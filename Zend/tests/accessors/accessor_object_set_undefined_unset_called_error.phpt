@@ -1,5 +1,7 @@
 --TEST--
 ZE2 Tests that an undefined setter produces an error on unset()
+--XFAIL--
+Waiting on https://github.com/cpriest/php-src/issues/12
 --FILE--
 <?php
 

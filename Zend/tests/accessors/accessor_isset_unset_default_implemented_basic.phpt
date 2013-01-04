@@ -1,5 +1,7 @@
 --TEST--
 ZE2 Tests that isset/unset default implementations work as expected, also ensures that isset/unset call the getter/setter accessors
+--XFAIL--
+Waiting on https://github.com/cpriest/php-src/issues/12
 --FILE--
 <?php
 
