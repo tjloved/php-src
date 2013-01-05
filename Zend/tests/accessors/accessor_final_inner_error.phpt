@@ -25,4 +25,4 @@ $o = new TimePeriod2();
 echo $o->Hours."\n";
 ?>
 --EXPECTF--
-Fatal error: Cannot override final property setter TimePeriod::$Hours in %s on line %d
+Fatal error: Cannot override final accessor TimePeriod::$Hours->set() in %s on line %d

@@ -17,4 +17,4 @@ $o = new TimePeriod();
 echo $o->Hours."\n";
 ?>
 --EXPECTF--
-Fatal error: Cannot get private property TimePeriod::$Hours from context '' in %s on line %d
+Fatal error: Call to private accessor TimePeriod::$Hours->get() from context '' in %s on line %d

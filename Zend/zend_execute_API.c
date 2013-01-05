@@ -1606,7 +1606,6 @@ zend_class_entry *zend_fetch_class_by_name(const char *class_name, uint class_na
 
 #define MAX_ABSTRACT_INFO_CNT 3
 #define MAX_ABSTRACT_INFO_FMT "%s%s%s%s"
-#define MAX_ABS_ACCESSOR_INFO_FMT "%s%s%s%s%s%s"
 
 #define DISPLAY_ABSTRACT_FN(idx) \
 	ai.afn[idx] ? ZEND_FN_SCOPE_NAME(ai.afn[idx]) : "", \
@@ -1615,11 +1614,9 @@ zend_class_entry *zend_fetch_class_by_name(const char *class_name, uint class_na
 	ai.afn[idx] && ai.afn[idx + 1] ? ", " : (ai.afn[idx] && ai.afn_cnt > MAX_ABSTRACT_INFO_CNT ? ", ..." : "")
 
 #define DISPLAY_ABS_ACCESSOR_FN(idx) \
-	ai.abs_acc[idx] ? zend_fn_purpose_string(ai.abs_acc[idx]) : "", \
-	ai.abs_acc[idx] ? " " : "", \
 	ai.abs_acc[idx] ? ZEND_FN_SCOPE_NAME(ai.abs_acc[idx]) : "", \
-	ai.abs_acc[idx] ? "::$" : "", \
-	ai.abs_acc[idx] ? ZEND_ACC_NAME(ai.abs_acc[idx]) : "", \
+	ai.abs_acc[idx] ? "::" : "", \
+	ai.abs_acc[idx] ? ai.abs_acc[idx]->common.function_name : "", \
 	ai.abs_acc[idx] && ai.abs_acc[idx + 1] ? ", " : (ai.abs_acc[idx] && ai.abs_acc_count > MAX_ABSTRACT_INFO_CNT ? ", ..." : "")
 
 typedef struct _zend_abstract_info {
@@ -1679,7 +1676,7 @@ void zend_verify_abstract_class(zend_class_entry *ce TSRMLS_DC) /* {{{ */
 				);
 		}
 		if (ai.abs_acc_count) {
-			zend_error(E_ERROR, "Class %s contains %d abstract accessor%s and must be declared abstract or implement the remaining accessors (" MAX_ABS_ACCESSOR_INFO_FMT MAX_ABS_ACCESSOR_INFO_FMT MAX_ABS_ACCESSOR_INFO_FMT ")",
+			zend_error(E_ERROR, "Class %s contains %d abstract accessor%s and must be declared abstract or implement the remaining accessors (" MAX_ABSTRACT_INFO_FMT MAX_ABSTRACT_INFO_FMT MAX_ABSTRACT_INFO_FMT ")",
 				ce->name, ai.abs_acc_count,
 				ai.abs_acc_count > 1 ? "s" : "",
 				DISPLAY_ABS_ACCESSOR_FN(0),

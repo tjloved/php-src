@@ -385,9 +385,6 @@ typedef union _zend_function {
 	zend_internal_function internal_function;
 } zend_function;
 
-#define ZEND_ACC_NAME(func) zend_get_accessor_name_from_function(func TSRMLS_CC)
-#define ZEND_ACC_NAME_AI(ai) zend_get_accessor_name_from_accessor_info(ai TSRMLS_CC)
-
 typedef struct _zend_accessor_info {
 	zend_uint		flags;
 	zend_function 	*getter;
@@ -693,10 +690,7 @@ void zend_do_goto(const znode *label TSRMLS_DC);
 void zend_resolve_goto_label(zend_op_array *op_array, zend_op *opline, int pass2 TSRMLS_DC);
 void zend_release_labels(TSRMLS_D);
 
-const char *zend_get_accessor_name_from_function(const zend_function *func TSRMLS_DC);
-const char *zend_get_accessor_name_from_accessor_info(const zend_accessor_info *ai TSRMLS_DC);
-zend_accessor_info *zend_get_accessor_info_from_function(const zend_function *func TSRMLS_DC);
-zend_accessor_info *zend_get_accessor_from_init_static_method_call(zend_op_array *op_array, zend_op *opline, const char **context_name_out TSRMLS_DC);
+char *zend_get_accessor_name_from_function(const zend_function *func);
 char *zend_visibility_string(zend_uint fn_flags);
 char *zend_fn_purpose_string(zend_function *function);
 

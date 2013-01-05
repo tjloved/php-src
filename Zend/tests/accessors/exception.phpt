@@ -23,20 +23,20 @@ try { unset($foo->bar); } catch (Exception $e) { echo $e, "\n\n"; }
 --EXPECTF--
 exception 'Exception' with message 'except in getter' in %s:%d
 Stack trace:
-#0 %s(%d): Foo->bar->get()
+#0 %s(%d): Foo->$bar->get()
 #1 {main}
 
 exception 'Exception' with message 'except in setter' in %s:%d
 Stack trace:
-#0 %s(%d): Foo->bar->set('test')
+#0 %s(%d): Foo->$bar->set('test')
 #1 {main}
 
 exception 'Exception' with message 'except in issetter' in %s:%d
 Stack trace:
-#0 %s(%d): Foo->bar->isset()
+#0 %s(%d): Foo->$bar->isset()
 #1 {main}
 
 exception 'Exception' with message 'except in unsetter' in %s:%d
 Stack trace:
-#0 %s(%d): Foo->bar->unset()
+#0 %s(%d): Foo->$bar->unset()
 #1 {main}

@@ -76,7 +76,7 @@ Reflecting on property TestClass::a1
 
 __toString():
 string(%d) "Accessor [ public $a1 ] {
-    Method [ <user> public method __geta1 ] {
+    Method [ <user> public method $a1->get ] {
       @@ %s %d - %d
     }
 }
@@ -84,7 +84,7 @@ string(%d) "Accessor [ public $a1 ] {
 "
 export():
 string(%d) "Accessor [ public $a1 ] {
-    Method [ <user> public method __geta1 ] {
+    Method [ <user> public method $a1->get ] {
       @@ %s %d - %d
     }
 }
@@ -92,7 +92,7 @@ string(%d) "Accessor [ public $a1 ] {
 "
 export():
 Accessor [ public $a1 ] {
-    Method [ <user> public method __geta1 ] {
+    Method [ <user> public method $a1->get ] {
       @@ %s %d - %d
     }
 }
@@ -120,7 +120,7 @@ Reflecting on property TestClass::a2
 
 __toString():
 string(%d) "Accessor [ public $a2 ] {
-    Method [ <user> public method __seta2 ] {
+    Method [ <user> public method $a2->set ] {
       @@ %s %d - %d
 
       - Parameters [1] {
@@ -132,7 +132,7 @@ string(%d) "Accessor [ public $a2 ] {
 "
 export():
 string(%d) "Accessor [ public $a2 ] {
-    Method [ <user> public method __seta2 ] {
+    Method [ <user> public method $a2->set ] {
       @@ %s %d - %d
 
       - Parameters [1] {
@@ -144,7 +144,7 @@ string(%d) "Accessor [ public $a2 ] {
 "
 export():
 Accessor [ public $a2 ] {
-    Method [ <user> public method __seta2 ] {
+    Method [ <user> public method $a2->set ] {
       @@ %s %d - %d
 
       - Parameters [1] {
@@ -175,10 +175,10 @@ Reflecting on property TestClass::a3
 
 __toString():
 string(%d) "Accessor [ public $a3 ] {
-    Method [ <user> public method __geta3 ] {
+    Method [ <user> public method $a3->get ] {
       @@ %s %d - %d
     }
-    Method [ <user> public method __seta3 ] {
+    Method [ <user> public method $a3->set ] {
       @@ %s %d - %d
 
       - Parameters [1] {
@@ -190,10 +190,10 @@ string(%d) "Accessor [ public $a3 ] {
 "
 export():
 string(%d) "Accessor [ public $a3 ] {
-    Method [ <user> public method __geta3 ] {
+    Method [ <user> public method $a3->get ] {
       @@ %s %d - %d
     }
-    Method [ <user> public method __seta3 ] {
+    Method [ <user> public method $a3->set ] {
       @@ %s %d - %d
 
       - Parameters [1] {
@@ -205,10 +205,10 @@ string(%d) "Accessor [ public $a3 ] {
 "
 export():
 Accessor [ public $a3 ] {
-    Method [ <user> public method __geta3 ] {
+    Method [ <user> public method $a3->get ] {
       @@ %s %d - %d
     }
-    Method [ <user> public method __seta3 ] {
+    Method [ <user> public method $a3->set ] {
       @@ %s %d - %d
 
       - Parameters [1] {

@@ -20,4 +20,4 @@ $o->Hours = 2;
 --EXPECTF--
 1
 
-Fatal error: Cannot set private property TimePeriod::$Hours from context '' in %s on line %d
+Fatal error: Call to private accessor TimePeriod::$Hours->set() from context '' in %s on line %d

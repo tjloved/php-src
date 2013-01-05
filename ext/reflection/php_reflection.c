@@ -353,7 +353,7 @@ static zval * reflection_instantiate(zend_class_entry *pce, zval *object TSRMLS_
 static void _const_string(string *str, char *name, zval *value, char *indent TSRMLS_DC);
 static void _function_string(string *str, zend_function *fptr, zend_class_entry *scope, char* indent TSRMLS_DC);
 static void _property_string(string *str, zend_property_info *prop, char *prop_name, char* indent TSRMLS_DC);
-static void _property_accessor_string(string *str, zend_accessor_info *ai, char* indent TSRMLS_DC);
+static void _property_accessor_string(string *str, zend_property_info *prop, char *indent TSRMLS_DC);
 static void _class_string(string *str, zend_class_entry *ce, zval *obj, char *indent TSRMLS_DC);
 static void _extension_string(string *str, zend_module_entry *module, char *indent TSRMLS_DC);
 static void _zend_extension_string(string *str, zend_extension *extension, char *indent TSRMLS_DC);
@@ -970,20 +970,15 @@ static void _property_string(string *str, zend_property_info *prop, char *prop_n
 
 
 /* {{{ _property_accessor_string */
-static void _property_accessor_string(string *str, zend_accessor_info *ai, char* indent TSRMLS_DC)
+static void _property_accessor_string(string *str, zend_property_info *prop, char *indent TSRMLS_DC)
 {
-	const char *name = NULL;
+	zend_accessor_info *ai = prop->ai;
 	string sub_indent;
 	string_init(&sub_indent);
 	string_printf(&sub_indent, "%s    ", indent);
 
 	string_printf(str, "%sAccessor [ ", indent);
 	if (ai) {
-		if(ai->getter) {
-			name = ZEND_ACC_NAME(ai->getter);
-		} else if(ai->setter) {
-			name = ZEND_ACC_NAME(ai->setter);
-		}
 		/* These are mutually exclusive */
 		switch (ai->flags & ZEND_ACC_PPP_MASK) {
 			case ZEND_ACC_PUBLIC:
@@ -1000,7 +995,7 @@ static void _property_accessor_string(string *str, zend_accessor_info *ai, char*
 			string_printf(str, "static ");
 		}
 
-		string_printf(str, "$%s ] {\n", name);
+		string_printf(str, "$%s ] {\n", prop->name);
 
 		if(ai->getter) {
 			_function_string(str, ai->getter, ai->getter->common.scope, sub_indent.string TSRMLS_CC);
@@ -5563,7 +5558,7 @@ ZEND_METHOD(reflection_property_accessor, __toString)
 	}
 	GET_REFLECTION_OBJECT_PTR(ref);
 	string_init(&str);
-	_property_accessor_string(&str, ref->prop.ai, "" TSRMLS_CC);
+	_property_accessor_string(&str, &ref->prop, "" TSRMLS_CC);
 	RETURN_STRINGL(str.string, str.len - 1, 0);
 }
 /* }}} */

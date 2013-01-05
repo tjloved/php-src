@@ -2265,18 +2265,7 @@ ZEND_API void zend_fetch_debug_backtrace(zval *return_value, int skip_last, int 
 		function_name = fbc->common.function_name;
 
 		if (function_name) {
-			if (IS_ACCESSOR_FN(fbc)) {
-				add_assoc_string_ex(
-					stack_frame, "property", sizeof("property"),
-					zend_get_accessor_name_from_function(fbc TSRMLS_CC), 1
-				);
-				add_assoc_string_ex(
-					stack_frame, "accessor", sizeof("accessor"),
-					zend_fn_purpose_string(fbc), 1
-				);
-			} else {
-				add_assoc_string_ex(stack_frame, "function", sizeof("function"), (char*)function_name, 1);
-			}
+			add_assoc_string_ex(stack_frame, "function", sizeof("function"), (char*)function_name, 1);
 
 			if (ptr->object && Z_TYPE_P(ptr->object) == IS_OBJECT) {
 				if (fbc->common.scope) {

@@ -25,14 +25,14 @@ Clint Priest <php-dev@zerocue.com>
 --EXPECT--
 object(ReflectionMethod)#5 (2) {
   ["name"]=>
-  string(7) "__geta1"
+  string(8) "$a1->get"
   ["class"]=>
   string(10) "TimePeriod"
 }
 bool(false)
 object(ReflectionMethod)#5 (2) {
   ["name"]=>
-  string(7) "__geta3"
+  string(8) "$a3->get"
   ["class"]=>
   string(10) "TimePeriod"
 }

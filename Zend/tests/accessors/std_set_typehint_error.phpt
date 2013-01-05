@@ -21,4 +21,4 @@ $tc  = new TestClass();
 $o->Object = $tc;
 ?>
 --EXPECTF--
-Catchable fatal error: Argument 1 passed to setter TimePeriod::$Object must be an instance of TestClass2, instance of TestClass given in %s on line %d
+Catchable fatal error: Argument 1 passed to TimePeriod::$Object->set() must be an instance of TestClass2, instance of TestClass given in %s on line %d

@@ -26,13 +26,13 @@ Clint Priest <php-dev@zerocue.com>
 bool(false)
 object(ReflectionMethod)#5 (2) {
   ["name"]=>
-  string(7) "__seta2"
+  string(8) "$a2->set"
   ["class"]=>
   string(10) "TimePeriod"
 }
 object(ReflectionMethod)#5 (2) {
   ["name"]=>
-  string(7) "__seta3"
+  string(8) "$a3->set"
   ["class"]=>
   string(10) "TimePeriod"
 }

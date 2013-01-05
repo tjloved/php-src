@@ -23,15 +23,13 @@ unset($foo->bar);
 --EXPECTF--
 array(1) {
   [0]=>
-  array(8) {
+  array(7) {
     ["file"]=>
     string(%d) "%s"
     ["line"]=>
     int(%d)
-    ["property"]=>
-    string(3) "bar"
-    ["accessor"]=>
-    string(3) "get"
+    ["function"]=>
+    string(9) "$bar->get"
     ["class"]=>
     string(3) "Foo"
     ["object"]=>
@@ -48,15 +46,13 @@ array(1) {
 }
 array(1) {
   [0]=>
-  array(8) {
+  array(7) {
     ["file"]=>
     string(%d) "%s"
     ["line"]=>
     int(%d)
-    ["property"]=>
-    string(3) "bar"
-    ["accessor"]=>
-    string(3) "set"
+    ["function"]=>
+    string(9) "$bar->set"
     ["class"]=>
     string(3) "Foo"
     ["object"]=>
@@ -75,15 +71,13 @@ array(1) {
 }
 array(1) {
   [0]=>
-  array(8) {
+  array(7) {
     ["file"]=>
     string(%d) "%s"
     ["line"]=>
     int(%d)
-    ["property"]=>
-    string(3) "bar"
-    ["accessor"]=>
-    string(5) "isset"
+    ["function"]=>
+    string(11) "$bar->isset"
     ["class"]=>
     string(3) "Foo"
     ["object"]=>
@@ -100,15 +94,13 @@ array(1) {
 }
 array(1) {
   [0]=>
-  array(8) {
+  array(7) {
     ["file"]=>
     string(%d) "%s"
     ["line"]=>
     int(%d)
-    ["property"]=>
-    string(3) "bar"
-    ["accessor"]=>
-    string(5) "unset"
+    ["function"]=>
+    string(11) "$bar->unset"
     ["class"]=>
     string(3) "Foo"
     ["object"]=>

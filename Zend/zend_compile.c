@@ -1605,6 +1605,16 @@ void zend_declare_accessor(znode *var_name TSRMLS_DC) { /* {{{ */
 }
 /* }}} */
 
+static inline char *create_accessor_function_name(char *property_name, char *accessor_type) /* {{{ */
+{
+	/* Format: $ property_name -> accessor_type */
+	int buffer_len = strlen(property_name) + strlen(accessor_type) + 3 + 1;
+	char *buffer = emalloc(buffer_len);
+	snprintf(buffer, buffer_len, "$%s->%s", property_name, accessor_type);
+	return buffer;
+}
+/* }}} */
+
 void zend_do_begin_accessor_declaration(znode *function_token, znode *var_name, znode *modifiers, int return_reference, int has_params TSRMLS_DC) /* {{{ */
 {
 	zend_property_info *property_info;
@@ -1615,32 +1625,28 @@ void zend_do_begin_accessor_declaration(znode *function_token, znode *var_name, 
 		Z_LVAL(modifiers->u.constant) |= (property_info->ai->flags & ZEND_ACC_STATIC);
 
 		if(Z_TYPE(function_token->u.constant) == IS_STRING && strcasecmp("get", Z_STRVAL(function_token->u.constant)) == 0) {
-			/* Convert type and variable name to __getHours() */
-			char *tmp = strcatalloc("__get", 5, Z_STRVAL(var_name->u.constant), Z_STRLEN(var_name->u.constant) TSRMLS_CC);
 			efree(Z_STRVAL(function_token->u.constant));
-			ZVAL_STRINGL(&function_token->u.constant, tmp, 5 + Z_STRLEN(var_name->u.constant), 0);
+			ZVAL_STRING(&function_token->u.constant, create_accessor_function_name(Z_STRVAL(var_name->u.constant), "get"), 0);
 
-			if(has_params) {
+			if (has_params) {
 				zend_error(E_COMPILE_ERROR, "Getters do not accept parameters for variable %s::$%s", CG(active_class_entry)->name, Z_STRVAL(var_name->u.constant));
 			}
 
 			/* Declare Function */
 			zend_do_begin_function_declaration(function_token, function_token, 1, return_reference, modifiers, ZEND_FNP_PROP_GETTER TSRMLS_CC);
 		} else if(Z_TYPE(function_token->u.constant) == IS_STRING && strcasecmp("set", Z_STRVAL(function_token->u.constant)) == 0) {
-			/* Convert type and variable name to __setHours() */
-			char *tmp = strcatalloc("__set", 5, Z_STRVAL(var_name->u.constant), Z_STRLEN(var_name->u.constant) TSRMLS_CC);
 			znode unused_node, unused_node2, value_node;
 
 			efree(Z_STRVAL(function_token->u.constant));
-			ZVAL_STRINGL(&function_token->u.constant, tmp, 5 + Z_STRLEN(var_name->u.constant), 0);
+			ZVAL_STRING(&function_token->u.constant, create_accessor_function_name(Z_STRVAL(var_name->u.constant), "set"), 0);
 
-			if(return_reference) {
+			if (return_reference) {
 				zend_error(E_WARNING, "Property setter %s::$%s indicates a return reference with '&', setters do not return values, ignored.", CG(active_class_entry)->name, Z_STRVAL(var_name->u.constant));
 			}
 			/* Declare Function */
 			zend_do_begin_function_declaration(function_token, function_token, 1, ZEND_RETURN_VAL, modifiers, ZEND_FNP_PROP_SETTER TSRMLS_CC);
 
-			if(!has_params) {
+			if (!has_params) {
 				/* Add $value parameter to __setHours() */
 				unused_node.op_type = unused_node2.op_type = IS_UNUSED;
 				unused_node.u.op.num = unused_node2.u.op.num = 1;
@@ -1650,22 +1656,18 @@ void zend_do_begin_accessor_declaration(znode *function_token, znode *var_name, 
 				zend_do_receive_arg(ZEND_RECV, &value_node, &unused_node, NULL, &unused_node2, 0 TSRMLS_CC);
 			}
 		} else if(Z_TYPE(function_token->u.constant) == IS_LONG && Z_LVAL(function_token->u.constant) == T_ISSET) {
-			/* Convert type and variable name to __issetHours() */
-			char *tmp = strcatalloc("__isset", 7, Z_STRVAL(var_name->u.constant), Z_STRLEN(var_name->u.constant) TSRMLS_CC);
-			ZVAL_STRINGL(&function_token->u.constant, tmp, 7 + Z_STRLEN(var_name->u.constant), 0);
+			ZVAL_STRING(&function_token->u.constant, create_accessor_function_name(Z_STRVAL(var_name->u.constant), "isset"), 0);
 
-			if(has_params) {
+			if (has_params) {
 				zend_error(E_COMPILE_ERROR, "Issetters do not accept parameters for variable %s::$%s", CG(active_class_entry)->name, Z_STRVAL(var_name->u.constant));
 			}
 
 			/* Declare Function */
 			zend_do_begin_function_declaration(function_token, function_token, 1, ZEND_RETURN_VAL, modifiers, ZEND_FNP_PROP_ISSETTER TSRMLS_CC);
 		} else if(Z_TYPE(function_token->u.constant) == IS_LONG && Z_LVAL(function_token->u.constant) == T_UNSET) {
-			/* Convert type and variable name to __unsetHours() */
-			char *tmp = strcatalloc("__unset", 7, Z_STRVAL(var_name->u.constant), Z_STRLEN(var_name->u.constant) TSRMLS_CC);
-			ZVAL_STRINGL(&function_token->u.constant, tmp, 7 + Z_STRLEN(var_name->u.constant), 0);
+			ZVAL_STRING(&function_token->u.constant, create_accessor_function_name(Z_STRVAL(var_name->u.constant), "unset"), 0);
 
-			if(has_params) {
+			if (has_params) {
 				zend_error(E_COMPILE_ERROR, "Unsetters do not accept parameters for variable %s::$%s", CG(active_class_entry)->name, Z_STRVAL(var_name->u.constant));
 			}
 
@@ -3665,11 +3667,7 @@ static void do_inheritance_check_on_method(zend_function *child, zend_function *
 	}
 
 	if (parent_flags & ZEND_ACC_FINAL) {
-		if (IS_ACCESSOR_FN(parent)) {
-			zend_error(E_COMPILE_ERROR, "Cannot override final property %ster %s::$%s", zend_fn_purpose_string(child), ZEND_FN_SCOPE_NAME(parent), ZEND_ACC_NAME(child));
-		} else {
-			zend_error(E_COMPILE_ERROR, "Cannot override final method %s::%s()", ZEND_FN_SCOPE_NAME(parent), child->common.function_name);
-		}
+		zend_error(E_COMPILE_ERROR, "Cannot override final %s %s::%s()", IS_ACCESSOR_FN(parent) ? "accessor" : "method", ZEND_FN_SCOPE_NAME(parent), child->common.function_name);
 	}
 
 	child_flags	= child->common.fn_flags;
@@ -3677,17 +3675,9 @@ static void do_inheritance_check_on_method(zend_function *child, zend_function *
 	 */
 	if ((child_flags & ZEND_ACC_STATIC) != (parent_flags & ZEND_ACC_STATIC)) {
 		if (child->common.fn_flags & ZEND_ACC_STATIC) {
-			if(IS_ACCESSOR_FN(child)) {
-				zend_error(E_COMPILE_ERROR, "Cannot make non static accessor %s::$%s static in class %s", ZEND_FN_SCOPE_NAME(parent), ZEND_ACC_NAME(child), ZEND_FN_SCOPE_NAME(child));
-			} else {
-				zend_error(E_COMPILE_ERROR, "Cannot make non static method %s::%s() static in class %s", ZEND_FN_SCOPE_NAME(parent), child->common.function_name, ZEND_FN_SCOPE_NAME(child));
-			}
+			zend_error(E_COMPILE_ERROR, "Cannot make non static method %s::%s() static in class %s", ZEND_FN_SCOPE_NAME(parent), child->common.function_name, ZEND_FN_SCOPE_NAME(child));
 		} else {
-			if(IS_ACCESSOR_FN(child)) {
-				zend_error(E_COMPILE_ERROR, "Cannot make static accessor %s::$%s non static in class %s", ZEND_FN_SCOPE_NAME(parent), ZEND_ACC_NAME(child), ZEND_FN_SCOPE_NAME(child));
-			} else {
-				zend_error(E_COMPILE_ERROR, "Cannot make static method %s::%s() non static in class %s", ZEND_FN_SCOPE_NAME(parent), child->common.function_name, ZEND_FN_SCOPE_NAME(child));
-			}
+			zend_error(E_COMPILE_ERROR, "Cannot make static method %s::%s() non static in class %s", ZEND_FN_SCOPE_NAME(parent), child->common.function_name, ZEND_FN_SCOPE_NAME(child));
 		}
 	}
 
@@ -3702,11 +3692,7 @@ static void do_inheritance_check_on_method(zend_function *child, zend_function *
 		/* Prevent derived classes from restricting access that was available in parent classes
 		 */
 		if ((child_flags & ZEND_ACC_PPP_MASK) > (parent_flags & ZEND_ACC_PPP_MASK)) {
-			if (IS_ACCESSOR_FN(child)) {
-				zend_error(E_COMPILE_ERROR, "Access level to %ster %s::$%s must be %s (as in class %s)%s", zend_fn_purpose_string(child), ZEND_FN_SCOPE_NAME(child), ZEND_ACC_NAME(child), zend_visibility_string(parent_flags), ZEND_FN_SCOPE_NAME(parent), (parent_flags&ZEND_ACC_PUBLIC) ? "" : " or weaker");
-			} else {
-				zend_error(E_COMPILE_ERROR, "Access level to %s::%s() must be %s (as in class %s)%s", ZEND_FN_SCOPE_NAME(child), child->common.function_name, zend_visibility_string(parent_flags), ZEND_FN_SCOPE_NAME(parent), (parent_flags&ZEND_ACC_PUBLIC) ? "" : " or weaker");
-			}
+			zend_error(E_COMPILE_ERROR, "Access level to %s::%s() must be %s (as in class %s)%s", ZEND_FN_SCOPE_NAME(child), child->common.function_name, zend_visibility_string(parent_flags), ZEND_FN_SCOPE_NAME(parent), (parent_flags&ZEND_ACC_PUBLIC) ? "" : " or weaker");
 		} else if (((child_flags & ZEND_ACC_PPP_MASK) < (parent_flags & ZEND_ACC_PPP_MASK))
 			&& ((parent_flags & ZEND_ACC_PPP_MASK) & ZEND_ACC_PRIVATE)) {
 				child->common.fn_flags |= ZEND_ACC_CHANGED;
@@ -3746,13 +3732,16 @@ static zend_bool do_inherit_method_check(HashTable *child_function_table, zend_f
 	if (zend_hash_quick_find(child_function_table, hash_key->arKey, hash_key->nKeyLength, hash_key->h, (void **) &child)==FAILURE) {
 		if(IS_ACCESSOR_FN(parent)) {
 			zend_property_info *property_info;
-			const char			*acc_name = ZEND_ACC_NAME(parent);
-			zend_uint			acc_name_len = strlen(acc_name);
+			char *acc_name = zend_get_accessor_name_from_function(parent);
+			zend_uint acc_name_len = strlen(acc_name);
 
 			if(zend_hash_find(&child_ce->properties_info, acc_name, acc_name_len+1, (void **) &property_info) == SUCCESS) {
-				if(!property_info->ai)
+				if (!property_info->ai) {
+					efree(acc_name);
 					return 0; /* Do not copy */
+				}
 			}
+			efree(acc_name);
 		}
 		if (parent_flags & (ZEND_ACC_ABSTRACT)) {
 			child_ce->ce_flags |= ZEND_ACC_IMPLICIT_ABSTRACT_CLASS;
@@ -3894,8 +3883,8 @@ static inline void zend_do_update_accessors(zend_class_entry *ce TSRMLS_DC) /* {
 	zend_hash_move_forward(&ce->function_table)) {
 		if (IS_ACCESSOR_FN(func)) {
 			zend_property_info	*property_info;
-			const char *var_name = ZEND_ACC_NAME(func);
-			zend_uint	var_name_len = strlen(var_name);
+			char *var_name = zend_get_accessor_name_from_function(func);
+			zend_uint var_name_len = strlen(var_name);
 
 			if(zend_hash_find(&ce->properties_info, var_name, var_name_len+1, (void **) &property_info)==SUCCESS) {
 				if(func->common.purpose == ZEND_FNP_PROP_GETTER) {
@@ -3910,6 +3899,7 @@ static inline void zend_do_update_accessors(zend_class_entry *ce TSRMLS_DC) /* {
 			} else {
 				zend_error_noreturn(E_COMPILE_ERROR, "Property_info for %s::$%s is not present, should not happen in zend_do_update_accessors()", ce->name, var_name);
 			}
+			efree(var_name);
 		}
 	}
 }
@@ -4071,7 +4061,7 @@ static int do_interface_constant_check(zval **val TSRMLS_DC, int num_args, va_li
 /*static int prune_dangling_accessors(zend_function *zf, zend_class_entry *ce TSRMLS_DC) {  {{{
 	if(IS_ACCESSOR_FN(zf)) {
 		zend_property_info *property_info;
-		const char			*acc_name = ZEND_ACC_NAME(zf);
+		const char			*acc_name = zend_get_accessor_name_from_function(zf);
 		zend_uint			acc_name_len = strlen(acc_name);
 
 		if(zend_hash_find(&ce->properties_info, acc_name, acc_name_len+1, (void **) &property_info) == SUCCESS) {
@@ -7489,70 +7479,11 @@ void zend_do_end_compilation(TSRMLS_D) /* {{{ */
 }
 /* }}} */
 
-const char *zend_get_accessor_name_from_function(const zend_function *func TSRMLS_DC) /* {{{ */
+char *zend_get_accessor_name_from_function(const zend_function *func) /* {{{ */
 {
-	if(!func || !IS_ACCESSOR_FN(func))
-		return "Not an accessor";
-
-	switch(func->common.purpose) {
-		case ZEND_FNP_PROP_GETTER:
-		case ZEND_FNP_PROP_SETTER:
-			return &func->common.function_name[5];
-		case ZEND_FNP_PROP_ISSETTER:
-		case ZEND_FNP_PROP_UNSETTER:
-			return &func->common.function_name[7];
-	}
-	return "Unknown Accessor Purpose";
-}
-/* }}} */
-
-const char *zend_get_accessor_name_from_accessor_info(const zend_accessor_info *ai TSRMLS_DC) /* {{{ */
-{
-	if(!ai)
-		return "Not an accessor";
-
-	if(ai->getter) {
-		return ZEND_ACC_NAME(ai->getter);
-	}
-	if(ai->setter) {
-		return ZEND_ACC_NAME(ai->setter);
-	}
-	if(ai->isset) {
-		return ZEND_ACC_NAME(ai->isset);
-	}
-	if(ai->unset) {
-		return ZEND_ACC_NAME(ai->unset);
-	}
-	return "Unknown Accessor Name";
-}
-/* }}} */
-
-zend_accessor_info *zend_get_accessor_info_from_function(const zend_function *func TSRMLS_DC) /* {{{ */
-{
-	const char 	*member_name 	= NULL;
-	zend_uint	member_name_len = 0;
-
-	zend_property_info		*property_info;
-
-	if(!func || !IS_ACCESSOR_FN(func))
-		return NULL;
-
-	switch(func->common.purpose) {
-		case ZEND_FNP_PROP_GETTER:
-		case ZEND_FNP_PROP_SETTER:
-			member_name = &func->common.function_name[5];
-			break;
-		case ZEND_FNP_PROP_ISSETTER:
-		case ZEND_FNP_PROP_UNSETTER:
-			member_name = &func->common.function_name[7];
-			break;
-	}
-	member_name_len = strlen(member_name);
-
-	if(zend_hash_find(&func->common.scope->properties_info, member_name, member_name_len+1, (void**)&property_info) == SUCCESS) {
-		return property_info->ai;
-	}
-	return NULL;
+	const char *fn_name = func->common.function_name;
+	int prop_len = strchr(fn_name, '-') - fn_name - 1;
+	return estrndup(fn_name + 1, prop_len);
 }
 /* }}} */
 
