@@ -132,10 +132,15 @@ ZEND_API HashTable *zend_std_get_debug_info(zval *object, int *is_temp TSRMLS_DC
 }
 /* }}} */
 
-static zval *zend_std_call_getter(zval *object, zval *member TSRMLS_DC) /* {{{ */
+static zval *zend_std_call_getter(zval *object, zval *member, zend_function *getter, int bp_var_type TSRMLS_DC) /* {{{ */
 {
-	zval *retval = NULL;
-	zend_class_entry *ce = Z_OBJCE_P(object);
+	zval *rv = NULL;
+	zend_object *zobj = Z_OBJ_P(object);
+
+	Z_ADDREF_P(object);
+	if (PZVAL_IS_REF(object)) {
+		SEPARATE_ZVAL(&object);
+	}
 
 	/* __get handler is called with one argument:
 	      property name
@@ -145,15 +150,41 @@ static zval *zend_std_call_getter(zval *object, zval *member TSRMLS_DC) /* {{{ *
 
 	SEPARATE_ARG_IF_REF(member);
 
-	zend_call_method_with_1_params(&object, ce, &ce->__get, ZEND_GET_FUNC_NAME, &retval, member);
+	if(getter == zobj->ce->__get) {
+		zend_call_method_with_1_params(&object, zobj->ce, &zobj->ce->__get, ZEND_GET_FUNC_NAME, &rv, member);
+	} else {
+		zend_call_method_with_0_params(&object, zobj->ce, &getter, getter->common.function_name, &rv);
+	}
+
+	if (rv) {
+		Z_DELREF_P(rv);
+		if (!Z_ISREF_P(rv) &&
+		    (bp_var_type == BP_VAR_W || bp_var_type == BP_VAR_RW  || bp_var_type == BP_VAR_UNSET)) {
+			if (Z_REFCOUNT_P(rv) > 0) {
+				zval *tmp = rv;
+
+				ALLOC_ZVAL(rv);
+				*rv = *tmp;
+				zval_copy_ctor(rv);
+				Z_UNSET_ISREF_P(rv);
+				Z_SET_REFCOUNT_P(rv, 0);
+			}
+			if (UNEXPECTED(Z_TYPE_P(rv) != IS_OBJECT)) {
+				zend_error(E_NOTICE, "Indirect modification of overloaded property %s::$%s has no effect", zobj->ce->name, Z_STRVAL_P(member));
+			}
+		}
+	} else {
+		rv = EG(uninitialized_zval_ptr);
+	}
+	if (EXPECTED(rv != object)) {
+		zval_ptr_dtor(&object);
+	} else {
+		Z_DELREF_P(object);
+	}
 
 	zval_ptr_dtor(&member);
 
-	if (retval) {
-		Z_DELREF_P(retval);
-	}
-
-	return retval;
+	return rv;
 }
 /* }}} */
 
@@ -443,64 +474,30 @@ zval *zend_std_read_property(zval *object, zval *member, int type, const zend_li
 					: zend_std_get_method(&object, (char *)property_info->ai->getter->common.function_name, strlen(property_info->ai->getter->common.function_name), NULL TSRMLS_CC);
 			if(getter) {
 				guard->in_get = 1;
-				zend_call_method_with_0_params(&object, zobj->ce, &getter, getter->common.function_name, &rv);
+				rv = zend_std_call_getter(object, member, getter, type TSRMLS_CC);
 				guard->in_get = 0;
-				if (rv) {
-					Z_DELREF_P(rv);
-				} else {
-					rv = &EG(uninitialized_zval_ptr);
-				}
-				return rv;
+				retval = &rv;
 			}
 		}
 	}
 
-	if (UNEXPECTED(!property_info) ||
+	if (retval == NULL && (UNEXPECTED(!property_info) ||
 	    ((EXPECTED((property_info->flags & ZEND_ACC_STATIC) == 0) &&
 	     property_info->offset >= 0) ?
 	        (zobj->properties ?
 	            ((retval = (zval**)zobj->properties_table[property_info->offset]) == NULL) :
 	            (*(retval = &zobj->properties_table[property_info->offset]) == NULL)) :
 	        (UNEXPECTED(!zobj->properties) ||
-	          UNEXPECTED(zend_hash_quick_find(zobj->properties, property_info->name, property_info->name_length+1, property_info->h, (void **) &retval) == FAILURE)))) {
+	          UNEXPECTED(zend_hash_quick_find(zobj->properties, property_info->name, property_info->name_length+1, property_info->h, (void **) &retval) == FAILURE))))) {
 		zend_guard *guard = NULL;
 
 		if ( zobj->ce->__get != NULL && zend_get_property_guard(zobj, property_info, member, &guard) == SUCCESS && !guard->in_get) {
 			/* have getter - try with it! */
 			
-			Z_ADDREF_P(object);
-			if (PZVAL_IS_REF(object)) {
-				SEPARATE_ZVAL(&object);
-			}
 			guard->in_get = 1; /* prevent circular getting */
-			rv = zend_std_call_getter(object, member TSRMLS_CC);
+			rv = zend_std_call_getter(object, member, zobj->ce->__get, type TSRMLS_CC);
 			guard->in_get = 0;
-
-			if (rv) {
-				retval = &rv;
-				if (!Z_ISREF_P(rv) &&
-				    (type == BP_VAR_W || type == BP_VAR_RW  || type == BP_VAR_UNSET)) {
-					if (Z_REFCOUNT_P(rv) > 0) {
-						zval *tmp = rv;
-
-						ALLOC_ZVAL(rv);
-						*rv = *tmp;
-						zval_copy_ctor(rv);
-						Z_UNSET_ISREF_P(rv);
-						Z_SET_REFCOUNT_P(rv, 0);
-					}
-					if (UNEXPECTED(Z_TYPE_P(rv) != IS_OBJECT)) {
-						zend_error(E_NOTICE, "Indirect modification of overloaded property %s::$%s has no effect", zobj->ce->name, Z_STRVAL_P(member));
-					}
-				}
-			} else {
-				retval = &EG(uninitialized_zval_ptr);
-			}
-			if (EXPECTED(*retval != object)) {
-				zval_ptr_dtor(&object);
-			} else {
-				Z_DELREF_P(object);
-			}
+			retval = &rv;
 		} else {
 			if (zobj->ce->__get && guard && guard->in_get == 1) {
 				if (Z_STRVAL_P(member)[0] == '\0') {
@@ -517,6 +514,7 @@ zval *zend_std_read_property(zval *object, zval *member, int type, const zend_li
 			retval = &EG(uninitialized_zval_ptr);
 		}
 	}
+
 	if (UNEXPECTED(tmp_member != NULL)) {
 		Z_ADDREF_PP(retval);
 		zval_ptr_dtor(&tmp_member);
