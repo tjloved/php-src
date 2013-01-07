@@ -3812,7 +3812,7 @@ static void _addmethod(zend_function *mptr, zend_class_entry *ce, zval *retval, 
 	uint len = strlen(mptr->common.function_name);
 	zend_function *closure;
 
-	if (mptr->common.fn_flags & filter && !(IS_ACCESSOR_FN(mptr))) {
+	if (mptr->common.fn_flags & filter) {
 		ALLOC_ZVAL(method);
 		if (ce == zend_ce_closure && obj && (len == sizeof(ZEND_INVOKE_FUNC_NAME)-1)
 			&& memcmp(mptr->common.function_name, ZEND_INVOKE_FUNC_NAME, sizeof(ZEND_INVOKE_FUNC_NAME)-1) == 0
