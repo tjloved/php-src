@@ -257,6 +257,65 @@ static zend_always_inline zend_bool is_derived_class(zend_class_entry *child_cla
 }
 /* }}} */
 
+static zend_always_inline zend_function *zend_get_accessor_from_property_info(zend_property_info *prop, zend_uchar num) /* {{{ */
+{
+	/* getter: num=0, setter: num=1, isset; num=2, unset: num=3 */
+	return prop->ai ? *(&prop->ai->getter + num) : NULL;
+}
+/* }}} */
+
+static zend_function *zend_get_accessor_from_ce(zend_class_entry *ce, const char *name, int name_len, ulong name_hash, zend_uchar num) /* {{{ */
+{
+	zend_property_info *property_info;
+
+	if (zend_hash_quick_find(&ce->properties_info, name, name_len+1, name_hash, (void **) &property_info) == FAILURE) {
+		return NULL;
+	}
+
+	return zend_get_accessor_from_property_info(property_info, num);
+}
+/* }}} */
+
+static zend_function *zend_get_accessor(zend_property_info *prop, zend_class_entry *ce, zend_uchar num TSRMLS_DC) /* {{{ */
+{
+	zend_function *fbc = zend_get_accessor_from_property_info(prop, num);
+
+	if (fbc->common.fn_flags & ZEND_ACC_PRIVATE) {
+		if (fbc->common.scope == ce && EG(scope) == ce) {
+			return fbc;
+		} else {
+			ce = ce->parent;
+			while (ce) {
+				if (ce == EG(scope)) {
+					fbc = zend_get_accessor_from_ce(ce, prop->name, prop->name_length, prop->h, num);
+					if (fbc) {
+						return fbc;
+					}
+				}
+				ce = ce->parent;
+			}
+
+			zend_error_noreturn(E_ERROR, "Call to %s accessor %s::%s() from context '%s'", zend_visibility_string(fbc->common.fn_flags), ZEND_FN_SCOPE_NAME(fbc), fbc->common.function_name, EG(scope) ? EG(scope)->name : "");
+		}
+	}
+
+	if ((fbc->op_array.fn_flags & ZEND_ACC_CHANGED)
+	    && EG(scope) && is_derived_class(fbc->common.scope, EG(scope))
+	) {
+		zend_function *private_fbc = zend_get_accessor_from_ce(ce, prop->name, prop->name_length, prop->h, num);
+		if (private_fbc) fbc = private_fbc;
+	}
+
+	if ((fbc->common.fn_flags & ZEND_ACC_PROTECTED)
+	    && !zend_check_protected(zend_get_function_root_class(fbc), EG(scope))
+	) {
+		zend_error_noreturn(E_ERROR, "Call to %s accessor %s::%s() from context '%s'", zend_visibility_string(fbc->common.fn_flags), ZEND_FN_SCOPE_NAME(fbc), fbc->common.function_name, EG(scope) ? EG(scope)->name : "");
+	}
+
+	return fbc;
+}
+/* }}} */
+
 zend_always_inline struct _zend_property_info *zend_get_property_info_quick(zend_class_entry *ce, zval *member, int silent, const zend_literal *key TSRMLS_DC) /* {{{ */
 {
 	zend_property_info *property_info;
@@ -437,10 +496,7 @@ zval *zend_std_read_property(zval *object, zval *member, int type, const zend_li
 		}
 
 		if(zend_get_property_guard(zobj, property_info, member, &guard) == SUCCESS && guard->in_get == 0) {
-			/* If public getter, no access check required */
-			zend_function *getter = property_info->ai->getter->common.fn_flags & ZEND_ACC_PUBLIC
-					? property_info->ai->getter
-					: zend_std_get_method(&object, (char *)property_info->ai->getter->common.function_name, strlen(property_info->ai->getter->common.function_name), NULL TSRMLS_CC);
+			zend_function *getter = zend_get_accessor(property_info, zobj->ce, 0 TSRMLS_CC);
 			if(getter) {
 				guard->in_get = 1;
 				zend_call_method_with_0_params(&object, zobj->ce, &getter, getter->common.function_name, &rv);
@@ -556,10 +612,7 @@ ZEND_API void zend_std_write_property(zval *object, zval *member, zval *value, c
 			return;
 		}
 		if(zend_get_property_guard(zobj, property_info, member, &guard) == SUCCESS && guard->in_set == 0) {
-			/* If public setter, no access check required */
-			zend_function *setter = property_info->ai->setter->common.fn_flags & ZEND_ACC_PUBLIC
-					? property_info->ai->setter
-					: zend_std_get_method(&object, (char *)property_info->ai->setter->common.function_name, strlen(property_info->ai->setter->common.function_name), NULL TSRMLS_CC);
+			zend_function *setter = zend_get_accessor(property_info, zobj->ce, 1 TSRMLS_CC);
 			if(setter) {
 				zval *retval = NULL;
 
@@ -778,10 +831,7 @@ static zval **zend_std_get_property_ptr_ptr(zval *object, zval *member, const ze
 		}
 
 		if(zend_get_property_guard(zobj, property_info, member, &guard) == SUCCESS && guard->in_get == 0) {
-			/* If public getter, no access check required */
-			zend_function *getter = property_info->ai->getter->common.fn_flags & ZEND_ACC_PUBLIC
-					? property_info->ai->getter
-					: zend_std_get_method(&object, (char *)property_info->ai->getter->common.function_name, strlen(property_info->ai->getter->common.function_name), NULL TSRMLS_CC);
+			zend_function *getter = zend_get_accessor(property_info, zobj->ce, 0 TSRMLS_CC);
 			if(getter) {
 				/* we do have getter - fail and let it try again with usual get/set */
 				return NULL;
@@ -866,10 +916,7 @@ static void zend_std_unset_property(zval *object, zval *member, const zend_liter
 		}
 
 		if(zend_get_property_guard(zobj, property_info, member, &guard) == SUCCESS && guard->in_unset == 0) {
-			/* If public unsetter, no access check required */
-			zend_function *unsetter = property_info->ai->unset->common.fn_flags & ZEND_ACC_PUBLIC
-					? property_info->ai->unset
-					: zend_std_get_method(&object, (char *)property_info->ai->unset->common.function_name, strlen(property_info->ai->unset->common.function_name), NULL TSRMLS_CC);
+			zend_function *unsetter = zend_get_accessor(property_info, zobj->ce, 3 TSRMLS_CC);
 			if(unsetter) {
 				zval *retval = NULL;
 				guard->in_unset = 1;
@@ -1486,10 +1533,7 @@ static int zend_std_has_property(zval *object, zval *member, int has_set_exists,
 		}
 
 		if(zend_get_property_guard(zobj, property_info, member, &guard) == SUCCESS && guard->in_isset == 0) {
-			/* If public issetter, no access check required */
-			zend_function *issetter = property_info->ai->isset->common.fn_flags & ZEND_ACC_PUBLIC
-					? property_info->ai->isset
-					: zend_std_get_method(&object, (char *)property_info->ai->isset->common.function_name, strlen(property_info->ai->isset->common.function_name), NULL TSRMLS_CC);
+			zend_function *issetter = zend_get_accessor(property_info, zobj->ce, 2 TSRMLS_CC);
 			if(issetter) {
 				zval *retval = NULL;
 				guard->in_isset = 1;
