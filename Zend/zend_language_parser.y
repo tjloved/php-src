@@ -705,18 +705,16 @@ accessor_optional_parens:
 ;
 
 accessor_function:
-		T_ISSET accessor_optional_parens
-			{ 	Z_LVAL($1.u.constant) = T_ISSET;
-				Z_LVAL($$.u.constant) = 0;
-				zend_do_begin_accessor_declaration(&$1, &$$, 0, 0 TSRMLS_CC); }
+		accessor_modifiers T_ISSET accessor_optional_parens
+			{ 	Z_LVAL($2.u.constant) = T_ISSET;
+				zend_do_begin_accessor_declaration(&$2, &$1, 0, 0 TSRMLS_CC); }
 		method_body
-			{ zend_do_end_accessor_declaration(&$1, &$$, &$4 TSRMLS_CC); }
-	|	T_UNSET accessor_optional_parens
-			{ 	Z_LVAL($1.u.constant) = T_UNSET;
-				Z_LVAL($$.u.constant) = 0;
-				zend_do_begin_accessor_declaration(&$1, &$$, 0, 0 TSRMLS_CC); }
+			{ zend_do_end_accessor_declaration(&$2, &$1, &$5 TSRMLS_CC); }
+	|	accessor_modifiers T_UNSET accessor_optional_parens
+			{ 	Z_LVAL($2.u.constant) = T_UNSET;
+				zend_do_begin_accessor_declaration(&$2, &$1, 0, 0 TSRMLS_CC); }
 		method_body
-			{ zend_do_end_accessor_declaration(&$1, &$$, &$4 TSRMLS_CC); }
+			{ zend_do_end_accessor_declaration(&$2, &$1, &$5 TSRMLS_CC); }
 	|	accessor_modifiers is_reference T_STRING accessor_optional_parens
 			{ zend_do_begin_accessor_declaration(&$3, &$1, $2.op_type, 0 TSRMLS_CC); }
 		method_body
