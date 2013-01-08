@@ -1383,17 +1383,6 @@ void free_estring(char **str_p) /* {{{ */
 }
 /* }}} */
 
-/* Returns a new string of combined strings */
-char *strcatalloc(const char *a, size_t len_a, const char *b, size_t len_b TSRMLS_DC) /* {{{ */
-{
-	char *out = emalloc(len_a + len_b + 1);
-	memcpy(&out[0], a, len_a);
-	memcpy(&out[len_a], b, len_b+1);
-	return out;
-}
-/* }}} */
-
-
 /*
  * Local variables:
  * tab-width: 4

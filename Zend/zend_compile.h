@@ -690,7 +690,6 @@ void zend_do_goto(const znode *label TSRMLS_DC);
 void zend_resolve_goto_label(zend_op_array *op_array, zend_op *opline, int pass2 TSRMLS_DC);
 void zend_release_labels(TSRMLS_D);
 
-char *zend_get_accessor_name_from_function(const zend_function *func);
 char *zend_visibility_string(zend_uint fn_flags);
 char *zend_fn_purpose_string(zend_function *function);
 

@@ -1026,43 +1026,7 @@ void zend_do_assign(znode *result, znode *variable, znode *value TSRMLS_DC) /* {
 		int n = 0;
 
 		while (last_op_number - n > 0) {
-			zend_op *last_op;
-
-			last_op = &CG(active_op_array)->opcodes[last_op_number-n-1];
-
-			/* assigning to function call, re-negotiate the opcodes to call a single parameter function */
-			if(last_op->opcode == ZEND_DO_FCALL_BY_NAME && last_op_number >= 1 && (last_op-1)->opcode == ZEND_INIT_STATIC_METHOD_CALL) {
-				znode		zn_class, zn_func, zn_arg_list;
-
-				switch((last_op-1)->op1_type) {
-					case IS_VAR:
-						if((last_op-1)->extended_value == ZEND_FETCH_CLASS_PARENT) {
-							MAKE_ZNODEL(zn_class, "parent", 6);
-						}
-						if((last_op-1)->extended_value == ZEND_FETCH_CLASS_SELF) {
-							MAKE_ZNODEL(zn_class, "self", 4);
-						}
-						break;
-					case IS_CONST:
-						MAKE_ZNODE(zn_class, Z_STRVAL(CG(active_op_array)->literals[(last_op-1)->op1.constant].constant));	/* Capture class name */
-						break;
-				}
-
-				MAKE_ZNODE(zn_func, Z_STRVAL(CG(active_op_array)->literals[(last_op-1)->op2.constant].constant));	/* Capture function name */
-				Z_STRVAL(zn_func.u.constant)[2] = 's';	/* Change from __getXXX() to __setXXX() */
-				ZVAL_LONG(&zn_arg_list.u.constant, 1);
-
-				/* Clear ZEND_INIT_STATIC_METHOD_CALL and ZEND_DO_FCALL_BY_NAME oplines */
-				MAKE_NOP(last_op);
-				MAKE_NOP((last_op-1));
-
-				/* Replace with Class::__setXXX() call */
-				zend_do_begin_class_member_function_call(&zn_class, &zn_func TSRMLS_CC);
-				zend_do_pass_param(value, ZEND_SEND_VAL, Z_LVAL(result->u.constant) TSRMLS_CC);
-				zend_do_end_function_call(&zn_func, result, &zn_arg_list, 1, 0 TSRMLS_CC);
-				zend_do_extended_fcall_end(TSRMLS_C);
-				return;
-			}
+			zend_op *last_op = &CG(active_op_array)->opcodes[last_op_number-n-1];
 
 			if (last_op->result_type == IS_VAR &&
 			    last_op->result.var == variable->u.op.var) {
@@ -4560,23 +4524,6 @@ static void zend_do_traits_method_binding(zend_class_entry *ce TSRMLS_DC) /* {{{
 }
 /* }}} */
 
-static inline zend_op *find_previous_op(zend_uchar opcode TSRMLS_DC) /* {{{ */
-{
-	int last_op_number = get_next_op_number(CG(active_op_array));
-	zend_op *last_op;
-	int n = 0;
-
-	while (last_op_number - n > 0) {
-		last_op = &CG(active_op_array)->opcodes[last_op_number-n-1];
-		if(last_op->opcode == opcode) {
-			return last_op;
-		}
-		n++;
-	}
-	return NULL;
-}
-/* }}} */
-
 static zend_class_entry* find_first_definition(zend_class_entry *ce, size_t current_trait, const char* prop_name, int prop_name_length, ulong prop_hash, zend_class_entry *coliding_ce) /* {{{ */
 {
 	size_t i;
@@ -7509,14 +7456,6 @@ void zend_do_end_compilation(TSRMLS_D) /* {{{ */
 {
 	CG(has_bracketed_namespaces) = 0;
 	zend_do_end_namespace(TSRMLS_C);
-}
-/* }}} */
-
-char *zend_get_accessor_name_from_function(const zend_function *func) /* {{{ */
-{
-	const char *fn_name = func->common.function_name;
-	int prop_len = strchr(fn_name, '-') - fn_name - 1;
-	return estrndup(fn_name + 1, prop_len);
 }
 /* }}} */
 
