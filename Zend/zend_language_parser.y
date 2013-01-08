@@ -701,7 +701,7 @@ accessor_modifier:
 
 accessor_optional_parens:
 		/* empty */
-	| '(' ')'
+	|	'(' ')'
 ;
 
 accessor_function:
@@ -709,64 +709,22 @@ accessor_function:
 			{ 	Z_LVAL($1.u.constant) = T_ISSET;
 				Z_LVAL($$.u.constant) = 0;
 				zend_do_begin_accessor_declaration(&$1, &$$, 0, 0 TSRMLS_CC); }
-				'{' inner_statement_list '}'
+		method_body
 			{ zend_do_end_accessor_declaration(&$1, &$$, &$4 TSRMLS_CC); }
-	|	T_ISSET accessor_optional_parens
-			{ 
-				Z_LVAL($1.u.constant) = T_ISSET;	
-				Z_LVAL($$.u.constant) = 0;
-				zend_do_begin_accessor_declaration(&$1, &$$, 0, 0 TSRMLS_CC);
-				zend_do_end_accessor_declaration(&$1, &$$, NULL TSRMLS_CC);
-			}
-		';'
 	|	T_UNSET accessor_optional_parens
 			{ 	Z_LVAL($1.u.constant) = T_UNSET;
 				Z_LVAL($$.u.constant) = 0;
 				zend_do_begin_accessor_declaration(&$1, &$$, 0, 0 TSRMLS_CC); }
-				'{' inner_statement_list '}'
+		method_body
 			{ zend_do_end_accessor_declaration(&$1, &$$, &$4 TSRMLS_CC); }
-	|	T_UNSET accessor_optional_parens
-			{ 
-				Z_LVAL($1.u.constant) = T_UNSET;	
-				Z_LVAL($$.u.constant) = 0;
-				zend_do_begin_accessor_declaration(&$1, &$$, 0, 0 TSRMLS_CC);
-				zend_do_end_accessor_declaration(&$1, &$$, NULL TSRMLS_CC);
-			}
-		';'
-
-		/* With Parenthesis, Body & Parameters - Disallow getter, allow setter w/ 1 parameter */
+	|	accessor_modifiers is_reference T_STRING accessor_optional_parens
+			{ zend_do_begin_accessor_declaration(&$3, &$1, $2.op_type, 0 TSRMLS_CC); }
+		method_body
+			{ zend_do_end_accessor_declaration(&$3, &$1, &$6 TSRMLS_CC); }
 	|	accessor_modifiers is_reference T_STRING '(' 
 			{ zend_do_begin_accessor_declaration(&$3, &$1, $2.op_type, 1 TSRMLS_CC); }
-				non_empty_parameter_list ')' '{' inner_statement_list '}'
-			{ zend_do_end_accessor_declaration(&$3, &$1, &$5 TSRMLS_CC); }
-			
-		/* With Parenthesis & Body, No Parameters, Getter Only */
-	|	accessor_modifiers is_reference T_STRING '(' ')'
-			{ zend_do_begin_accessor_declaration(&$3, &$1, $2.op_type, 0 TSRMLS_CC); }
-				'{' inner_statement_list '}'
-			{ zend_do_end_accessor_declaration(&$3, &$1, &$5 TSRMLS_CC); }
-
-		/* Without Parenthesis */
-	|	accessor_modifiers is_reference T_STRING
-			{ zend_do_begin_accessor_declaration(&$3, &$1, $2.op_type, 0 TSRMLS_CC); }
-				'{' inner_statement_list '}'
-			{ zend_do_end_accessor_declaration(&$3, &$1, &$5 TSRMLS_CC); }
-		
-		/* With Parethensis, No Body */
-	|	accessor_modifiers is_reference T_STRING '(' ')'
-		{
-			zend_do_begin_accessor_declaration(&$3, &$1, $2.op_type, 0 TSRMLS_CC);
-			zend_do_end_accessor_declaration(&$3, &$1, NULL TSRMLS_CC);
-		}
-		';'
-		
-		/* Without Parenthesis, No Body */
-	|	accessor_modifiers is_reference T_STRING
-		{
-			zend_do_begin_accessor_declaration(&$3, &$1, $2.op_type, 0 TSRMLS_CC);
-			zend_do_end_accessor_declaration(&$3, &$1, NULL TSRMLS_CC);
-		}
-		';'
+		non_empty_parameter_list ')' method_body
+			{ zend_do_end_accessor_declaration(&$3, &$1, &$8 TSRMLS_CC); }
 ;
 
 class_variable_accessor_declarations:

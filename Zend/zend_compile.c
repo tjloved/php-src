@@ -1716,9 +1716,10 @@ void zend_do_end_accessor_declaration(znode *function_token, znode *modifiers, c
 	zend_property_info *property_info = CG(current_property_info);
 	const char *property_name = zend_get_property_name(property_info);
 	int property_name_len = strlen(property_name);
+	zend_bool has_body = body && Z_LVAL(body->u.constant) != ZEND_ACC_ABSTRACT;
 
 	/* If we have no function body, create an automatic body */
-	if(body == NULL && (CG(active_class_entry)->ce_flags & ZEND_ACC_INTERFACE) == 0) {
+	if (!has_body && (CG(active_class_entry)->ce_flags & ZEND_ACC_INTERFACE) == 0) {
 		zval eval_php_code;
 		zend_uint original_compiler_options = CG(compiler_options);
 
@@ -1773,7 +1774,7 @@ void zend_do_end_accessor_declaration(znode *function_token, znode *modifiers, c
 			zend_do_extended_info(TSRMLS_C);
 		}
 		CG(compiler_options) = original_compiler_options;
-	} else if(body != NULL && (CG(active_class_entry)->ce_flags & ZEND_ACC_INTERFACE) == ZEND_ACC_INTERFACE) {
+	} else if (has_body && (CG(active_class_entry)->ce_flags & ZEND_ACC_INTERFACE) == ZEND_ACC_INTERFACE) {
 		zend_error(E_WARNING, "Interface %s::$%s %ster cannot have implementation defined, implementation ignored.", CG(active_class_entry)->name, property_name, zend_fn_purpose_string((zend_function*)CG(active_op_array)));
 	}
 
