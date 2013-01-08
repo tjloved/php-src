@@ -1607,37 +1607,41 @@ int zend_do_verify_access_types(const znode *current_access_type, const znode *n
 /* }}} */
 
 void zend_declare_accessor(znode *var_name TSRMLS_DC) { /* {{{ */
-	zend_property_info	*property_info;
-	char				*vn_copy = NULL;
-	zend_uint			orig_ce_flags = CG(active_class_entry)->ce_flags;
+	zend_property_info *property_info;
+	char *property_name;
+	int property_name_len;
+	zend_uint orig_ce_flags = CG(active_class_entry)->ce_flags;
 
-	if(CG(access_type) & ZEND_ACC_STATIC) {
+	if (CG(access_type) & ZEND_ACC_STATIC) {
 		zend_error_noreturn(E_COMPILE_ERROR, "Cannot define static accessor %s::$%s, not supported at this time", CG(active_class_entry)->name, Z_STRVAL(var_name->u.constant));
 	}
 
-	// Hide that we're working with an interface during property accessor declaration
-	CG(active_class_entry)->ce_flags &= ~ZEND_ACC_INTERFACE;
+	/* zend_do_declare_property free's the string, so copy it */
+	property_name_len = Z_STRLEN(var_name->u.constant);
+	property_name = estrndup(Z_STRVAL(var_name->u.constant), property_name_len);
 
-	/* zend_do_declare_property free's the string, we still need it later on, so copy and put back in place */
-	vn_copy = (char *) estrndup(Z_STRVAL(var_name->u.constant), Z_STRLEN(var_name->u.constant));
+	/* Hide that we're working with an interface during property accessor declaration */
+	CG(active_class_entry)->ce_flags &= ~ZEND_ACC_INTERFACE;
 	zend_do_declare_property(var_name, NULL, CG(access_type) & ~(ZEND_ACC_FINAL) TSRMLS_CC);
-	Z_STRVAL(var_name->u.constant) = vn_copy;
 	CG(active_class_entry)->ce_flags = orig_ce_flags;
 
-	if(zend_hash_find(&CG(active_class_entry)->properties_info, Z_STRVAL(var_name->u.constant), Z_STRLEN(var_name->u.constant)+1, (void **) &property_info)==SUCCESS) {
-		if(property_info->ai != NULL) {
-			zend_error_noreturn(E_COMPILE_ERROR, "property_info for %s::$%s already has accessor_info created, should not happen in zend_declare_accessor()", CG(active_class_entry)->name, Z_STRVAL(var_name->u.constant));
+	if (zend_hash_find(&CG(active_class_entry)->properties_info, property_name, property_name_len + 1, (void **) &property_info)==SUCCESS) {
+		if (property_info->ai != NULL) {
+			zend_error_noreturn(E_COMPILE_ERROR, "property_info for %s::$%s already has accessor_info created, should not happen in zend_declare_accessor()", CG(active_class_entry)->name, property_name);
 		}
 
 		property_info->ai = ecalloc(1, sizeof(zend_accessor_info));
 		property_info->ai->flags = CG(access_type);
+
+		CG(current_property_info) = property_info;
+		efree(property_name);
 	} else {
-		zend_error_noreturn(E_COMPILE_ERROR, "Property_info for %s::$%s is not present, should not happen in zend_declare_accessor()", CG(active_class_entry)->name, Z_STRVAL(var_name->u.constant));
+		zend_error_noreturn(E_COMPILE_ERROR, "Property_info for %s::$%s is not present, should not happen in zend_declare_accessor()", CG(active_class_entry)->name, property_name);
 	}
 }
 /* }}} */
 
-static inline char *create_accessor_function_name(char *property_name, char *accessor_type) /* {{{ */
+static inline char *create_accessor_function_name(const char *property_name, char *accessor_type) /* {{{ */
 {
 	/* Format: $ property_name -> accessor_type */
 	int buffer_len = strlen(property_name) + strlen(accessor_type) + 3 + 1;
@@ -1647,92 +1651,91 @@ static inline char *create_accessor_function_name(char *property_name, char *acc
 }
 /* }}} */
 
-void zend_do_begin_accessor_declaration(znode *function_token, znode *var_name, znode *modifiers, int return_reference, int has_params TSRMLS_DC) /* {{{ */
+void zend_do_begin_accessor_declaration(znode *function_token, znode *modifiers, int return_reference, int has_params TSRMLS_DC) /* {{{ */
 {
-	zend_property_info *property_info;
+	zend_property_info *property_info = CG(current_property_info);
 	zend_function *func = NULL;
+	zend_uint property_flags;
 
-	if(zend_hash_find(&CG(active_class_entry)->properties_info, Z_STRVAL(var_name->u.constant), Z_STRLEN(var_name->u.constant)+1, (void **) &property_info)==SUCCESS) {
-		/* Inherit property modifiers, allowing to override PPP. This check
-		 * can be improved depending on just what exactly we want to allow
-		 * (this will become important once we support abstract). */
-		zend_uint property_flags = property_info->ai->flags;
-		if ((Z_LVAL(modifiers->u.constant) & ZEND_ACC_PPP_MASK) != 0) {
-			property_flags &= ~ZEND_ACC_PPP_MASK;
+	/* Inherit property modifiers, allowing to override PPP. This check
+	 * can be improved depending on just what exactly we want to allow
+	 * (this will become important once we support abstract). */
+	property_flags = property_info->ai->flags;
+	if ((Z_LVAL(modifiers->u.constant) & ZEND_ACC_PPP_MASK) != 0) {
+		property_flags &= ~ZEND_ACC_PPP_MASK;
+	}
+	Z_LVAL(modifiers->u.constant) |= property_flags;
+
+	if (Z_TYPE(function_token->u.constant) == IS_STRING && strcasecmp("get", Z_STRVAL(function_token->u.constant)) == 0) {
+		efree(Z_STRVAL(function_token->u.constant));
+		ZVAL_STRING(&function_token->u.constant, create_accessor_function_name(property_info->name, "get"), 0);
+
+		if (has_params) {
+			zend_error(E_COMPILE_ERROR, "Getters do not accept parameters for variable %s::$%s", CG(active_class_entry)->name, property_info->name);
 		}
-		Z_LVAL(modifiers->u.constant) |= property_flags;
 
-		if(Z_TYPE(function_token->u.constant) == IS_STRING && strcasecmp("get", Z_STRVAL(function_token->u.constant)) == 0) {
-			efree(Z_STRVAL(function_token->u.constant));
-			ZVAL_STRING(&function_token->u.constant, create_accessor_function_name(Z_STRVAL(var_name->u.constant), "get"), 0);
+		/* Declare Function */
+		zend_do_begin_function_declaration(function_token, function_token, 1, return_reference, modifiers, ZEND_FNP_PROP_GETTER TSRMLS_CC);
+	} else if (Z_TYPE(function_token->u.constant) == IS_STRING && strcasecmp("set", Z_STRVAL(function_token->u.constant)) == 0) {
+		znode unused_node, unused_node2, value_node;
 
-			if (has_params) {
-				zend_error(E_COMPILE_ERROR, "Getters do not accept parameters for variable %s::$%s", CG(active_class_entry)->name, Z_STRVAL(var_name->u.constant));
-			}
+		efree(Z_STRVAL(function_token->u.constant));
+		ZVAL_STRING(&function_token->u.constant, create_accessor_function_name(property_info->name, "set"), 0);
 
-			/* Declare Function */
-			zend_do_begin_function_declaration(function_token, function_token, 1, return_reference, modifiers, ZEND_FNP_PROP_GETTER TSRMLS_CC);
-		} else if(Z_TYPE(function_token->u.constant) == IS_STRING && strcasecmp("set", Z_STRVAL(function_token->u.constant)) == 0) {
-			znode unused_node, unused_node2, value_node;
-
-			efree(Z_STRVAL(function_token->u.constant));
-			ZVAL_STRING(&function_token->u.constant, create_accessor_function_name(Z_STRVAL(var_name->u.constant), "set"), 0);
-
-			if (return_reference) {
-				zend_error(E_WARNING, "Property setter %s::$%s indicates a return reference with '&', setters do not return values, ignored.", CG(active_class_entry)->name, Z_STRVAL(var_name->u.constant));
-			}
-			/* Declare Function */
-			zend_do_begin_function_declaration(function_token, function_token, 1, ZEND_RETURN_VAL, modifiers, ZEND_FNP_PROP_SETTER TSRMLS_CC);
-
-			if (!has_params) {
-				/* Add $value parameter to __setHours() */
-				unused_node.op_type = unused_node2.op_type = IS_UNUSED;
-				unused_node.u.op.num = unused_node2.u.op.num = 1;
-
-				ZVAL_STRINGL(&value_node.u.constant, "value", 5, 1);
-
-				zend_do_receive_arg(ZEND_RECV, &value_node, &unused_node, NULL, &unused_node2, 0 TSRMLS_CC);
-			}
-		} else if(Z_TYPE(function_token->u.constant) == IS_LONG && Z_LVAL(function_token->u.constant) == T_ISSET) {
-			ZVAL_STRING(&function_token->u.constant, create_accessor_function_name(Z_STRVAL(var_name->u.constant), "isset"), 0);
-
-			if (has_params) {
-				zend_error(E_COMPILE_ERROR, "Issetters do not accept parameters for variable %s::$%s", CG(active_class_entry)->name, Z_STRVAL(var_name->u.constant));
-			}
-
-			/* Declare Function */
-			zend_do_begin_function_declaration(function_token, function_token, 1, ZEND_RETURN_VAL, modifiers, ZEND_FNP_PROP_ISSETTER TSRMLS_CC);
-		} else if(Z_TYPE(function_token->u.constant) == IS_LONG && Z_LVAL(function_token->u.constant) == T_UNSET) {
-			ZVAL_STRING(&function_token->u.constant, create_accessor_function_name(Z_STRVAL(var_name->u.constant), "unset"), 0);
-
-			if (has_params) {
-				zend_error(E_COMPILE_ERROR, "Unsetters do not accept parameters for variable %s::$%s", CG(active_class_entry)->name, Z_STRVAL(var_name->u.constant));
-			}
-
-			/* Declare Function */
-			zend_do_begin_function_declaration(function_token, function_token, 1, ZEND_RETURN_VAL, modifiers, ZEND_FNP_PROP_UNSETTER TSRMLS_CC);
-		} else {
-			zend_error(E_COMPILE_ERROR, "Unknown accessor '%s', expecting get or set for variable $%s", Z_STRVAL(function_token->u.constant), Z_STRVAL(var_name->u.constant));
+		if (return_reference) {
+			zend_error(E_WARNING, "Property setter %s::$%s indicates a return reference with '&', setters do not return values, ignored.", CG(active_class_entry)->name, property_info->name);
 		}
-		func = (zend_function*)CG(active_op_array);
+		/* Declare Function */
+		zend_do_begin_function_declaration(function_token, function_token, 1, ZEND_RETURN_VAL, modifiers, ZEND_FNP_PROP_SETTER TSRMLS_CC);
 
-		if (func->common.purpose == ZEND_FNP_PROP_GETTER) {
-			property_info->ai->getter = func;
-		} else if(func->common.purpose == ZEND_FNP_PROP_SETTER) {
-			property_info->ai->setter = func;
-		} else if(func->common.purpose == ZEND_FNP_PROP_ISSETTER) {
-			property_info->ai->isset = func;
-		} else if(func->common.purpose == ZEND_FNP_PROP_UNSETTER) {
-			property_info->ai->unset = func;
+		if (!has_params) {
+			/* Add $value parameter to __setHours() */
+			unused_node.op_type = unused_node2.op_type = IS_UNUSED;
+			unused_node.u.op.num = unused_node2.u.op.num = 1;
+
+			ZVAL_STRINGL(&value_node.u.constant, "value", 5, 1);
+
+			zend_do_receive_arg(ZEND_RECV, &value_node, &unused_node, NULL, &unused_node2, 0 TSRMLS_CC);
 		}
+	} else if (Z_TYPE(function_token->u.constant) == IS_LONG && Z_LVAL(function_token->u.constant) == T_ISSET) {
+		ZVAL_STRING(&function_token->u.constant, create_accessor_function_name(property_info->name, "isset"), 0);
+
+		if (has_params) {
+			zend_error(E_COMPILE_ERROR, "Issetters do not accept parameters for variable %s::$%s", CG(active_class_entry)->name, property_info->name);
+		}
+
+		/* Declare Function */
+		zend_do_begin_function_declaration(function_token, function_token, 1, ZEND_RETURN_VAL, modifiers, ZEND_FNP_PROP_ISSETTER TSRMLS_CC);
+	} else if (Z_TYPE(function_token->u.constant) == IS_LONG && Z_LVAL(function_token->u.constant) == T_UNSET) {
+		ZVAL_STRING(&function_token->u.constant, create_accessor_function_name(property_info->name, "unset"), 0);
+
+		if (has_params) {
+			zend_error(E_COMPILE_ERROR, "Unsetters do not accept parameters for variable %s::$%s", CG(active_class_entry)->name, property_info->name);
+		}
+
+		/* Declare Function */
+		zend_do_begin_function_declaration(function_token, function_token, 1, ZEND_RETURN_VAL, modifiers, ZEND_FNP_PROP_UNSETTER TSRMLS_CC);
 	} else {
-		zend_error_noreturn(E_COMPILE_ERROR, "Property_info for %s::$%s is not present, should not happen in zend_do_begin_accessor_declaration()", CG(active_class_entry)->name, Z_STRVAL(var_name->u.constant));
+		zend_error(E_COMPILE_ERROR, "Unknown accessor '%s', expecting get or set for variable $%s", Z_STRVAL(function_token->u.constant), property_info->name);
+	}
+
+	func = (zend_function*)CG(active_op_array);
+	if (func->common.purpose == ZEND_FNP_PROP_GETTER) {
+		property_info->ai->getter = func;
+	} else if(func->common.purpose == ZEND_FNP_PROP_SETTER) {
+		property_info->ai->setter = func;
+	} else if(func->common.purpose == ZEND_FNP_PROP_ISSETTER) {
+		property_info->ai->isset = func;
+	} else if(func->common.purpose == ZEND_FNP_PROP_UNSETTER) {
+		property_info->ai->unset = func;
 	}
 }
 /* }}} */
 
-void zend_do_end_accessor_declaration(znode *function_token, znode *var_name, znode *modifiers, const znode *body TSRMLS_DC) /* {{{ */
+void zend_do_end_accessor_declaration(znode *function_token, znode *modifiers, const znode *body TSRMLS_DC) /* {{{ */
 {
+	zend_property_info *property_info = CG(current_property_info);
+
 	/* If we have no function body, create an automatic body */
 	if(body == NULL && (CG(active_class_entry)->ce_flags & ZEND_ACC_INTERFACE) == 0) {
 		zval eval_php_code;
@@ -1741,110 +1744,91 @@ void zend_do_end_accessor_declaration(znode *function_token, znode *var_name, zn
 		CG(compiler_options) = ZEND_COMPILE_DEFAULT_FOR_EVAL;
 
 		if(CG(active_op_array)->purpose == ZEND_FNP_PROP_GETTER) {
-			/* Equivalent to:  	return $this->Property;  or static equivalent */
-
-			zend_uint		bufsize = 16 + Z_STRLEN(var_name->u.constant) + 1 + 1;
+			/* Equivalent to: return $this->Property; */
+			zend_uint		bufsize = 16 + property_info->name_length + 1 + 1;
 			char			*buffer = emalloc(bufsize);
 
 			Z_STRVAL(eval_php_code) = buffer;
 			Z_TYPE(eval_php_code) = IS_STRING;
-			if((Z_LVAL(modifiers->u.constant) & ZEND_ACC_STATIC)) {
-				Z_STRLEN(eval_php_code) = snprintf(Z_STRVAL(eval_php_code), bufsize, "return self::$%s;", Z_STRVAL(var_name->u.constant));
-			} else {
-				Z_STRLEN(eval_php_code) = snprintf(Z_STRVAL(eval_php_code), bufsize, "return $this->%s;", Z_STRVAL(var_name->u.constant));
-			}
+			Z_STRLEN(eval_php_code) = snprintf(Z_STRVAL(eval_php_code), bufsize, "return $this->%s;", property_info->name);
 			zend_compile_string_inline(&eval_php_code, (char*)CG(active_op_array)->filename TSRMLS_CC);
 			efree(buffer);
 			zend_do_extended_info(TSRMLS_C);
 
 		} else if(CG(active_op_array)->purpose == ZEND_FNP_PROP_SETTER) {
 			/* Equivalent to: $this->Property = $value; */
-			zend_uint		bufsize = 9 + Z_STRLEN(var_name->u.constant) + 10 + 1;
+			zend_uint		bufsize = 9 + property_info->name_length + 10 + 1;
 			char			*buffer = emalloc(bufsize);
 
 			Z_STRVAL(eval_php_code) = buffer;
 			Z_TYPE(eval_php_code) = IS_STRING;
-			if((Z_LVAL(modifiers->u.constant) & ZEND_ACC_STATIC)) {
-				Z_STRLEN(eval_php_code) = snprintf(Z_STRVAL(eval_php_code), bufsize, "self::$%s = $value;", Z_STRVAL(var_name->u.constant));
-			} else {
-				Z_STRLEN(eval_php_code) = snprintf(Z_STRVAL(eval_php_code), bufsize, "$this->%s = $value;", Z_STRVAL(var_name->u.constant));
-			}
+			Z_STRLEN(eval_php_code) = snprintf(Z_STRVAL(eval_php_code), bufsize, "$this->%s = $value;", property_info->name);
 			zend_compile_string_inline(&eval_php_code, (char*)CG(active_op_array)->filename TSRMLS_CC);
 			efree(buffer);
 			zend_do_extended_info(TSRMLS_C);
 
 		} else if(CG(active_op_array)->purpose == ZEND_FNP_PROP_ISSETTER) {
 			/* Equivalent to: return $this->Property != NULL; (via getter) */
-			zend_uint		bufsize = 14 + Z_STRLEN(var_name->u.constant) +10 + 1;
+			zend_uint		bufsize = 14 + property_info->name_length + 10 + 1;
 			char			*buffer = emalloc(bufsize);
 
 			Z_STRVAL(eval_php_code) = buffer;
 			Z_TYPE(eval_php_code) = IS_STRING;
-			if((Z_LVAL(modifiers->u.constant) & ZEND_ACC_STATIC)) {
-				Z_STRLEN(eval_php_code) = snprintf(Z_STRVAL(eval_php_code), bufsize, "return self::$%s !== NULL;", Z_STRVAL(var_name->u.constant));
-			} else {
-				Z_STRLEN(eval_php_code) = snprintf(Z_STRVAL(eval_php_code), bufsize, "return $this->%s !== NULL;", Z_STRVAL(var_name->u.constant));
-			}
+			Z_STRLEN(eval_php_code) = snprintf(Z_STRVAL(eval_php_code), bufsize, "return $this->%s !== NULL;", property_info->name);
 			zend_compile_string_inline(&eval_php_code, (char*)CG(active_op_array)->filename TSRMLS_CC);
 			efree(buffer);
 			zend_do_extended_info(TSRMLS_C);
 
 		} else if(CG(active_op_array)->purpose == ZEND_FNP_PROP_UNSETTER) {
 			/* Equivalent to: $this->Property = NULL; (via setter) */
-			zend_uint		bufsize = 7 + Z_STRLEN(var_name->u.constant) + 8 + 1;
+			zend_uint		bufsize = 7 + property_info->name_length + 8 + 1;
 			char			*buffer = emalloc(bufsize);
 
 			Z_STRVAL(eval_php_code) = buffer;
 			Z_TYPE(eval_php_code) = IS_STRING;
-			if((Z_LVAL(modifiers->u.constant) & ZEND_ACC_STATIC)) {
-				Z_STRLEN(eval_php_code) = snprintf(Z_STRVAL(eval_php_code), bufsize, "self::$%s = NULL;", Z_STRVAL(var_name->u.constant));
-			} else {
-				Z_STRLEN(eval_php_code) = snprintf(Z_STRVAL(eval_php_code), bufsize, "$this->%s = NULL;", Z_STRVAL(var_name->u.constant));
-			}
+			Z_STRLEN(eval_php_code) = snprintf(Z_STRVAL(eval_php_code), bufsize, "$this->%s = NULL;", property_info->name);
 			zend_compile_string_inline(&eval_php_code, (char*)CG(active_op_array)->filename TSRMLS_CC);
 			efree(buffer);
 			zend_do_extended_info(TSRMLS_C);
 		}
 		CG(compiler_options) = original_compiler_options;
 	} else if(body != NULL && (CG(active_class_entry)->ce_flags & ZEND_ACC_INTERFACE) == ZEND_ACC_INTERFACE) {
-		zend_error(E_WARNING, "Interface %s::$%s %ster cannot have implementation defined, implementation ignored.", CG(active_class_entry)->name, Z_STRVAL(var_name->u.constant), zend_fn_purpose_string((zend_function*)CG(active_op_array)));
+		zend_error(E_WARNING, "Interface %s::$%s %ster cannot have implementation defined, implementation ignored.", CG(active_class_entry)->name, property_info->name, zend_fn_purpose_string((zend_function*)CG(active_op_array)));
 	}
 
 	zend_do_end_function_declaration(function_token TSRMLS_CC);
 }
 /* }}} */
 
-void zend_finalize_accessor(znode *var_name TSRMLS_DC) { /* {{{ */
-	zend_property_info	*property_info;
+void zend_finalize_accessor(TSRMLS_D) { /* {{{ */
+	zend_property_info *property_info = CG(current_property_info);
 
-	if(zend_hash_find(&CG(active_class_entry)->properties_info, Z_STRVAL(var_name->u.constant), Z_STRLEN(var_name->u.constant)+1, (void **) &property_info)==SUCCESS) {
-		if(!property_info->ai->isset && property_info->ai->getter) {
-			znode zn_fntoken, zn_modifiers;
-			INIT_ZNODE(zn_fntoken);
-			ZVAL_LONG(&zn_fntoken.u.constant, T_ISSET);
+	if (!property_info->ai->isset && property_info->ai->getter) {
+		znode zn_fntoken, zn_modifiers;
+		INIT_ZNODE(zn_fntoken);
+		ZVAL_LONG(&zn_fntoken.u.constant, T_ISSET);
 
-			/* Inherit flags accessor declaration */
-			INIT_ZNODE(zn_modifiers);
-			Z_LVAL(zn_modifiers.u.constant) = property_info->ai->flags;
+		/* Inherit flags accessor declaration */
+		INIT_ZNODE(zn_modifiers);
+		Z_LVAL(zn_modifiers.u.constant) = property_info->ai->flags;
 
-			zend_do_begin_accessor_declaration(&zn_fntoken, var_name, &zn_modifiers, 0, 0 TSRMLS_CC);
-			zend_do_end_accessor_declaration(&zn_fntoken, var_name, &zn_modifiers, NULL TSRMLS_CC);
-		}
-		if(!property_info->ai->unset && property_info->ai->setter) {
-			znode zn_fntoken, zn_modifiers;
-			INIT_ZNODE(zn_fntoken);
-			ZVAL_LONG(&zn_fntoken.u.constant, T_UNSET);
-
-			/* Inherit flags accessor declaration */
-			INIT_ZNODE(zn_modifiers);
-			Z_LVAL(zn_modifiers.u.constant) = property_info->ai->flags;
-
-			zend_do_begin_accessor_declaration(&zn_fntoken, var_name, &zn_modifiers, 0, 0 TSRMLS_CC);
-			zend_do_end_accessor_declaration(&zn_fntoken, var_name, &zn_modifiers, NULL TSRMLS_CC);
-		}
-	} else {
-		zend_error_noreturn(E_COMPILE_ERROR, "Property_info for %s::$%s is not present, should not happen in zend_finalize_accessor()", CG(active_class_entry)->name, Z_STRVAL(var_name->u.constant));
+		zend_do_begin_accessor_declaration(&zn_fntoken, &zn_modifiers, 0, 0 TSRMLS_CC);
+		zend_do_end_accessor_declaration(&zn_fntoken, &zn_modifiers, NULL TSRMLS_CC);
 	}
+	if (!property_info->ai->unset && property_info->ai->setter) {
+		znode zn_fntoken, zn_modifiers;
+		INIT_ZNODE(zn_fntoken);
+		ZVAL_LONG(&zn_fntoken.u.constant, T_UNSET);
+
+		/* Inherit flags accessor declaration */
+		INIT_ZNODE(zn_modifiers);
+		Z_LVAL(zn_modifiers.u.constant) = property_info->ai->flags;
+
+		zend_do_begin_accessor_declaration(&zn_fntoken, &zn_modifiers, 0, 0 TSRMLS_CC);
+		zend_do_end_accessor_declaration(&zn_fntoken, &zn_modifiers, NULL TSRMLS_CC);
+	}
+
+	CG(current_property_info) = NULL;
 }
 /* }}} */
 
