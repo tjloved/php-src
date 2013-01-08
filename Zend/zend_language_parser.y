@@ -683,23 +683,13 @@ member_modifier:
 
 accessors:
 		/* empty */
-	|	non_empty_accessor	{ $$ = $1; }
-;
-
-non_empty_accessor:
-		accessor_function						{ $$ = $1; }
-	| 	non_empty_accessor accessor_function	{ $$ = $1; }
+	|	accessors accessor_function
 ;
 
 accessor_modifiers:
-		/* empty */						{ Z_LVAL($$.u.constant) = CG(access_type); }
-	|	non_empty_accessor_modifiers	{ $$ = $1; }
+		/* empty */								{ Z_LVAL($$.u.constant) = 0; }
+	|	accessor_modifiers accessor_modifier	{ Z_LVAL($$.u.constant) = zend_do_verify_access_types(&$1, &$2); }
 ;
-
-non_empty_accessor_modifiers:
-		accessor_modifier								{ $$ = $1; }
-	|	non_empty_accessor_modifiers accessor_modifier	{ Z_LVAL($$.u.constant) = zend_do_verify_access_types(&$1, &$2); }
-
 
 accessor_modifier:
 		T_PUBLIC				{ Z_LVAL($$.u.constant) = ZEND_ACC_PUBLIC; }
@@ -717,28 +707,28 @@ accessor_optional_parens:
 accessor_function:
 		T_ISSET accessor_optional_parens
 			{ 	Z_LVAL($1.u.constant) = T_ISSET;
-				Z_LVAL($$.u.constant) = CG(access_type);
+				Z_LVAL($$.u.constant) = 0;
 				zend_do_begin_accessor_declaration(&$1, CG(accessor_node), &$$, 0, 0 TSRMLS_CC); }
 				'{' inner_statement_list '}'
 			{ zend_do_end_accessor_declaration(&$1, CG(accessor_node), &$$, &$4 TSRMLS_CC); }
 	|	T_ISSET accessor_optional_parens
 			{ 
 				Z_LVAL($1.u.constant) = T_ISSET;	
-				Z_LVAL($$.u.constant) = CG(access_type);
+				Z_LVAL($$.u.constant) = 0;
 				zend_do_begin_accessor_declaration(&$1, CG(accessor_node), &$$, 0, 0 TSRMLS_CC);
 				zend_do_end_accessor_declaration(&$1, CG(accessor_node), &$$, NULL TSRMLS_CC);
 			}
 		';'
 	|	T_UNSET accessor_optional_parens
 			{ 	Z_LVAL($1.u.constant) = T_UNSET;
-				Z_LVAL($$.u.constant) = CG(access_type);
+				Z_LVAL($$.u.constant) = 0;
 				zend_do_begin_accessor_declaration(&$1, CG(accessor_node), &$$, 0, 0 TSRMLS_CC); }
 				'{' inner_statement_list '}'
 			{ zend_do_end_accessor_declaration(&$1, CG(accessor_node), &$$, &$4 TSRMLS_CC); }
 	|	T_UNSET accessor_optional_parens
 			{ 
 				Z_LVAL($1.u.constant) = T_UNSET;	
-				Z_LVAL($$.u.constant) = CG(access_type);
+				Z_LVAL($$.u.constant) = 0;
 				zend_do_begin_accessor_declaration(&$1, CG(accessor_node), &$$, 0, 0 TSRMLS_CC);
 				zend_do_end_accessor_declaration(&$1, CG(accessor_node), &$$, NULL TSRMLS_CC);
 			}

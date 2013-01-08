@@ -1653,8 +1653,14 @@ void zend_do_begin_accessor_declaration(znode *function_token, znode *var_name, 
 	zend_function *func = NULL;
 
 	if(zend_hash_find(&CG(active_class_entry)->properties_info, Z_STRVAL(var_name->u.constant), Z_STRLEN(var_name->u.constant)+1, (void **) &property_info)==SUCCESS) {
-		/* Inherit flags from outer accessor definition */
-		Z_LVAL(modifiers->u.constant) |= (property_info->ai->flags & ZEND_ACC_STATIC);
+		/* Inherit property modifiers, allowing to override PPP. This check
+		 * can be improved depending on just what exactly we want to allow
+		 * (this will become important once we support abstract). */
+		zend_uint property_flags = property_info->ai->flags;
+		if ((Z_LVAL(modifiers->u.constant) & ZEND_ACC_PPP_MASK) != 0) {
+			property_flags &= ~ZEND_ACC_PPP_MASK;
+		}
+		Z_LVAL(modifiers->u.constant) |= property_flags;
 
 		if(Z_TYPE(function_token->u.constant) == IS_STRING && strcasecmp("get", Z_STRVAL(function_token->u.constant)) == 0) {
 			efree(Z_STRVAL(function_token->u.constant));
