@@ -533,6 +533,26 @@ static int zend_get_property_guard(zend_object *zobj, zend_property_info *proper
 }
 /* }}} */
 
+static zend_always_inline zend_bool zend_get_property_value_helper(zend_property_info *property_info, zend_object *zobj, zval ***value) /* {{{ */
+{
+	if (UNEXPECTED(!property_info)) {
+		return 0;
+	}
+
+	if (EXPECTED((property_info->flags & ZEND_ACC_STATIC) == 0) && property_info->offset >= 0) {
+		if (zobj->properties) {
+			*value = (zval **) zobj->properties_table[property_info->offset];
+		} else {
+			*value = &zobj->properties_table[property_info->offset];
+		}
+
+		return zobj->properties_table[property_info->offset] != NULL;
+	} else if (UNEXPECTED(!zobj->properties) || UNEXPECTED(zend_hash_quick_find(zobj->properties,  property_info->name, property_info->name_length+1, property_info->h, (void **) value) == FAILURE)) {
+		return 0;
+	}
+}
+/* }}} */
+
 zval *zend_std_read_property(zval *object, zval *member, int type, const zend_literal *key TSRMLS_DC) /* {{{ */
 {
 	zend_object *zobj;
@@ -583,12 +603,7 @@ zval *zend_std_read_property(zval *object, zval *member, int type, const zend_li
 	}
 
 	if(retval == NULL) {
-		if ((UNEXPECTED(!property_info) || (
-				(EXPECTED((property_info->flags & ZEND_ACC_STATIC) == 0) && property_info->offset >= 0)
-					? (zobj->properties
-						? ((retval = (zval**)zobj->properties_table[property_info->offset]) == NULL)
-						: (*(retval = &zobj->properties_table[property_info->offset]) == NULL))
-					: (UNEXPECTED(!zobj->properties) || UNEXPECTED(zend_hash_quick_find(zobj->properties, property_info->name, property_info->name_length+1, property_info->h, (void **) &retval) == FAILURE))))) {
+		if (!zend_get_property_value_helper(property_info, zobj, &retval)) {
 			zend_guard *guard = NULL;
 
 			if ( zobj->ce->__get != NULL && zend_get_property_guard(zobj, property_info, member, &guard) == SUCCESS && !guard->in_get) {
@@ -667,14 +682,7 @@ ZEND_API void zend_std_write_property(zval *object, zval *member, zval *value, c
 	}
 
 	if(handled == 0) {
-		if (EXPECTED(property_info != NULL) &&
-			((EXPECTED((property_info->flags & ZEND_ACC_STATIC) == 0) &&
-			 property_info->offset >= 0) ?
-				(zobj->properties ?
-					((variable_ptr = (zval**)zobj->properties_table[property_info->offset]) != NULL) :
-					(*(variable_ptr = &zobj->properties_table[property_info->offset]) != NULL)) :
-				(EXPECTED(zobj->properties != NULL) &&
-				  EXPECTED(zend_hash_quick_find(zobj->properties, property_info->name, property_info->name_length+1, property_info->h, (void **) &variable_ptr) == SUCCESS)))) {
+		if (zend_get_property_value_helper(property_info, zobj, &variable_ptr)) {
 			/* if we already have this value there, we don't actually need to do anything */
 			if (EXPECTED(*variable_ptr != value)) {
 				/* if we are assigning reference, we shouldn't move it, but instead assign variable
@@ -874,12 +882,7 @@ static zval **zend_std_get_property_ptr_ptr(zval *object, zval *member, const ze
 	}
 
 	if (retval == (zval**)-1) {
-		if((UNEXPECTED(!property_info) || (
-				(EXPECTED((property_info->flags & ZEND_ACC_STATIC) == 0) && property_info->offset >= 0)
-					? (zobj->properties
-						? ((retval = (zval**)zobj->properties_table[property_info->offset]) == NULL)
-						: (*(retval = &zobj->properties_table[property_info->offset]) == NULL))
-					: (UNEXPECTED(!zobj->properties) || UNEXPECTED(zend_hash_quick_find(zobj->properties, property_info->name, property_info->name_length+1, property_info->h, (void **) &retval) == FAILURE))))) {
+		if (!zend_get_property_value_helper(property_info, zobj, &retval)) {
 			zval *new_zval;
 			zend_guard *guard;
 
@@ -1566,12 +1569,7 @@ static int zend_std_has_property(zval *object, zval *member, int has_set_exists,
 	}
 
 	if(result == -1) {
-		if (UNEXPECTED(!property_info) || (
-				(EXPECTED((property_info->flags & ZEND_ACC_STATIC) == 0) && property_info->offset >= 0)
-					? (zobj->properties
-						? ((value = (zval**)zobj->properties_table[property_info->offset]) == NULL)
-						: (*(value = &zobj->properties_table[property_info->offset]) == NULL))
-					: (UNEXPECTED(!zobj->properties) || UNEXPECTED(zend_hash_quick_find(zobj->properties, property_info->name, property_info->name_length+1, property_info->h, (void **) &value) == FAILURE)))) {
+		if(!zend_get_property_value_helper(property_info, zobj, &value)) {
 			zend_guard *guard;
 
 			result = 0;
