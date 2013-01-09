@@ -556,9 +556,9 @@ void zend_do_yield(znode *result, znode *value, const znode *key, zend_bool is_v
 void zend_do_handle_exception(TSRMLS_D);
 
 void zend_declare_accessor(znode *var_name TSRMLS_DC);
-void zend_do_begin_accessor_declaration(znode *function_token, znode *var_name, znode *modifiers, int return_reference, int has_params TSRMLS_DC);
-void zend_do_end_accessor_declaration(znode *function_token, znode *var_name, znode *modifiers, const znode *body TSRMLS_DC);
-void zend_finalize_accessor(znode *var_name TSRMLS_DC);
+void zend_do_begin_accessor_declaration(znode *function_token, znode *modifiers, int return_reference, int has_params TSRMLS_DC);
+void zend_do_end_accessor_declaration(znode *function_token, const znode *body TSRMLS_DC);
+void zend_finalize_accessor(TSRMLS_D);
 
 void zend_do_begin_lambda_function_declaration(znode *result, znode *function_token, int return_reference, int is_static TSRMLS_DC);
 void zend_do_fetch_lexical_variable(znode *varname, zend_bool is_ref TSRMLS_DC);
@@ -690,7 +690,6 @@ void zend_do_goto(const znode *label TSRMLS_DC);
 void zend_resolve_goto_label(zend_op_array *op_array, zend_op *opline, int pass2 TSRMLS_DC);
 void zend_release_labels(TSRMLS_D);
 
-char *zend_get_accessor_name_from_function(const zend_function *func);
 char *zend_visibility_string(zend_uint fn_flags);
 char *zend_fn_purpose_string(zend_function *function);
 
