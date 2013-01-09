@@ -1711,7 +1711,7 @@ void zend_do_begin_accessor_declaration(znode *function_token, znode *modifiers,
 }
 /* }}} */
 
-void zend_do_end_accessor_declaration(znode *function_token, znode *modifiers, const znode *body TSRMLS_DC) /* {{{ */
+void zend_do_end_accessor_declaration(znode *function_token, const znode *body TSRMLS_DC) /* {{{ */
 {
 	zend_property_info *property_info = CG(current_property_info);
 	const char *property_name = zend_get_property_name(property_info);
@@ -1792,10 +1792,10 @@ void zend_finalize_accessor(TSRMLS_D) { /* {{{ */
 
 		/* Inherit flags accessor declaration */
 		INIT_ZNODE(zn_modifiers);
-		Z_LVAL(zn_modifiers.u.constant) = property_info->ai->flags;
+		Z_LVAL(zn_modifiers.u.constant) = 0;
 
 		zend_do_begin_accessor_declaration(&zn_fntoken, &zn_modifiers, 0, 0 TSRMLS_CC);
-		zend_do_end_accessor_declaration(&zn_fntoken, &zn_modifiers, NULL TSRMLS_CC);
+		zend_do_end_accessor_declaration(&zn_fntoken, NULL TSRMLS_CC);
 	}
 	if (!property_info->ai->unset && property_info->ai->setter) {
 		znode zn_fntoken, zn_modifiers;
@@ -1804,10 +1804,10 @@ void zend_finalize_accessor(TSRMLS_D) { /* {{{ */
 
 		/* Inherit flags accessor declaration */
 		INIT_ZNODE(zn_modifiers);
-		Z_LVAL(zn_modifiers.u.constant) = property_info->ai->flags;
+		Z_LVAL(zn_modifiers.u.constant) = 0;
 
 		zend_do_begin_accessor_declaration(&zn_fntoken, &zn_modifiers, 0, 0 TSRMLS_CC);
-		zend_do_end_accessor_declaration(&zn_fntoken, &zn_modifiers, NULL TSRMLS_CC);
+		zend_do_end_accessor_declaration(&zn_fntoken, NULL TSRMLS_CC);
 	}
 
 	CG(current_property_info) = NULL;

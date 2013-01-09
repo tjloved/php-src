@@ -557,7 +557,7 @@ void zend_do_handle_exception(TSRMLS_D);
 
 void zend_declare_accessor(znode *var_name TSRMLS_DC);
 void zend_do_begin_accessor_declaration(znode *function_token, znode *modifiers, int return_reference, int has_params TSRMLS_DC);
-void zend_do_end_accessor_declaration(znode *function_token, znode *modifiers, const znode *body TSRMLS_DC);
+void zend_do_end_accessor_declaration(znode *function_token, const znode *body TSRMLS_DC);
 void zend_finalize_accessor(TSRMLS_D);
 
 void zend_do_begin_lambda_function_declaration(znode *result, znode *function_token, int return_reference, int is_static TSRMLS_DC);
