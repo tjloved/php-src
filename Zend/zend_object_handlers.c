@@ -425,6 +425,7 @@ zend_always_inline struct _zend_property_info *zend_get_property_info_quick(zend
 		EG(std_property_info).name_length = Z_STRLEN_P(member);
 		EG(std_property_info).h = h;
 		EG(std_property_info).ce = ce;
+		EG(std_property_info).ai = NULL;
 		EG(std_property_info).offset = -1;
 		property_info = &EG(std_property_info);
 	}

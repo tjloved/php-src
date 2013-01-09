@@ -1371,20 +1371,24 @@ static void reflection_property_factory(zend_class_entry *ce, zend_property_info
 
 	zend_unmangle_property_name(prop->name, prop->name_length, &class_name, &prop_name);
 
-	if (!(prop->flags & ZEND_ACC_PRIVATE)) {
-		/* we have to search the class hierarchy for this (implicit) public or protected property */
-		zend_class_entry *tmp_ce = ce, *store_ce = ce;
-		zend_property_info *tmp_info = NULL;
-
-		while (tmp_ce && zend_hash_find(&tmp_ce->properties_info, prop_name, strlen(prop_name) + 1, (void **) &tmp_info) != SUCCESS) {
-			ce = tmp_ce;
-			tmp_ce = tmp_ce->parent;
-		}
-
-		if (tmp_info && !(tmp_info->flags & ZEND_ACC_SHADOW)) { /* found something and it's not a parent's private */
-			prop = tmp_info;
-		} else { /* not found, use initial value */
-			ce = store_ce;
+	if (!prop->ai) {
+		/* Not sure what this code does, maybe dead code? Leaving it in place
+		 * just in case it's fixing some crazy, untested bugs. */
+		if (!(prop->flags & ZEND_ACC_PRIVATE)) {
+			/* we have to search the class hierarchy for this (implicit) public or protected property */
+			zend_class_entry *tmp_ce = ce, *store_ce = ce;
+			zend_property_info *tmp_info = NULL;
+	
+			while (tmp_ce && zend_hash_find(&tmp_ce->properties_info, prop_name, strlen(prop_name) + 1, (void **) &tmp_info) != SUCCESS) {
+				ce = tmp_ce;
+				tmp_ce = tmp_ce->parent;
+			}
+	
+			if (tmp_info && !(tmp_info->flags & ZEND_ACC_SHADOW)) { /* found something and it's not a parent's private */
+				prop = tmp_info;
+			} else { /* not found, use initial value */
+				ce = store_ce;
+			}
 		}
 	}
 
@@ -1393,43 +1397,16 @@ static void reflection_property_factory(zend_class_entry *ce, zend_property_info
 	ZVAL_STRING(name, prop_name, 1);
 	ZVAL_STRINGL(classname, prop->ce->name, prop->ce->name_length, 1);
 
-	reflection_instantiate(reflection_property_ptr, object TSRMLS_CC);
+	reflection_instantiate(
+		prop->ai ? reflection_property_accessor_ptr : reflection_property_ptr,
+		object TSRMLS_CC
+	);
 	intern = (reflection_object *) zend_object_store_get_object(object TSRMLS_CC);
 	reference = (property_reference*) emalloc(sizeof(property_reference));
 	reference->ce = ce;
 	reference->prop = *prop;
 	intern->ptr = reference;
-	intern->ref_type = REF_TYPE_PROPERTY;
-	intern->ce = ce;
-	intern->ignore_visibility = 0;
-	reflection_update_property(object, "name", name);
-	reflection_update_property(object, "class", classname);
-}
-/* }}} */
-
-/* {{{ reflection_property_accessor_factory */
-static void reflection_property_accessor_factory(zend_class_entry *ce, zend_property_info *property_info, zval *object TSRMLS_DC)
-{
-	reflection_object *intern;
-	zval *name;
-	zval *classname;
-	property_reference *reference;
-	const char *class_name, *prop_name;
-
-	zend_unmangle_property_name(property_info->name, property_info->name_length, &class_name, &prop_name);
-
-	MAKE_STD_ZVAL(name);
-	MAKE_STD_ZVAL(classname);
-	ZVAL_STRING(name, prop_name, 1);
-	ZVAL_STRINGL(classname, ce->name, ce->name_length, 1);
-
-	reflection_instantiate(reflection_property_accessor_ptr, object TSRMLS_CC);
-	intern = (reflection_object *) zend_object_store_get_object(object TSRMLS_CC);
-	reference = (property_reference*) emalloc(sizeof(property_reference));
-	reference->ce = ce;
-	reference->prop = *property_info;
-	intern->ptr = reference;
-	intern->ref_type = REF_TYPE_PROPERTY_ACCESSOR;
+	intern->ref_type = prop->ai ? REF_TYPE_PROPERTY_ACCESSOR :  REF_TYPE_PROPERTY;
 	intern->ce = ce;
 	intern->ignore_visibility = 0;
 	reflection_update_property(object, "name", name);
@@ -3942,6 +3919,7 @@ ZEND_METHOD(reflection_class, getProperty)
 			property_info_tmp.name_length = name_len;
 			property_info_tmp.h = zend_get_hash_value(name, name_len+1);
 			property_info_tmp.doc_comment = NULL;
+			property_info_tmp.ai = NULL;
 			property_info_tmp.ce = ce;
 
 			reflection_property_factory(ce, &property_info_tmp, return_value TSRMLS_CC);
@@ -3996,10 +3974,7 @@ static int _addproperty(zend_property_info *pptr TSRMLS_DC, int num_args, va_lis
 
 	if (pptr->flags	& filter) {
 		ALLOC_ZVAL(property);
-		if(pptr->ai != NULL)
-			reflection_property_accessor_factory(ce, pptr, property TSRMLS_CC);
-		else
-			reflection_property_factory(ce, pptr, property TSRMLS_CC);
+		reflection_property_factory(ce, pptr, property TSRMLS_CC);
 		add_next_index_zval(retval, property);
 	}
 	return 0;
