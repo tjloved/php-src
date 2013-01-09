@@ -1737,20 +1737,21 @@ void zend_do_end_accessor_declaration(znode *function_token, const znode *body T
 			efree(buffer);
 			zend_do_extended_info(TSRMLS_C);
 
-		} else if(CG(active_op_array)->purpose == ZEND_FNP_PROP_SETTER) {
+		} else if (CG(active_op_array)->purpose == ZEND_FNP_PROP_SETTER) {
 			/* Equivalent to: $this->Property = $value; */
-			zend_uint		bufsize = 9 + property_name_len + 10 + 1;
-			char			*buffer = emalloc(bufsize);
+			zend_arg_info *arg_info = CG(active_op_array)->arg_info;
+			zend_uint bufsize = property_name_len + arg_info->name_len + 12 + 1;
+			char *buffer = emalloc(bufsize);
 
 			Z_STRVAL(eval_php_code) = buffer;
 			Z_TYPE(eval_php_code) = IS_STRING;
-			Z_STRLEN(eval_php_code) = snprintf(Z_STRVAL(eval_php_code), bufsize, "$this->%s = $value;", property_name);
+			Z_STRLEN(eval_php_code) = snprintf(Z_STRVAL(eval_php_code), bufsize, "$this->%s = $%s;", property_name, arg_info->name);
 			zend_compile_string_inline(&eval_php_code, (char*)CG(active_op_array)->filename TSRMLS_CC);
 			efree(buffer);
 			zend_do_extended_info(TSRMLS_C);
 
 		} else if(CG(active_op_array)->purpose == ZEND_FNP_PROP_ISSETTER) {
-			/* Equivalent to: return $this->Property != NULL; (via getter) */
+			/* Equivalent to: return $this->Property !== NULL; (via getter) */
 			zend_uint		bufsize = 14 + property_name_len + 10 + 1;
 			char			*buffer = emalloc(bufsize);
 
