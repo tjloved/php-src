@@ -4,17 +4,16 @@ ZE2 Tests that isset/unset automatic implementations work as expected, also ensu
 <?php
 
 class AccessorTest {
-	public $a = 3600;
-	
 	public $b {
-		get { echo "Getting \$b\n"; return $this->a; }
-		set { echo "Setting \$b\n"; $this->a = $value; }
+		get { echo "Getting \$b\n"; return $this->b; }
+		set { echo "Setting \$b\n"; $this->b = $value; }
 		isset;
 		unset;
 	}
 }
 
 $o = new AccessorTest();
+$o->b = 3600;
 
 echo "\$o->b: ".$o->b."\n";
 echo "is_null(\$o->b): ".((int)is_null($o->b))."\n";
@@ -23,14 +22,15 @@ echo "Unsetting \$o->b\n";
 unset($o->b);
 echo "is_null(\$o->b): ".((int)is_null($o->b))."\n";
 echo "isset(\$o->b): ".((int)isset($o->b))."\n";
-echo "Done\n";
+echo "empty(\$o->b): ".((int)empty($o->b))."\n";
 ?>
+===DONE===
 --EXPECTF--
+Setting $b
 Getting $b
 $o->b: 3600
 Getting $b
 is_null($o->b): 0
-Getting $b
 Getting $b
 isset($o->b): 1
 Unsetting $o->b
@@ -39,4 +39,6 @@ Getting $b
 is_null($o->b): 1
 Getting $b
 isset($o->b): 0
-Done
+Getting $b
+empty($o->b): 1
+===DONE===
