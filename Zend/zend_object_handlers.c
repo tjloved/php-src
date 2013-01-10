@@ -550,6 +550,7 @@ static zend_always_inline zend_bool zend_get_property_value_helper(zend_property
 	} else if (UNEXPECTED(!zobj->properties) || UNEXPECTED(zend_hash_quick_find(zobj->properties,  property_info->name, property_info->name_length+1, property_info->h, (void **) value) == FAILURE)) {
 		return 0;
 	}
+	return 1;
 }
 /* }}} */
 
@@ -1580,16 +1581,24 @@ static int zend_std_has_property(zval *object, zval *member, int has_set_exists,
 				guard->in_isset = 0;
 			}
 		} else {
-			switch (has_set_exists) {
-			case 0:
-				result = (Z_TYPE_PP(value) != IS_NULL);
-				break;
-			default:
-				result = zend_is_true(*value);
-				break;
-			case 2:
-				result = 1;
-				break;
+			*value = zend_std_read_property(object, member, BP_VAR_IS, key);
+
+			result = 0;
+			if(*value) {
+				Z_ADDREF_PP(value);
+
+				switch (has_set_exists) {
+					case 0:
+						result = (Z_TYPE_PP(value) != IS_NULL);
+						break;
+					case 2:
+						result = 1;
+						break;
+					default:
+						result = zend_is_true(*value);
+						break;
+				}
+				zval_ptr_dtor(value);
 			}
 		}
 	}
