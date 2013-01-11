@@ -27,14 +27,14 @@ function reflectProperty($class, $property) {
     var_dump($propInfo->isDefault());
     
     $instance = new $class();
-    if ($propInfo->getGetter() != false && $propInfo->getGetter()->isPublic()) {
+    if ($propInfo->getGet() != false && $propInfo->getGet()->isPublic()) {
         echo "getValue():\n";
         var_dump($propInfo->getValue($instance));
     }
-    if ($propInfo->getSetter() != false && $propInfo->getSetter()->isPublic()) {
+    if ($propInfo->getSet() != false && $propInfo->getSet()->isPublic()) {
         echo "setValue(\"NewValue\"):\n";
         $propInfo->setValue($instance, "NewValue");
-        if($propInfo->getGetter() != false) {
+        if($propInfo->getGet() != false) {
 	        echo "getValue() after a setValue():\n";
 	        var_dump($propInfo->getValue($instance));
 	    }

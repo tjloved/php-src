@@ -5008,6 +5008,15 @@ ZEND_METHOD(reflection_property, getModifiers)
 }
 /* }}} */
 
+/** @REFACTOR:
+ * 		ReflectionProperty::getValue()/setValue() both circumvent zend_std_write_property()
+ * 		for no good reason I can see, could be refactored to use the standard zend_api rather than
+ * 		directly set the property.
+ *
+ * 		If this were done, then ReflectionPropertyAccessor::getValue()/setValue() could probably
+ * 		also go away and rely on the parent class implementation
+ */
+
 /* {{{ proto public mixed ReflectionProperty::getValue([stdclass object])
    Returns this property's value */
 ZEND_METHOD(reflection_property, getValue)
@@ -5271,9 +5280,9 @@ ZEND_METHOD(reflection_property_accessor, __construct)
 }
 /* }}} */
 
-/* {{{ proto public void ReflectionPropertyAccessor::getGetter()
+/* {{{ proto public void ReflectionPropertyAccessor::getGet()
    Gets the ReflectionMethod accessor for getting this property, returns false if there is no accessor */
-ZEND_METHOD(reflection_property_accessor, getGetter)
+ZEND_METHOD(reflection_property_accessor, getGet)
 {
 	reflection_object *intern;
 	property_reference *ref;
@@ -5289,9 +5298,9 @@ ZEND_METHOD(reflection_property_accessor, getGetter)
 }
 /* }}} */
 
-/* {{{ proto public void ReflectionPropertyAccessor::getSetter()
+/* {{{ proto public void ReflectionPropertyAccessor::getSet()
    Gets the ReflectionMethod accessor for setting this property, returns false if there is no accessor */
-ZEND_METHOD(reflection_property_accessor, getSetter)
+ZEND_METHOD(reflection_property_accessor, getSet)
 {
 	reflection_object *intern;
 	property_reference *ref;
@@ -5307,56 +5316,39 @@ ZEND_METHOD(reflection_property_accessor, getSetter)
 }
 /* }}} */
 
-static void _property_accessor_check_flag(INTERNAL_FUNCTION_PARAMETERS, int mask) /* {{{ */
+/* {{{ proto public void ReflectionPropertyAccessor::getIsset()
+   Gets the ReflectionMethod isset accessor for this property, returns false if there is no accessor */
+ZEND_METHOD(reflection_property_accessor, getIsset)
 {
 	reflection_object *intern;
 	property_reference *ref;
 
-	if (zend_parse_parameters_none() == FAILURE) {
+	METHOD_NOTSTATIC(reflection_property_accessor_ptr);
+	GET_REFLECTION_OBJECT_PTR(ref);
+
+	if(ref->prop.ai->isset) {
+		reflection_method_factory(ref->ce, ref->prop.ai->isset, NULL, return_value TSRMLS_CC);
 		return;
 	}
+	RETURN_FALSE
+}
+/* }}} */
+
+/* {{{ proto public void ReflectionPropertyAccessor::getUnset()
+   Gets the ReflectionMethod unset accessor for this property, returns false if there is no accessor */
+ZEND_METHOD(reflection_property_accessor, getUnset)
+{
+	reflection_object *intern;
+	property_reference *ref;
+
+	METHOD_NOTSTATIC(reflection_property_accessor_ptr);
 	GET_REFLECTION_OBJECT_PTR(ref);
-	RETURN_BOOL(ref->prop.ai->flags & mask);
-}
-/* }}} */
 
-/* {{{ proto public bool ReflectionPropertyAccessor::isPublic()
-   Returns whether this accessor is public */
-ZEND_METHOD(reflection_property_accessor, isPublic)
-{
-	_property_accessor_check_flag(INTERNAL_FUNCTION_PARAM_PASSTHRU, ZEND_ACC_PUBLIC | ZEND_ACC_IMPLICIT_PUBLIC);
-}
-/* }}} */
-
-/* {{{ proto public bool ReflectionPropertyAccessor::isPrivate()
-   Returns whether this accessor is private */
-ZEND_METHOD(reflection_property_accessor, isPrivate)
-{
-	_property_accessor_check_flag(INTERNAL_FUNCTION_PARAM_PASSTHRU, ZEND_ACC_PRIVATE);
-}
-/* }}} */
-
-/* {{{ proto public bool ReflectionPropertyAccessor::isProtected()
-   Returns whether this accessor is protected */
-ZEND_METHOD(reflection_property_accessor, isProtected)
-{
-	_property_accessor_check_flag(INTERNAL_FUNCTION_PARAM_PASSTHRU, ZEND_ACC_PROTECTED);
-}
-/* }}} */
-
-/* {{{ proto public bool ReflectionPropertyAccessor::isStatic()
-   Returns whether this accessor is static */
-ZEND_METHOD(reflection_property_accessor, isStatic)
-{
-	_property_accessor_check_flag(INTERNAL_FUNCTION_PARAM_PASSTHRU, ZEND_ACC_STATIC);
-}
-/* }}} */
-
-/* {{{ proto public bool ReflectionPropertyAccessor::isDefault()
-   Returns whether this accessor is default (declared at compilation time). */
-ZEND_METHOD(reflection_property_accessor, isDefault)
-{
-	_property_accessor_check_flag(INTERNAL_FUNCTION_PARAM_PASSTHRU, ~ZEND_ACC_IMPLICIT_PUBLIC);
+	if(ref->prop.ai->unset) {
+		reflection_method_factory(ref->ce, ref->prop.ai->unset, NULL, return_value TSRMLS_CC);
+		return;
+	}
+	RETURN_FALSE
 }
 /* }}} */
 
@@ -5398,46 +5390,6 @@ ZEND_METHOD(reflection_property_accessor, getDeclaringClass)
 }
 /* }}} */
 
-
-/* {{{ proto public string ReflectionPropertyAccessor::getDocComment()
-   Returns the doc comment for this accessor */
-ZEND_METHOD(reflection_property_accessor, getDocComment)
-{
-	reflection_object *intern;
-	property_reference *ref;
-
-	if (zend_parse_parameters_none() == FAILURE) {
-		return;
-	}
-	GET_REFLECTION_OBJECT_PTR(ref);
-
-	if(ref->prop.doc_comment) {
-		RETURN_STRINGL(ref->prop.doc_comment, ref->prop.doc_comment_len, 1);
-	}
-	RETURN_FALSE;
-}
-/* }}} */
-
-/* {{{ proto public int ReflectionPropertyAccessor::setAccessible(bool visible)
-   Sets whether non-public properties can be requested */
-ZEND_METHOD(reflection_property_accessor, setAccessible)
-{
-	reflection_object *intern;
-	zend_bool visible;
-
-	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "b", &visible) == FAILURE) {
-		return;
-	}
-
-	intern = (reflection_object *) zend_object_store_get_object(getThis() TSRMLS_CC);
-
-	if (intern == NULL) {
-		return;
-	}
-
-	intern->ignore_visibility = visible;
-}
-/* }}} */
 
 /* {{{ proto public mixed ReflectionPropertyAccessor::getValue([stdclass object])
    Returns this property's value by calling the accessor */
@@ -5509,16 +5461,6 @@ ZEND_METHOD(reflection_property_accessor, setValue)
 	}
 }
 /* }}} */
-
-/* {{{ proto public string ReflectionPropertyAccessor::getName()
-   Returns the property name */
-ZEND_METHOD(reflection_property_accessor, getName)
-{
-	if (zend_parse_parameters_none() == FAILURE) {
-		return;
-	}
-	_default_get_entry(getThis(), "name", sizeof("name"), return_value TSRMLS_CC);
-}
 
 /* {{{ proto public string ReflectionPropertyAccessor::__toString()
    Returns a string representation */
@@ -6380,24 +6322,17 @@ static const zend_function_entry reflection_property_functions[] = {
 
 
 static const zend_function_entry reflection_property_accessor_functions[] = {
-	ZEND_ME(reflection, __clone, arginfo_reflection__void, ZEND_ACC_PRIVATE|ZEND_ACC_FINAL)
 	ZEND_ME(reflection_property_accessor, export, arginfo_reflection_property_export, ZEND_ACC_STATIC|ZEND_ACC_PUBLIC)
 	ZEND_ME(reflection_property_accessor, __construct, arginfo_reflection_property___construct, 0)
 	ZEND_ME(reflection_property_accessor, __toString, arginfo_reflection__void, 0)
-	ZEND_ME(reflection_property_accessor, getName, arginfo_reflection__void, 0)
 	ZEND_ME(reflection_property_accessor, getValue, arginfo_reflection_property_getValue, 0)
 	ZEND_ME(reflection_property_accessor, setValue, arginfo_reflection_property_setValue, 0)
-	ZEND_ME(reflection_property_accessor, isPublic, arginfo_reflection__void, 0)
-	ZEND_ME(reflection_property_accessor, isPrivate, arginfo_reflection__void, 0)
-	ZEND_ME(reflection_property_accessor, isProtected, arginfo_reflection__void, 0)
-	ZEND_ME(reflection_property_accessor, isStatic, arginfo_reflection__void, 0)
-	ZEND_ME(reflection_property_accessor, isDefault, arginfo_reflection__void, 0)
-	ZEND_ME(reflection_property_accessor, getGetter, arginfo_reflection__void, 0)
-	ZEND_ME(reflection_property_accessor, getSetter, arginfo_reflection__void, 0)
+	ZEND_ME(reflection_property_accessor, getGet, arginfo_reflection__void, 0)
+	ZEND_ME(reflection_property_accessor, getSet, arginfo_reflection__void, 0)
+	ZEND_ME(reflection_property_accessor, getIsset, arginfo_reflection__void, 0)
+	ZEND_ME(reflection_property_accessor, getUnset, arginfo_reflection__void, 0)
 	ZEND_ME(reflection_property_accessor, getModifiers, arginfo_reflection__void, 0)
 	ZEND_ME(reflection_property_accessor, getDeclaringClass, arginfo_reflection__void, 0)
-	ZEND_ME(reflection_property_accessor, getDocComment, arginfo_reflection__void, 0)
-	ZEND_ME(reflection_property_accessor, setAccessible, arginfo_reflection_property_setAccessible, 0)
 	PHP_FE_END
 };
 
@@ -6583,7 +6518,7 @@ PHP_MINIT_FUNCTION(reflection) /* {{{ */
 
 	INIT_CLASS_ENTRY(_reflection_entry, "ReflectionPropertyAccessor", reflection_property_accessor_functions);
 	_reflection_entry.create_object = reflection_objects_new;
-	reflection_property_accessor_ptr = zend_register_internal_class(&_reflection_entry TSRMLS_CC);
+	reflection_property_accessor_ptr = zend_register_internal_class_ex(&_reflection_entry, reflection_property_ptr, NULL TSRMLS_CC);
 	reflection_register_implement(reflection_property_accessor_ptr, reflector_ptr TSRMLS_CC);
 	zend_declare_property_string(reflection_property_accessor_ptr, "name", sizeof("name")-1, "", ZEND_ACC_PUBLIC TSRMLS_CC);
 	zend_declare_property_string(reflection_property_accessor_ptr, "class", sizeof("class")-1, "", ZEND_ACC_PUBLIC TSRMLS_CC);

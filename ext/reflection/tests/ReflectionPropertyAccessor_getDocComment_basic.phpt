@@ -25,13 +25,13 @@ Clint Priest <php-dev@zerocue.com>
 	foreach($rc->getProperties() as $objProperty) {
 		var_dump($objProperty->getName());
 		var_dump($objProperty->getDocComment());
-		if($objProperty->getGetter()) {
+		if($objProperty->getGet()) {
 			echo "getter DocComment\n";
-			var_dump($objProperty->getGetter()->getDocComment());
+			var_dump($objProperty->getGet()->getDocComment());
 		}
-		if($objProperty->getSetter()) {
+		if($objProperty->getSet()) {
 			echo "setter DocComment\n";
-			var_dump($objProperty->getSetter()->getDocComment());
+			var_dump($objProperty->getSet()->getDocComment());
 		}
 		echo "******************\n";
 	}

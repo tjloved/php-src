@@ -1,5 +1,5 @@
 --TEST--
-ReflectionPropertyAccessor::getGetter();
+ReflectionPropertyAccessor::getGet();
 --CREDITS--
 Clint Priest <php-dev@zerocue.com>
 --FILE--
@@ -18,7 +18,7 @@ Clint Priest <php-dev@zerocue.com>
 	}
 	$rc = new ReflectionClass('TimePeriod');
 	foreach($rc->getProperties() as $objProperty) {
-		var_dump($objProperty->getGetter());
+		var_dump($objProperty->getGet());
 	}
 ?>
 ==DONE==
