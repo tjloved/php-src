@@ -24,13 +24,13 @@ Clint Priest <php-dev@zerocue.com>
 ==DONE==
 --EXPECT--
 bool(false)
-object(ReflectionMethod)#5 (2) {
+object(ReflectionMethodAccessor)#5 (2) {
   ["name"]=>
   string(8) "$a2->set"
   ["class"]=>
   string(10) "TimePeriod"
 }
-object(ReflectionMethod)#5 (2) {
+object(ReflectionMethodAccessor)#5 (2) {
   ["name"]=>
   string(8) "$a3->set"
   ["class"]=>

@@ -61,6 +61,7 @@ PHPAPI zend_class_entry *reflection_parameter_ptr;
 PHPAPI zend_class_entry *reflection_class_ptr;
 PHPAPI zend_class_entry *reflection_object_ptr;
 PHPAPI zend_class_entry *reflection_method_ptr;
+PHPAPI zend_class_entry *reflection_method_accessor_ptr;
 PHPAPI zend_class_entry *reflection_property_ptr;
 PHPAPI zend_class_entry *reflection_property_accessor_ptr;
 PHPAPI zend_class_entry *reflection_extension_ptr;
@@ -1341,6 +1342,7 @@ static void reflection_method_factory(zend_class_entry *ce, zend_function *metho
 	reflection_object *intern;
 	zval *name;
 	zval *classname;
+	zend_uint	isAccessor = IS_ACCESSOR_FN(method);
 
 	if (closure_object) {
 		Z_ADDREF_P(closure_object);
@@ -1349,7 +1351,7 @@ static void reflection_method_factory(zend_class_entry *ce, zend_function *metho
 	MAKE_STD_ZVAL(classname);
 	ZVAL_STRING(name, method->common.function_name, 1);
 	ZVAL_STRINGL(classname, method->common.scope->name, method->common.scope->name_length, 1);
-	reflection_instantiate(reflection_method_ptr, object TSRMLS_CC);
+	reflection_instantiate(isAccessor ? reflection_method_accessor_ptr : reflection_method_ptr, object TSRMLS_CC);
 	intern = (reflection_object *) zend_object_store_get_object(object TSRMLS_CC);
 	intern->ptr = method;
 	intern->ref_type = REF_TYPE_FUNCTION;
@@ -3131,6 +3133,14 @@ ZEND_METHOD(reflection_method, isProtected)
 ZEND_METHOD(reflection_method, isStatic)
 {
 	_function_check_flag(INTERNAL_FUNCTION_PARAM_PASSTHRU, ZEND_ACC_STATIC);
+}
+/* }}} */
+
+/* {{{ proto public bool ReflectionMethodAccessor::isAutoImplemented()
+   Returns whether this accessor is automatically implemented */
+ZEND_METHOD(reflection_method_accessor, isAutoImplemented)
+{
+	_function_check_flag(INTERNAL_FUNCTION_PARAM_PASSTHRU, ZEND_ACC_AUTO_IMPLEMENTED);
 }
 /* }}} */
 
@@ -6130,6 +6140,11 @@ static const zend_function_entry reflection_method_functions[] = {
 	PHP_FE_END
 };
 
+static const zend_function_entry reflection_method_accessor_functions[] = {
+	ZEND_ME(reflection_method_accessor, isAutoImplemented, arginfo_reflection__void, 0)
+	PHP_FE_END
+};
+
 
 ZEND_BEGIN_ARG_INFO_EX(arginfo_reflection_class_export, 0, 0, 1)
 	ZEND_ARG_INFO(0, argument)
@@ -6490,6 +6505,10 @@ PHP_MINIT_FUNCTION(reflection) /* {{{ */
 	REGISTER_REFLECTION_CLASS_CONST_LONG(method, "IS_ABSTRACT", ZEND_ACC_ABSTRACT);
 	REGISTER_REFLECTION_CLASS_CONST_LONG(method, "IS_FINAL", ZEND_ACC_FINAL);
 
+	INIT_CLASS_ENTRY(_reflection_entry, "ReflectionMethodAccessor", reflection_method_accessor_functions);
+	_reflection_entry.create_object = reflection_objects_new;
+	reflection_method_accessor_ptr = zend_register_internal_class_ex(&_reflection_entry, reflection_method_ptr, NULL TSRMLS_CC);
+
 	INIT_CLASS_ENTRY(_reflection_entry, "ReflectionClass", reflection_class_functions);
 	_reflection_entry.create_object = reflection_objects_new;
 	reflection_class_ptr = zend_register_internal_class(&_reflection_entry TSRMLS_CC);
@@ -6520,13 +6539,6 @@ PHP_MINIT_FUNCTION(reflection) /* {{{ */
 	_reflection_entry.create_object = reflection_objects_new;
 	reflection_property_accessor_ptr = zend_register_internal_class_ex(&_reflection_entry, reflection_property_ptr, NULL TSRMLS_CC);
 	reflection_register_implement(reflection_property_accessor_ptr, reflector_ptr TSRMLS_CC);
-	zend_declare_property_string(reflection_property_accessor_ptr, "name", sizeof("name")-1, "", ZEND_ACC_PUBLIC TSRMLS_CC);
-	zend_declare_property_string(reflection_property_accessor_ptr, "class", sizeof("class")-1, "", ZEND_ACC_PUBLIC TSRMLS_CC);
-
-	REGISTER_REFLECTION_CLASS_CONST_LONG(property_accessor, "IS_STATIC", ZEND_ACC_STATIC);
-	REGISTER_REFLECTION_CLASS_CONST_LONG(property_accessor, "IS_PUBLIC", ZEND_ACC_PUBLIC);
-	REGISTER_REFLECTION_CLASS_CONST_LONG(property_accessor, "IS_PROTECTED", ZEND_ACC_PROTECTED);
-	REGISTER_REFLECTION_CLASS_CONST_LONG(property_accessor, "IS_PRIVATE", ZEND_ACC_PRIVATE);
 
 	INIT_CLASS_ENTRY(_reflection_entry, "ReflectionExtension", reflection_extension_functions);
 	_reflection_entry.create_object = reflection_objects_new;

@@ -23,14 +23,14 @@ Clint Priest <php-dev@zerocue.com>
 ?>
 ==DONE==
 --EXPECTF--
-object(ReflectionMethod)#5 (2) {
+object(ReflectionMethodAccessor)#5 (2) {
   ["name"]=>
   string(%d) "$a1->isset"
   ["class"]=>
   string(10) "TimePeriod"
 }
 bool(false)
-object(ReflectionMethod)#5 (2) {
+object(ReflectionMethodAccessor)#5 (2) {
   ["name"]=>
   string(%d) "$a3->isset"
   ["class"]=>

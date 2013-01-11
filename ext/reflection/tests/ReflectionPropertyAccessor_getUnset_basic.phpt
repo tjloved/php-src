@@ -1,5 +1,5 @@
 --TEST--
-ReflectionPropertyAccessor::getIsset();
+ReflectionPropertyAccessor::getUnset();
 --CREDITS--
 Clint Priest <php-dev@zerocue.com>
 --FILE--
@@ -24,13 +24,13 @@ Clint Priest <php-dev@zerocue.com>
 ==DONE==
 --EXPECTF--
 bool(false)
-object(ReflectionMethod)#5 (2) {
+object(ReflectionMethodAccessor)#5 (2) {
   ["name"]=>
   string(%d) "$a2->unset"
   ["class"]=>
   string(10) "TimePeriod"
 }
-object(ReflectionMethod)#5 (2) {
+object(ReflectionMethodAccessor)#5 (2) {
   ["name"]=>
   string(%d) "$a3->unset"
   ["class"]=>

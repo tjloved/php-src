@@ -1774,6 +1774,7 @@ void zend_do_end_accessor_declaration(znode *function_token, const znode *body T
 			efree(buffer);
 			zend_do_extended_info(TSRMLS_C);
 		}
+		CG(active_op_array)->fn_flags |= ZEND_ACC_AUTO_IMPLEMENTED;
 		CG(compiler_options) = original_compiler_options;
 	} else if (has_body && (CG(active_class_entry)->ce_flags & ZEND_ACC_INTERFACE) == ZEND_ACC_INTERFACE) {
 		zend_error(E_WARNING, "Interface %s::$%s %ster cannot have implementation defined, implementation ignored.", CG(active_class_entry)->name, property_name, zend_fn_purpose_string((zend_function*)CG(active_op_array)));
