@@ -1581,7 +1581,7 @@ static int zend_std_has_property(zval *object, zval *member, int has_set_exists,
 				guard->in_isset = 0;
 			}
 		} else {
-			*value = zend_std_read_property(object, member, BP_VAR_IS, key);
+			*value = zend_std_read_property(object, member, BP_VAR_IS, key TSRMLS_CC);
 
 			result = 0;
 			if(*value) {
