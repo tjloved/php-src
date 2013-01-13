@@ -34,7 +34,7 @@
 
 #define FREE_PNODE(znode)	zval_dtor(&znode->u.constant);
 
-#define IS_ACCESSOR_FN(fn) ( (fn)->common.purpose >= ZEND_FNP_PROP_GETTER && (fn)->common.purpose <= ZEND_FNP_PROP_UNSETTER )
+#define IS_ACCESSOR_FN(fn) (((fn)->common.fn_flags & ZEND_ACC_ACCESSOR) != 0)
 
 #define INIT_ZNODE(zn) \
 	{															\
@@ -233,16 +233,8 @@ typedef struct _zend_try_catch_element {
 #define ZEND_ACC_RETURN_REFERENCE		0x4000000
 #define ZEND_ACC_DONE_PASS_TWO			0x8000000
 
-#define ZEND_ACC_AUTO_IMPLEMENTED		0x10000000
-
-
-
-/** Function Purposes **/
-#define ZEND_FNP_UNDEFINED				0		/* No special purpose function */
-#define ZEND_FNP_PROP_GETTER			1		/* Special purpose accessor: getter */
-#define ZEND_FNP_PROP_SETTER			2		/* Special purpose accessor: setter */
-#define ZEND_FNP_PROP_ISSETTER			3		/* Special purpose accessor: issetter */
-#define ZEND_FNP_PROP_UNSETTER			4		/* Special purpose accessor: unsetter */
+#define ZEND_ACC_ACCESSOR				0x10000000
+#define ZEND_ACC_AUTO_IMPLEMENTED		0x20000000
 
 /* Offsets into zend_accessor_info->fn */
 #define ZEND_ACCESSOR_GET   0
@@ -304,7 +296,6 @@ struct _zend_op_array {
 	zend_uint num_args;
 	zend_uint required_num_args;
 	zend_arg_info *arg_info;
-	zend_uchar purpose;			/* ZEND_FNP_* */
 	/* END of common elements */
 
 	zend_uint *refcount;
@@ -362,7 +353,6 @@ typedef struct _zend_internal_function {
 	zend_uint num_args;
 	zend_uint required_num_args;
 	zend_arg_info *arg_info;
-	zend_uchar purpose;			/* ZEND_FNP_* */
 	/* END of common elements */
 
 	void (*handler)(INTERNAL_FUNCTION_PARAMETERS);
@@ -383,7 +373,6 @@ typedef union _zend_function {
 		zend_uint num_args;
 		zend_uint required_num_args;
 		zend_arg_info *arg_info;
-		zend_uchar purpose;			/* ZEND_FNP_* */
 	} common;
 
 	zend_op_array op_array;
@@ -542,7 +531,7 @@ void zend_do_add_string(znode *result, const znode *op1, znode *op2 TSRMLS_DC);
 void zend_do_add_variable(znode *result, const znode *op1, const znode *op2 TSRMLS_DC);
 
 int zend_do_verify_access_types(const znode *current_access_type, const znode *new_modifier);
-void zend_do_begin_function_declaration(znode *function_token, znode *function_name, int is_method, int return_reference, znode *fn_flags_znode, zend_uchar purpose TSRMLS_DC);
+void zend_do_begin_function_declaration(znode *function_token, znode *function_name, int is_method, int return_reference, znode *fn_flags_znode TSRMLS_DC);
 void zend_do_end_function_declaration(const znode *function_token TSRMLS_DC);
 void zend_do_receive_arg(zend_uchar op, znode *varname, const znode *offset, const znode *initialization, znode *class_type, zend_bool pass_by_reference TSRMLS_DC);
 int zend_do_begin_function_call(znode *function_name, zend_bool check_namespace TSRMLS_DC);
@@ -693,7 +682,6 @@ void zend_resolve_goto_label(zend_op_array *op_array, zend_op *opline, int pass2
 void zend_release_labels(TSRMLS_D);
 
 char *zend_visibility_string(zend_uint fn_flags);
-char *zend_fn_purpose_string(zend_function *function);
 
 
 ZEND_API void function_add_ref(zend_function *function);

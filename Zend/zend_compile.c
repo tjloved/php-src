@@ -1631,7 +1631,7 @@ void zend_do_begin_accessor_declaration(znode *function_token, znode *modifiers,
 	if ((Z_LVAL(modifiers->u.constant) & ZEND_ACC_PPP_MASK) != 0) {
 		property_flags &= ~ZEND_ACC_PPP_MASK;
 	}
-	Z_LVAL(modifiers->u.constant) |= property_flags;
+	Z_LVAL(modifiers->u.constant) |= property_flags | ZEND_ACC_ACCESSOR;
 
 	if (Z_TYPE(function_token->u.constant) == IS_STRING && strcasecmp("get", Z_STRVAL(function_token->u.constant)) == 0) {
 		efree(Z_STRVAL(function_token->u.constant));
@@ -1642,7 +1642,7 @@ void zend_do_begin_accessor_declaration(znode *function_token, znode *modifiers,
 		}
 
 		/* Declare Function */
-		zend_do_begin_function_declaration(function_token, function_token, 1, return_reference, modifiers, ZEND_FNP_PROP_GETTER TSRMLS_CC);
+		zend_do_begin_function_declaration(function_token, function_token, 1, return_reference, modifiers TSRMLS_CC);
 		property_info->ai->fn[ZEND_ACCESSOR_GET] = (zend_function *) CG(active_op_array);
 	} else if (Z_TYPE(function_token->u.constant) == IS_STRING && strcasecmp("set", Z_STRVAL(function_token->u.constant)) == 0) {
 		znode unused_node, unused_node2, value_node;
@@ -1654,7 +1654,7 @@ void zend_do_begin_accessor_declaration(znode *function_token, znode *modifiers,
 			zend_error(E_WARNING, "Property setter %s::$%s indicates a return reference with '&', setters do not return values, ignored.", CG(active_class_entry)->name, property_name);
 		}
 		/* Declare Function */
-		zend_do_begin_function_declaration(function_token, function_token, 1, ZEND_RETURN_VAL, modifiers, ZEND_FNP_PROP_SETTER TSRMLS_CC);
+		zend_do_begin_function_declaration(function_token, function_token, 1, ZEND_RETURN_VAL, modifiers TSRMLS_CC);
 		property_info->ai->fn[ZEND_ACCESSOR_SET] = (zend_function *) CG(active_op_array);
 
 		if (!has_params) {
@@ -1674,7 +1674,7 @@ void zend_do_begin_accessor_declaration(znode *function_token, znode *modifiers,
 		}
 
 		/* Declare Function */
-		zend_do_begin_function_declaration(function_token, function_token, 1, ZEND_RETURN_VAL, modifiers, ZEND_FNP_PROP_ISSETTER TSRMLS_CC);
+		zend_do_begin_function_declaration(function_token, function_token, 1, ZEND_RETURN_VAL, modifiers TSRMLS_CC);
 		property_info->ai->fn[ZEND_ACCESSOR_ISSET] = (zend_function *) CG(active_op_array);
 	} else if (Z_TYPE(function_token->u.constant) == IS_LONG && Z_LVAL(function_token->u.constant) == T_UNSET) {
 		ZVAL_STRING(&function_token->u.constant, create_accessor_function_name(property_name, "unset"), 0);
@@ -1684,7 +1684,7 @@ void zend_do_begin_accessor_declaration(znode *function_token, znode *modifiers,
 		}
 
 		/* Declare Function */
-		zend_do_begin_function_declaration(function_token, function_token, 1, ZEND_RETURN_VAL, modifiers, ZEND_FNP_PROP_UNSETTER TSRMLS_CC);
+		zend_do_begin_function_declaration(function_token, function_token, 1, ZEND_RETURN_VAL, modifiers TSRMLS_CC);
 		property_info->ai->fn[ZEND_ACCESSOR_UNSET] = (zend_function *) CG(active_op_array);
 	} else {
 		zend_error(E_COMPILE_ERROR, "Unknown accessor '%s', expecting get or set for variable $%s", Z_STRVAL(function_token->u.constant), property_name);
@@ -1704,9 +1704,18 @@ void zend_do_end_accessor_declaration(znode *function_token, const znode *body T
 		zval eval_php_code;
 		zend_uint original_compiler_options = CG(compiler_options);
 
+		/* Find out what kind of accessor this is by checking in which
+		 * ->fn slot it is in */
+		zend_uchar acc;
+		for (acc = 0; acc < ZEND_ACCESSOR_COUNT; ++acc) {
+			if (property_info->ai->fn[acc] == (zend_function *) CG(active_op_array)) {
+				break;
+			}
+		}
+
 		CG(compiler_options) = ZEND_COMPILE_DEFAULT_FOR_EVAL;
 
-		if(CG(active_op_array)->purpose == ZEND_FNP_PROP_GETTER) {
+		if (acc == ZEND_ACCESSOR_GET) {
 			/* Equivalent to: return $this->Property; */
 			zend_uint		bufsize = 16 + property_name_len + 1 + 1;
 			char			*buffer = emalloc(bufsize);
@@ -1718,7 +1727,7 @@ void zend_do_end_accessor_declaration(znode *function_token, const znode *body T
 			efree(buffer);
 			zend_do_extended_info(TSRMLS_C);
 
-		} else if (CG(active_op_array)->purpose == ZEND_FNP_PROP_SETTER) {
+		} else if (acc == ZEND_ACCESSOR_SET) {
 			/* Equivalent to: $this->Property = $value; */
 			zend_arg_info *arg_info = CG(active_op_array)->arg_info;
 			zend_uint bufsize = property_name_len + arg_info->name_len + 12 + 1;
@@ -1731,7 +1740,7 @@ void zend_do_end_accessor_declaration(znode *function_token, const znode *body T
 			efree(buffer);
 			zend_do_extended_info(TSRMLS_C);
 
-		} else if(CG(active_op_array)->purpose == ZEND_FNP_PROP_ISSETTER) {
+		} else if (acc == ZEND_ACCESSOR_ISSET) {
 			/* Equivalent to: return $this->Property !== NULL; (via getter) */
 			zend_uint		bufsize = 14 + property_name_len + 10 + 1;
 			char			*buffer = emalloc(bufsize);
@@ -1743,7 +1752,7 @@ void zend_do_end_accessor_declaration(znode *function_token, const znode *body T
 			efree(buffer);
 			zend_do_extended_info(TSRMLS_C);
 
-		} else if(CG(active_op_array)->purpose == ZEND_FNP_PROP_UNSETTER) {
+		} else if (acc == ZEND_ACCESSOR_UNSET) {
 			/* Equivalent to: $this->Property = NULL; (via setter) */
 			zend_uint		bufsize = 7 + property_name_len + 8 + 1;
 			char			*buffer = emalloc(bufsize);
@@ -1758,7 +1767,7 @@ void zend_do_end_accessor_declaration(znode *function_token, const znode *body T
 		CG(active_op_array)->fn_flags |= ZEND_ACC_AUTO_IMPLEMENTED;
 		CG(compiler_options) = original_compiler_options;
 	} else if (has_body && (CG(active_class_entry)->ce_flags & ZEND_ACC_INTERFACE) == ZEND_ACC_INTERFACE) {
-		zend_error(E_WARNING, "Interface %s::$%s %ster cannot have implementation defined, implementation ignored.", CG(active_class_entry)->name, property_name, zend_fn_purpose_string((zend_function*)CG(active_op_array)));
+		zend_error_noreturn(E_COMPILE_ERROR, "Interface accessor %s::%s() cannot contain body", CG(active_class_entry)->name, CG(active_op_array)->function_name);
 	}
 
 	zend_do_end_function_declaration(function_token TSRMLS_CC);
@@ -1797,7 +1806,7 @@ void zend_finalize_accessor(TSRMLS_D) { /* {{{ */
 }
 /* }}} */
 
-void zend_do_begin_function_declaration(znode *function_token, znode *function_name, int is_method, int return_reference, znode *fn_flags_znode, zend_uchar purpose TSRMLS_DC) /* {{{ */
+void zend_do_begin_function_declaration(znode *function_token, znode *function_name, int is_method, int return_reference, znode *fn_flags_znode TSRMLS_DC) /* {{{ */
 {
 	zend_op_array op_array;
 	char *name = function_name->u.constant.value.str.val;
@@ -1810,7 +1819,7 @@ void zend_do_begin_function_declaration(znode *function_token, znode *function_n
 
 	if (is_method) {
 		if (CG(active_class_entry)->ce_flags & ZEND_ACC_INTERFACE) {
-			if ((Z_LVAL(fn_flags_znode->u.constant) & ~(ZEND_ACC_STATIC|ZEND_ACC_PUBLIC))) {
+			if ((Z_LVAL(fn_flags_znode->u.constant) & ~(ZEND_ACC_STATIC|ZEND_ACC_PUBLIC|ZEND_ACC_ACCESSOR))) {
 				zend_error(E_COMPILE_ERROR, "Access type for interface method %s::%s() must be omitted", CG(active_class_entry)->name, function_name->u.constant.value.str.val);
 			}
 			Z_LVAL(fn_flags_znode->u.constant) |= ZEND_ACC_ABSTRACT; /* propagates to the rest of the parser */
@@ -1835,7 +1844,6 @@ void zend_do_begin_function_declaration(znode *function_token, znode *function_n
 		op_array.fn_flags |= ZEND_ACC_RETURN_REFERENCE;
 	}
 	op_array.fn_flags |= fn_flags;
-	op_array.purpose = purpose;
 
 	op_array.scope = is_method?CG(active_class_entry):NULL;
 	op_array.prototype = NULL;
@@ -2051,7 +2059,7 @@ void zend_do_begin_lambda_function_declaration(znode *result, znode *function_to
 	function_name.op_type = IS_CONST;
 	ZVAL_STRINGL(&function_name.u.constant, "{closure}", sizeof("{closure}")-1, 1);
 
-	zend_do_begin_function_declaration(function_token, &function_name, 0, return_reference, NULL, ZEND_FNP_UNDEFINED TSRMLS_CC);
+	zend_do_begin_function_declaration(function_token, &function_name, 0, return_reference, NULL TSRMLS_CC);
 
 	result->op_type = IS_TMP_VAR;
 	result->u.op.var = get_temporary_variable(current_op_array);
@@ -3330,21 +3338,6 @@ char *zend_visibility_string(zend_uint fn_flags) /* {{{ */
 		return "public";
 	}
 	return "";
-}
-/* }}} */
-
-char *zend_fn_purpose_string(zend_function *function) /* {{{ */
-{
-	if (function->common.purpose == ZEND_FNP_PROP_GETTER) {
-		return "get";
-	} else if (function->common.purpose == ZEND_FNP_PROP_SETTER) {
-		return "set";
-	} else if (function->common.purpose == ZEND_FNP_PROP_ISSETTER) {
-		return "isset";
-	} else if (function->common.purpose == ZEND_FNP_PROP_UNSETTER) {
-		return "unset";
-	}
-	return "access";
 }
 /* }}} */
 
