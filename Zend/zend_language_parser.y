@@ -592,7 +592,7 @@ class_statement:
 	|	trait_use_statement
 	|	method_modifiers function is_reference T_STRING { zend_do_begin_function_declaration(&$2, &$4, 1, $3.op_type, &$1 TSRMLS_CC); }
 		'(' parameter_list ')'
-		method_body { zend_do_abstract_method(&$4, &$1, &$9 TSRMLS_CC); zend_do_end_function_declaration(&$2 TSRMLS_CC); }
+		method_body { zend_do_abstract_method(&$9 TSRMLS_CC); zend_do_end_function_declaration(&$2 TSRMLS_CC); }
 ;
 
 trait_use_statement:
@@ -697,6 +697,7 @@ accessor_modifier:
 	|	T_PRIVATE				{ Z_LVAL($$.u.constant) = ZEND_ACC_PRIVATE; }
 	|	T_STATIC				{ Z_LVAL($$.u.constant) = ZEND_ACC_STATIC; }
 	|	T_FINAL					{ Z_LVAL($$.u.constant) = ZEND_ACC_FINAL; }
+	|	T_ABSTRACT				{ Z_LVAL($$.u.constant) = ZEND_ACC_ABSTRACT; }
 ;
 
 accessor_optional_parens:

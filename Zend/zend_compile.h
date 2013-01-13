@@ -666,7 +666,7 @@ void zend_do_extended_fcall_end(TSRMLS_D);
 
 void zend_do_ticks(TSRMLS_D);
 
-void zend_do_abstract_method(const znode *function_name, znode *modifiers, const znode *body TSRMLS_DC);
+void zend_do_abstract_method(const znode *body TSRMLS_DC);
 
 void zend_do_declare_constant(znode *name, znode *value TSRMLS_DC);
 void zend_do_build_namespace_name(znode *result, znode *prefix, znode *name TSRMLS_DC);

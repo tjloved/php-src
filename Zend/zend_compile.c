@@ -923,20 +923,19 @@ void zend_do_echo(const znode *arg TSRMLS_DC) /* {{{ */
 }
 /* }}} */
 
-void zend_do_abstract_method(const znode *function_name, znode *modifiers, const znode *body TSRMLS_DC) /* {{{ */
+void zend_do_abstract_method(const znode *body TSRMLS_DC) /* {{{ */
 {
 	char *method_type;
 
 	if (CG(active_class_entry)->ce_flags & ZEND_ACC_INTERFACE) {
-		Z_LVAL(modifiers->u.constant) |= ZEND_ACC_ABSTRACT;
 		method_type = "Interface";
 	} else {
 		method_type = "Abstract";
 	}
 
-	if (modifiers->u.constant.value.lval & ZEND_ACC_ABSTRACT) {
-		if(modifiers->u.constant.value.lval & ZEND_ACC_PRIVATE) {
-			zend_error(E_COMPILE_ERROR, "%s function %s::%s() cannot be declared private", method_type, CG(active_class_entry)->name, function_name->u.constant.value.str.val);
+	if (CG(active_op_array)->fn_flags & ZEND_ACC_ABSTRACT) {
+		if (CG(active_op_array)->fn_flags & ZEND_ACC_PRIVATE) {
+			zend_error(E_COMPILE_ERROR, "%s function %s::%s() cannot be declared private", method_type, CG(active_class_entry)->name, CG(active_op_array)->function_name);
 		}
 		if (Z_LVAL(body->u.constant) == ZEND_ACC_ABSTRACT) {
 			zend_op *opline = get_next_op(CG(active_op_array) TSRMLS_CC);
@@ -946,11 +945,11 @@ void zend_do_abstract_method(const znode *function_name, znode *modifiers, const
 			SET_UNUSED(opline->op2);
 		} else {
 			/* we had code in the function body */
-			zend_error(E_COMPILE_ERROR, "%s function %s::%s() cannot contain body", method_type, CG(active_class_entry)->name, function_name->u.constant.value.str.val);
+			zend_error(E_COMPILE_ERROR, "%s function %s::%s() cannot contain body", method_type, CG(active_class_entry)->name, CG(active_op_array)->function_name);
 		}
 	} else {
-		if (body->u.constant.value.lval == ZEND_ACC_ABSTRACT) {
-			zend_error(E_COMPILE_ERROR, "Non-abstract method %s::%s() must contain body", CG(active_class_entry)->name, function_name->u.constant.value.str.val);
+		if (Z_LVAL(body->u.constant) == ZEND_ACC_ABSTRACT) {
+			zend_error(E_COMPILE_ERROR, "Non-abstract method %s::%s() must contain body", CG(active_class_entry)->name, CG(active_op_array)->function_name);
 		}
 	}
 }
@@ -1589,7 +1588,7 @@ void zend_declare_accessor(znode *var_name TSRMLS_DC) { /* {{{ */
 
 	/* Hide that we're working with an interface during property accessor declaration */
 	CG(active_class_entry)->ce_flags &= ~ZEND_ACC_INTERFACE;
-	zend_do_declare_property(var_name, NULL, CG(access_type) & ~(ZEND_ACC_FINAL) TSRMLS_CC);
+	zend_do_declare_property(var_name, NULL, CG(access_type) & ~(ZEND_ACC_FINAL|ZEND_ACC_ABSTRACT) TSRMLS_CC);
 	CG(active_class_entry)->ce_flags = orig_ce_flags;
 
 	if (zend_hash_find(&CG(active_class_entry)->properties_info, property_name, property_name_len + 1, (void **) &property_info)==SUCCESS) {
@@ -1697,10 +1696,10 @@ void zend_do_end_accessor_declaration(znode *function_token, const znode *body T
 	zend_property_info *property_info = CG(current_property_info);
 	const char *property_name = zend_get_property_name(property_info);
 	int property_name_len = strlen(property_name);
-	zend_bool has_body = body && Z_LVAL(body->u.constant) != ZEND_ACC_ABSTRACT;
 
-	/* If we have no function body, create an automatic body */
-	if (!has_body && (CG(active_class_entry)->ce_flags & ZEND_ACC_INTERFACE) == 0) {
+	if (CG(active_op_array)->fn_flags & ZEND_ACC_ABSTRACT) {
+		zend_do_abstract_method(body TSRMLS_CC);
+	} else if (Z_LVAL(body->u.constant) == ZEND_ACC_ABSTRACT) {
 		zval eval_php_code;
 		zend_uint original_compiler_options = CG(compiler_options);
 
@@ -1766,8 +1765,6 @@ void zend_do_end_accessor_declaration(znode *function_token, const znode *body T
 		}
 		CG(active_op_array)->fn_flags |= ZEND_ACC_AUTO_IMPLEMENTED;
 		CG(compiler_options) = original_compiler_options;
-	} else if (has_body && (CG(active_class_entry)->ce_flags & ZEND_ACC_INTERFACE) == ZEND_ACC_INTERFACE) {
-		zend_error_noreturn(E_COMPILE_ERROR, "Interface accessor %s::%s() cannot contain body", CG(active_class_entry)->name, CG(active_op_array)->function_name);
 	}
 
 	zend_do_end_function_declaration(function_token TSRMLS_CC);
@@ -1778,28 +1775,32 @@ void zend_finalize_accessor(TSRMLS_D) { /* {{{ */
 	zend_property_info *property_info = CG(current_property_info);
 
 	if (!property_info->ai->fn[ZEND_ACCESSOR_ISSET] && property_info->ai->fn[ZEND_ACCESSOR_GET]) {
-		znode zn_fntoken, zn_modifiers;
+		znode zn_fntoken, zn_modifiers, zn_body;
 		INIT_ZNODE(zn_fntoken);
 		ZVAL_LONG(&zn_fntoken.u.constant, T_ISSET);
 
-		/* Inherit flags accessor declaration */
 		INIT_ZNODE(zn_modifiers);
 		Z_LVAL(zn_modifiers.u.constant) = 0;
 
+		INIT_ZNODE(zn_body);
+		Z_LVAL(zn_body.u.constant) = ZEND_ACC_ABSTRACT;
+
 		zend_do_begin_accessor_declaration(&zn_fntoken, &zn_modifiers, 0, 0 TSRMLS_CC);
-		zend_do_end_accessor_declaration(&zn_fntoken, NULL TSRMLS_CC);
+		zend_do_end_accessor_declaration(&zn_fntoken, &zn_body TSRMLS_CC);
 	}
 	if (!property_info->ai->fn[ZEND_ACCESSOR_UNSET] && property_info->ai->fn[ZEND_ACCESSOR_SET]) {
-		znode zn_fntoken, zn_modifiers;
+		znode zn_fntoken, zn_modifiers, zn_body;
 		INIT_ZNODE(zn_fntoken);
 		ZVAL_LONG(&zn_fntoken.u.constant, T_UNSET);
 
-		/* Inherit flags accessor declaration */
 		INIT_ZNODE(zn_modifiers);
 		Z_LVAL(zn_modifiers.u.constant) = 0;
 
+		INIT_ZNODE(zn_body);
+		Z_LVAL(zn_body.u.constant) = ZEND_ACC_ABSTRACT;
+
 		zend_do_begin_accessor_declaration(&zn_fntoken, &zn_modifiers, 0, 0 TSRMLS_CC);
-		zend_do_end_accessor_declaration(&zn_fntoken, NULL TSRMLS_CC);
+		zend_do_end_accessor_declaration(&zn_fntoken, &zn_body TSRMLS_CC);
 	}
 
 	CG(current_property_info) = NULL;
@@ -1857,10 +1858,9 @@ void zend_do_begin_function_declaration(znode *function_token, znode *function_n
 		zend_stack_push(&CG(context_stack), (void *) &CG(context), sizeof(CG(context)));
 		zend_init_compiler_context(TSRMLS_C);
 
-		/* Currently not necessary
 		if (fn_flags & ZEND_ACC_ABSTRACT) {
 			CG(active_class_entry)->ce_flags |= ZEND_ACC_IMPLICIT_ABSTRACT_CLASS;
-		}*/
+		}
 	} else if (is_method) {
 		int result;
 
@@ -3800,6 +3800,18 @@ static zend_bool do_inherit_property_access_check(HashTable *target_ht, zend_pro
 		}
 		return 0;	/* Don't copy from parent */
 	} else {
+		/* Make sure that when we copy abstract accessors the class is marked
+		 * abstract too */
+		if (parent_info->ai) {
+			int i;
+			for (i = 0; i < ZEND_ACCESSOR_COUNT; ++i) {
+				zend_function *fn = parent_info->ai->fn[i];
+				if (fn && (fn->common.fn_flags & ZEND_ACC_ABSTRACT)) {
+					ce->ce_flags |= ZEND_ACC_IMPLICIT_ABSTRACT_CLASS;
+				}
+			}
+		}
+	
 		return 1;	/* Copy from parent */
 	}
 }
