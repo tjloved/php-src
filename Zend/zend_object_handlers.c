@@ -1369,7 +1369,7 @@ ZEND_API zend_function *zend_std_get_static_method(zend_class_entry *ce, const c
 			if (ce->__callstatic) {
 				fbc = zend_get_user_callstatic_function(ce, function_name_strval, function_name_strlen);
 			} else {
-				zend_error_noreturn(E_ERROR, "Call to method %s %s::%s() from context '%s'", zend_visibility_string(fbc->common.fn_flags), ZEND_FN_SCOPE_NAME(fbc), function_name_strval, EG(scope) ? EG(scope)->name : "");
+				zend_error_noreturn(E_ERROR, "Call to %s method %s::%s() from context '%s'", zend_visibility_string(fbc->common.fn_flags), ZEND_FN_SCOPE_NAME(fbc), function_name_strval, EG(scope) ? EG(scope)->name : "");
 			}
 		}
 	} else if ((fbc->common.fn_flags & ZEND_ACC_PROTECTED)) {
@@ -1379,7 +1379,7 @@ ZEND_API zend_function *zend_std_get_static_method(zend_class_entry *ce, const c
 			if (ce->__callstatic) {
 				fbc = zend_get_user_callstatic_function(ce, function_name_strval, function_name_strlen);
 			} else {
-				zend_error_noreturn(E_ERROR, "Call to method %s %s::%s() from context '%s'", zend_visibility_string(fbc->common.fn_flags), ZEND_FN_SCOPE_NAME(fbc), function_name_strval, EG(scope) ? EG(scope)->name : "");
+				zend_error_noreturn(E_ERROR, "Call to %s method %s::%s() from context '%s'", zend_visibility_string(fbc->common.fn_flags), ZEND_FN_SCOPE_NAME(fbc), function_name_strval, EG(scope) ? EG(scope)->name : "");
 			}
 		}
 	}
