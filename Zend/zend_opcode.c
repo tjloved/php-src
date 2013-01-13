@@ -651,9 +651,6 @@ ZEND_API int pass_two(zend_op_array *op_array TSRMLS_DC)
 {
 	zend_op *opline, *end;
 
-	if( (op_array->fn_flags & ZEND_ACC_DONE_PASS_TWO) ) {
-		return 0;
-	}
 	if (op_array->type != ZEND_USER_FUNCTION && op_array->type != ZEND_EVAL_CODE) {
 		return 0;
 	}
