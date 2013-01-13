@@ -1,5 +1,5 @@
 --TEST--
-Accessors can be overwritten with a plain property
+Accessors can be re-declared with a plain property
 --FILE--
 <?php
 

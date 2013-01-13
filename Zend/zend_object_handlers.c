@@ -585,13 +585,18 @@ zval *zend_std_read_property(zval *object, zval *member, int type, const zend_li
 				zend_error(E_WARNING, "Cannot get property %s::$%s, no getter defined", zobj->ce->name, Z_STRVAL_P(member));
 			}
 			retval = &EG(uninitialized_zval_ptr);
-		} else if(zend_get_property_guard(zobj, property_info, member, &guard) == SUCCESS && guard->in_get == 0) {
+		} else if(zend_get_property_guard(zobj, property_info, member, &guard) == SUCCESS) {
 			zend_function *getter = zend_get_accessor(property_info, zobj->ce, ZEND_ACCESSOR_GET TSRMLS_CC);
 			if(getter) {
-				guard->in_get = 1;
-				rv = zend_std_call_getter(object, member, getter, type TSRMLS_CC);
-				guard->in_get = 0;
-				retval = &rv;
+				if(guard->in_get == 0) {
+					guard->in_get = 1;
+					rv = zend_std_call_getter(object, member, getter, type TSRMLS_CC);
+					guard->in_get = 0;
+					retval = &rv;
+				} else if(EG(active_op_array) != (zend_op_array*)getter) {
+					zend_error(E_WARNING, "Recursive access to %s::%s detected, return value is NULL.", zobj->ce->name, getter->common.function_name);
+					retval = &EG(uninitialized_zval_ptr);
+				}
 			}
 		}
 	}
@@ -662,15 +667,19 @@ ZEND_API void zend_std_write_property(zval *object, zval *member, zval *value, c
 
 		if(!property_info->ai->fn[ZEND_ACCESSOR_SET]) {
 			zend_error(E_WARNING, "Cannot set property %s::$%s, no setter defined", zobj->ce->name, Z_STRVAL_P(member));
-			return;
-		}
-		if(zend_get_property_guard(zobj, property_info, member, &guard) == SUCCESS && guard->in_set == 0) {
+			handled = 1;
+		} else if(zend_get_property_guard(zobj, property_info, member, &guard) == SUCCESS) {
 			zend_function *setter = zend_get_accessor(property_info, zobj->ce, ZEND_ACCESSOR_SET TSRMLS_CC);
 			if(setter) {
-				guard->in_set = 1;
-				zend_std_call_setter(object, member, value, setter TSRMLS_CC);
-				guard->in_set = 0;
-				handled = 1;
+				if(guard->in_set == 0) {
+					guard->in_set = 1;
+					zend_std_call_setter(object, member, value, setter TSRMLS_CC);
+					guard->in_set = 0;
+					handled = 1;
+				} else if(EG(active_op_array) != (zend_op_array*)setter) {
+					zend_error(E_WARNING, "Recursive access to %s::%s detected, call ignored.", zobj->ce->name, setter->common.function_name);
+					handled = 1;
+				}
 			}
 		}
 	}
@@ -944,13 +953,18 @@ static void zend_std_unset_property(zval *object, zval *member, const zend_liter
 			/* Have property but no unsetter, just return and do not throw error */
 			zend_error(E_WARNING, "Cannot unset guarded property %s::$%s, no unset defined.", zobj->ce->name, Z_STRVAL_P(member));
 			handled = 1;
-		} else if(zend_get_property_guard(zobj, property_info, member, &guard) == SUCCESS && guard->in_unset == 0) {
+		} else if(zend_get_property_guard(zobj, property_info, member, &guard) == SUCCESS) {
 			zend_function *unsetter = zend_get_accessor(property_info, zobj->ce, ZEND_ACCESSOR_UNSET TSRMLS_CC);
 			if(unsetter) {
-				guard->in_unset = 1;
-				zend_std_call_unsetter(object, member, unsetter TSRMLS_CC);
-				guard->in_unset = 0;
-				handled = 1;
+				if(guard->in_unset == 0) {
+					guard->in_unset = 1;
+					zend_std_call_unsetter(object, member, unsetter TSRMLS_CC);
+					guard->in_unset = 0;
+					handled = 1;
+				} else if(EG(active_op_array) != (zend_op_array*)unsetter) {
+					zend_error(E_WARNING, "Recursive access to %s::%s detected, call ignored.", zobj->ce->name, unsetter->common.function_name);
+					handled = 1;
+				}
 			}
 		}
 	}
@@ -1552,12 +1566,17 @@ static int zend_std_has_property(zval *object, zval *member, int has_set_exists,
 		if(!property_info->ai->fn[ZEND_ACCESSOR_ISSET]) {
 			/* Have property but no issetter, just return and do not throw error */
 			result = has_set_exists == 2;
-		} else if(zend_get_property_guard(zobj, property_info, member, &guard) == SUCCESS && guard->in_isset == 0) {
+		} else if(zend_get_property_guard(zobj, property_info, member, &guard) == SUCCESS) {
 			zend_function *issetter = zend_get_accessor(property_info, zobj->ce, ZEND_ACCESSOR_ISSET TSRMLS_CC);
 			if(issetter) {
-				guard->in_isset = 1;
-				result = zend_std_call_issetter(object, member, has_set_exists, issetter, key TSRMLS_CC);
-				guard->in_isset = 0;
+				if(guard->in_isset == 0) {
+					guard->in_isset = 1;
+					result = zend_std_call_issetter(object, member, has_set_exists, issetter, key TSRMLS_CC);
+					guard->in_isset = 0;
+				} else if(EG(active_op_array) != (zend_op_array*)issetter) {
+					zend_error(E_WARNING, "Recursive access to %s::%s detected, call ignored.", zobj->ce->name, issetter->common.function_name);
+					result = 0;
+				}
 			}
 		}
 	}

@@ -1,7 +1,5 @@
 --TEST--
 ZE2 Tests that isset/unset default implementations work as expected, also ensures that isset/unset call the getter/setter accessors
---XFAIL--
-Waiting on https://github.com/cpriest/php-src/issues/12
 --FILE--
 <?php
 
@@ -30,7 +28,6 @@ Getting $b
 $o->b: 3600
 Getting $b
 is_null($o->b): 0
-Getting $b
 Getting $b
 isset($o->b): 1
 Unsetting $o->b
