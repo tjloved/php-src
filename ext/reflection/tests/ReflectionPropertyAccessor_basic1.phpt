@@ -79,6 +79,9 @@ string(%d) "Accessor [ public $a1 ] {
     Method [ <user> public method $a1->get ] {
       @@ %s %d - %d
     }
+    Method [ <user> public method $a1->isset ] {
+      @@ %s %d - %d
+    }
 }
  ]
 "
@@ -87,12 +90,18 @@ string(%d) "Accessor [ public $a1 ] {
     Method [ <user> public method $a1->get ] {
       @@ %s %d - %d
     }
+    Method [ <user> public method $a1->isset ] {
+      @@ %s %d - %d
+    }
 }
  ]
 "
 export():
 Accessor [ public $a1 ] {
     Method [ <user> public method $a1->get ] {
+      @@ %s %d - %d
+    }
+    Method [ <user> public method $a1->isset ] {
       @@ %s %d - %d
     }
 }
@@ -127,6 +136,9 @@ string(%d) "Accessor [ public $a2 ] {
         Parameter #0 [ <required> $value ]
       }
     }
+    Method [ <user> public method $a2->unset ] {
+      @@ %s %d - %d
+    }
 }
  ]
 "
@@ -139,6 +151,9 @@ string(%d) "Accessor [ public $a2 ] {
         Parameter #0 [ <required> $value ]
       }
     }
+    Method [ <user> public method $a2->unset ] {
+      @@ %s %d - %d
+    }
 }
  ]
 "
@@ -150,6 +165,9 @@ Accessor [ public $a2 ] {
       - Parameters [1] {
         Parameter #0 [ <required> $value ]
       }
+    }
+    Method [ <user> public method $a2->unset ] {
+      @@ %s %d - %d
     }
 }
  ]
@@ -185,6 +203,12 @@ string(%d) "Accessor [ public $a3 ] {
         Parameter #0 [ <required> $value ]
       }
     }
+    Method [ <user> public method $a3->isset ] {
+      @@ %s %d - %d
+    }
+    Method [ <user> public method $a3->unset ] {
+      @@ %s %d - %d
+    }
 }
  ]
 "
@@ -200,6 +224,12 @@ string(%d) "Accessor [ public $a3 ] {
         Parameter #0 [ <required> $value ]
       }
     }
+    Method [ <user> public method $a3->isset ] {
+      @@ %s %d - %d
+    }
+    Method [ <user> public method $a3->unset ] {
+      @@ %s %d - %d
+    }
 }
  ]
 "
@@ -214,6 +244,12 @@ Accessor [ public $a3 ] {
       - Parameters [1] {
         Parameter #0 [ <required> $value ]
       }
+    }
+    Method [ <user> public method $a3->isset ] {
+      @@ %s %d - %d
+    }
+    Method [ <user> public method $a3->unset ] {
+      @@ %s %d - %d
     }
 }
  ]

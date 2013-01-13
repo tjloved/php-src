@@ -244,6 +244,12 @@ typedef struct _zend_try_catch_element {
 #define ZEND_FNP_PROP_ISSETTER			3		/* Special purpose accessor: issetter */
 #define ZEND_FNP_PROP_UNSETTER			4		/* Special purpose accessor: unsetter */
 
+/* Offsets into zend_accessor_info->fn */
+#define ZEND_ACCESSOR_GET   0
+#define ZEND_ACCESSOR_SET   1
+#define ZEND_ACCESSOR_ISSET 2
+#define ZEND_ACCESSOR_UNSET 3
+#define ZEND_ACCESSOR_COUNT 4
 
 typedef struct _zend_property_info {
 	zend_uint flags;
@@ -385,11 +391,8 @@ typedef union _zend_function {
 } zend_function;
 
 typedef struct _zend_accessor_info {
-	zend_uint		flags;
-	zend_function 	*getter;
-	zend_function 	*setter;
-	zend_function 	*isset;
-	zend_function 	*unset;
+	zend_uint flags;
+	zend_function *fn[4];
 } zend_accessor_info;
 
 typedef struct _zend_function_state {

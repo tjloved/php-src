@@ -1633,10 +1633,10 @@ static void zend_verify_abstract_class_accessor(zend_function *fn, zend_abstract
 static int zend_verify_abstract_class_property(zend_property_info *prop, zend_abstract_info *ai TSRMLS_DC) /* {{{ */
 {
 	if (prop->ai) {
-		zend_verify_abstract_class_accessor(prop->ai->getter, ai);
-		zend_verify_abstract_class_accessor(prop->ai->setter, ai);
-		zend_verify_abstract_class_accessor(prop->ai->isset, ai);
-		zend_verify_abstract_class_accessor(prop->ai->unset, ai);
+		int i;
+		for (i = 0; i < ZEND_ACCESSOR_COUNT; ++i) {
+			zend_verify_abstract_class_accessor(prop->ai->fn[i], ai);
+		}
 	}
 	return 0;
 }

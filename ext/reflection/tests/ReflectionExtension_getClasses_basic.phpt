@@ -8,70 +8,75 @@ $ext = new ReflectionExtension('reflection');
 var_dump($ext->getClasses());
 ?>
 ==DONE==
---EXPECT--
-array(13) {
+--EXPECTF--
+array(14) {
   ["ReflectionException"]=>
-  &object(ReflectionClass)#2 (1) {
+  &object(ReflectionClass)#%d (1) {
     ["name"]=>
     string(19) "ReflectionException"
   }
   ["Reflection"]=>
-  &object(ReflectionClass)#3 (1) {
+  &object(ReflectionClass)#%d (1) {
     ["name"]=>
     string(10) "Reflection"
   }
   ["Reflector"]=>
-  &object(ReflectionClass)#4 (1) {
+  &object(ReflectionClass)#%d (1) {
     ["name"]=>
     string(9) "Reflector"
   }
   ["ReflectionFunctionAbstract"]=>
-  &object(ReflectionClass)#5 (1) {
+  &object(ReflectionClass)#%d (1) {
     ["name"]=>
     string(26) "ReflectionFunctionAbstract"
   }
   ["ReflectionFunction"]=>
-  &object(ReflectionClass)#6 (1) {
+  &object(ReflectionClass)#%d (1) {
     ["name"]=>
     string(18) "ReflectionFunction"
   }
   ["ReflectionParameter"]=>
-  &object(ReflectionClass)#7 (1) {
+  &object(ReflectionClass)#%d (1) {
     ["name"]=>
     string(19) "ReflectionParameter"
   }
   ["ReflectionMethod"]=>
-  &object(ReflectionClass)#8 (1) {
+  &object(ReflectionClass)#%d (1) {
     ["name"]=>
     string(16) "ReflectionMethod"
   }
+  ["ReflectionMethodAccessor"]=>
+  &object(ReflectionClass)#%d (1) {
+    ["name"]=>
+    string(24) "ReflectionMethodAccessor"
+  }
   ["ReflectionClass"]=>
-  &object(ReflectionClass)#9 (1) {
+  &object(ReflectionClass)#%d (1) {
     ["name"]=>
     string(15) "ReflectionClass"
   }
   ["ReflectionObject"]=>
-  &object(ReflectionClass)#10 (1) {
+  &object(ReflectionClass)#%d (1) {
     ["name"]=>
     string(16) "ReflectionObject"
   }
   ["ReflectionProperty"]=>
-  &object(ReflectionClass)#11 (1) {
+  &object(ReflectionClass)#%d (1) {
     ["name"]=>
     string(18) "ReflectionProperty"
   }
   ["ReflectionPropertyAccessor"]=>
-  &object(ReflectionClass)#12 (1) {
+  &object(ReflectionClass)#%d (1) {
     ["name"]=>
     string(26) "ReflectionPropertyAccessor"
   }
   ["ReflectionExtension"]=>
-  &object(ReflectionClass)#13 (1) {
+  &object(ReflectionClass)#%d (1) {
     ["name"]=>
     string(19) "ReflectionExtension"
   }
   ["ReflectionZendExtension"]=>
-  &object(ReflectionClass)#14 (1) {
+  &object(ReflectionClass)#%d (1) {
     ["name"]=>
     string(23) "ReflectionZendExtension"
   }
