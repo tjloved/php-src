@@ -142,7 +142,6 @@ static void zend_duplicate_property_info(zend_property_info *property_info) /* {
 		int i;
 
 		property_info->ai = ecalloc(1, sizeof(zend_accessor_info));
-		property_info->ai->flags = parent_ai->flags;
 
 		for (i = 0; i < ZEND_ACCESSOR_COUNT; ++i) {
 			if (parent_ai->fn[i]) {
@@ -1597,7 +1596,9 @@ void zend_declare_accessor(znode *var_name TSRMLS_DC) { /* {{{ */
 		}
 
 		property_info->ai = ecalloc(1, sizeof(zend_accessor_info));
-		property_info->ai->flags = CG(access_type);
+
+		/* Add back final/abstract flags that were skipped previously */
+		property_info->flags |= CG(access_type);
 
 		CG(current_property_info) = property_info;
 		efree(property_name);
@@ -1626,7 +1627,7 @@ void zend_do_begin_accessor_declaration(znode *function_token, znode *modifiers,
 	/* Inherit property modifiers, allowing to override PPP. This check
 	 * can be improved depending on just what exactly we want to allow
 	 * (this will become important once we support abstract). */
-	property_flags = property_info->ai->flags;
+	property_flags = property_info->flags;
 	if ((Z_LVAL(modifiers->u.constant) & ZEND_ACC_PPP_MASK) != 0) {
 		property_flags &= ~ZEND_ACC_PPP_MASK;
 	}
@@ -4644,7 +4645,6 @@ static void zend_do_traits_property_binding(zend_class_entry *ce TSRMLS_DC) /* {
 				if (zend_hash_find(&ce->properties_info, prop_name, prop_name_length+1, (void**) &created_property_info) == SUCCESS) {
 					int j;
 					created_property_info->ai = ecalloc(1, sizeof(zend_accessor_info));
-					created_property_info->ai->flags = property_info->ai->flags;
 
 					for (j = 0; j < ZEND_ACCESSOR_COUNT; ++j) {
 						zend_do_trait_inherit_accessor(&created_property_info->ai->fn[j], property_info->ai->fn[j], ce, ce->traits[i], &overridden TSRMLS_CC);

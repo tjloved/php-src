@@ -9,7 +9,7 @@ var_dump($ext->getClasses());
 ?>
 ==DONE==
 --EXPECTF--
-array(14) {
+array(12) {
   ["ReflectionException"]=>
   &object(ReflectionClass)#%d (1) {
     ["name"]=>
@@ -45,11 +45,6 @@ array(14) {
     ["name"]=>
     string(16) "ReflectionMethod"
   }
-  ["ReflectionMethodAccessor"]=>
-  &object(ReflectionClass)#%d (1) {
-    ["name"]=>
-    string(24) "ReflectionMethodAccessor"
-  }
   ["ReflectionClass"]=>
   &object(ReflectionClass)#%d (1) {
     ["name"]=>
@@ -64,11 +59,6 @@ array(14) {
   &object(ReflectionClass)#%d (1) {
     ["name"]=>
     string(18) "ReflectionProperty"
-  }
-  ["ReflectionPropertyAccessor"]=>
-  &object(ReflectionClass)#%d (1) {
-    ["name"]=>
-    string(26) "ReflectionPropertyAccessor"
   }
   ["ReflectionExtension"]=>
   &object(ReflectionClass)#%d (1) {

@@ -380,7 +380,6 @@ typedef union _zend_function {
 } zend_function;
 
 typedef struct _zend_accessor_info {
-	zend_uint flags;
 	zend_function *fn[4];
 } zend_accessor_info;
 

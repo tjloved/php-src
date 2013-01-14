@@ -929,8 +929,8 @@ static void _property_string(string *str, zend_property_info *prop, char *prop_n
 {
 	const char *class_name;
 
-	if(prop->ai) {
-		_property_accessor_string(str, prop, indent);
+	if (prop && prop->ai) {
+		_property_accessor_string(str, prop, indent TSRMLS_CC);
 		return;
 	}
 
@@ -984,7 +984,7 @@ static void _property_accessor_string(string *str, zend_property_info *prop, cha
 		int i;
 
 		/* These are mutually exclusive */
-		switch (ai->flags & ZEND_ACC_PPP_MASK) {
+		switch (prop->flags & ZEND_ACC_PPP_MASK) {
 			case ZEND_ACC_PUBLIC:
 				string_printf(str, "public ");
 				break;
@@ -995,7 +995,7 @@ static void _property_accessor_string(string *str, zend_property_info *prop, cha
 				string_printf(str, "protected ");
 				break;
 		}
-		if (ai->flags & ZEND_ACC_STATIC) {
+		if (prop->flags & ZEND_ACC_STATIC) {
 			string_printf(str, "static ");
 		}
 
