@@ -1642,11 +1642,11 @@ static int zend_verify_abstract_class_function(zend_function *fn, zend_abstract_
 
 static int zend_verify_abstract_class_property(zend_property_info *prop, zend_abstract_info *ai TSRMLS_DC) /* {{{ */
 {
-	if (prop->ai) {
+	if (prop->accs) {
 		int i;
 		for (i = 0; i < ZEND_ACCESSOR_COUNT; ++i) {
-			if (prop->ai->fn[i]) {
-				zend_verify_abstract_class_function(prop->ai->fn[i], ai TSRMLS_CC);
+			if (prop->accs[i]) {
+				zend_verify_abstract_class_function(prop->accs[i], ai TSRMLS_CC);
 			}
 		}
 	}

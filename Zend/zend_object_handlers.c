@@ -340,13 +340,13 @@ static zend_function *zend_get_accessor_from_ce(zend_class_entry *ce, const char
 		return NULL;
 	}
 
-	return prop->ai ? prop->ai->fn[acc] : NULL;
+	return prop->accs ? prop->accs[acc] : NULL;
 }
 /* }}} */
 
 static zend_function *zend_get_accessor(zend_property_info *prop, zend_class_entry *ce, zend_uchar acc TSRMLS_DC) /* {{{ */
 {
-	zend_function *fbc = prop->ai->fn[acc];
+	zend_function *fbc = prop->accs[acc];
 
 	if (fbc->common.fn_flags & ZEND_ACC_PRIVATE) {
 		if (fbc->common.scope == ce && EG(scope) == ce) {
@@ -444,7 +444,7 @@ zend_always_inline struct _zend_property_info *zend_get_property_info_quick(zend
 		}
 		return scope_property_info;
 	} else if (property_info) {
-		if (!property_info->ai && UNEXPECTED(denied_access != 0)) {
+		if (!property_info->accs && UNEXPECTED(denied_access != 0)) {
 			/* Information was available, but we were denied access.  Error out. */
 			if (!silent) {
 				zend_error_noreturn(E_ERROR, "Cannot access %s property %s::$%s", zend_visibility_string(property_info->flags), ce->name, Z_STRVAL_P(member));
@@ -462,7 +462,7 @@ zend_always_inline struct _zend_property_info *zend_get_property_info_quick(zend
 		EG(std_property_info).name_length = Z_STRLEN_P(member);
 		EG(std_property_info).h = h;
 		EG(std_property_info).ce = ce;
-		EG(std_property_info).ai = NULL;
+		EG(std_property_info).accs = NULL;
 		EG(std_property_info).offset = -1;
 		property_info = &EG(std_property_info);
 	}
@@ -577,10 +577,10 @@ zval *zend_std_read_property(zval *object, zval *member, int type, const zend_li
 	property_info = zend_get_property_info_quick(zobj->ce, member, (zobj->ce->__get != NULL), key TSRMLS_CC);
 
 	/* Getter shadows property unless in guard */
-	if(property_info && property_info->ai) {
+	if(property_info && property_info->accs) {
 		zend_guard *guard = NULL;
 
-		if(!property_info->ai->fn[ZEND_ACCESSOR_GET]) {
+		if(!property_info->accs[ZEND_ACCESSOR_GET]) {
 			if(!silent) {
 				zend_error(E_WARNING, "Cannot get property %s::$%s, no getter defined", zobj->ce->name, Z_STRVAL_P(member));
 			}
@@ -662,10 +662,10 @@ ZEND_API void zend_std_write_property(zval *object, zval *member, zval *value, c
 	property_info = zend_get_property_info_quick(zobj->ce, member, (zobj->ce->__set != NULL), key TSRMLS_CC);
 
 	/* Setter shadows property unless in guard */
-	if(property_info && property_info->ai) {
+	if(property_info && property_info->accs) {
 		zend_guard *guard = NULL;
 
-		if(!property_info->ai->fn[ZEND_ACCESSOR_SET]) {
+		if(!property_info->accs[ZEND_ACCESSOR_SET]) {
 			zend_error(E_WARNING, "Cannot set property %s::$%s, no setter defined", zobj->ce->name, Z_STRVAL_P(member));
 			handled = 1;
 		} else if(zend_get_property_guard(zobj, property_info, member, &guard) == SUCCESS) {
@@ -867,10 +867,10 @@ static zval **zend_std_get_property_ptr_ptr(zval *object, zval *member, const ze
 	property_info = zend_get_property_info_quick(zobj->ce, member, (zobj->ce->__get != NULL), key TSRMLS_CC);
 
 	/* Getter shadows property unless in guard */
-	if(property_info && property_info->ai) {
+	if(property_info && property_info->accs) {
 		zend_guard *guard = NULL;
 
-		if(!property_info->ai->fn[ZEND_ACCESSOR_GET]) {
+		if(!property_info->accs[ZEND_ACCESSOR_GET]) {
 			zend_error(E_WARNING, "Cannot get property %s::$%s, no getter defined", zobj->ce->name, Z_STRVAL_P(member));
 			return &EG(uninitialized_zval_ptr);
 		}
@@ -946,10 +946,10 @@ static void zend_std_unset_property(zval *object, zval *member, const zend_liter
 	property_info = zend_get_property_info_quick(zobj->ce, member, (zobj->ce->__unset != NULL), key TSRMLS_CC);
 
 	/* Unsetter shadows property unless in guard */
-	if(property_info && property_info->ai) {
+	if(property_info && property_info->accs) {
 		zend_guard *guard = NULL;
 
-		if(!property_info->ai->fn[ZEND_ACCESSOR_UNSET]) {
+		if(!property_info->accs[ZEND_ACCESSOR_UNSET]) {
 			/* Have property but no unsetter, just return and do not throw error */
 			zend_error(E_WARNING, "Cannot unset guarded property %s::$%s, no unset defined.", zobj->ce->name, Z_STRVAL_P(member));
 			handled = 1;
@@ -1560,10 +1560,10 @@ static int zend_std_has_property(zval *object, zval *member, int has_set_exists,
 	property_info = zend_get_property_info_quick(zobj->ce, member, 1, key TSRMLS_CC);
 
 	/* Issetter shadows property unless in guard */
-	if(property_info && property_info->ai) {
+	if(property_info && property_info->accs) {
 		zend_guard *guard = NULL;
 
-		if(!property_info->ai->fn[ZEND_ACCESSOR_ISSET]) {
+		if(!property_info->accs[ZEND_ACCESSOR_ISSET]) {
 			/* Have property but no issetter, just return and do not throw error */
 			result = has_set_exists == 2;
 		} else if(zend_get_property_guard(zobj, property_info, member, &guard) == SUCCESS) {

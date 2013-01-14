@@ -129,7 +129,7 @@ static const char *zend_get_property_name(const zend_property_info *property_inf
 
 static void zend_duplicate_property_info(zend_property_info *property_info) /* {{{ */
 {
-	zend_accessor_info *parent_ai = property_info->ai;
+	zend_function **orig_accs = property_info->accs;
 
 	if (!IS_INTERNED(property_info->name)) {
 		property_info->name = estrndup(property_info->name, property_info->name_length);
@@ -138,14 +138,13 @@ static void zend_duplicate_property_info(zend_property_info *property_info) /* {
 		property_info->doc_comment = estrndup(property_info->doc_comment, property_info->doc_comment_len);
 	}
 
-	if (parent_ai) {
+	if (orig_accs) {
 		int i;
 
-		property_info->ai = ecalloc(1, sizeof(zend_accessor_info));
-
+		property_info->accs = ecalloc(ZEND_ACCESSOR_COUNT, sizeof(zend_function *));
 		for (i = 0; i < ZEND_ACCESSOR_COUNT; ++i) {
-			if (parent_ai->fn[i]) {
-				property_info->ai->fn[i] = duplicate_accessor_function(parent_ai->fn[i]);
+			if (orig_accs[i]) {
+				property_info->accs[i] = duplicate_accessor_function(orig_accs[i]);
 			}
 		}
 	}
@@ -167,19 +166,18 @@ static void zend_destroy_property_info(zend_property_info *property_info) /* {{{
 		efree((char*)property_info->doc_comment);
 	}
 
-	if (property_info->ai) {
-		zend_accessor_info *ai = property_info->ai;
+	if (property_info->accs) {
+		zend_function **accs = property_info->accs;
 		int i;
-
-		TSRMLS_FETCH(); /* Need to check how to avoid this tsrm fetch */
+		TSRMLS_FETCH();
 
 		for (i = 0; i < ZEND_ACCESSOR_COUNT; ++i) {
-			if (ai->fn[i]) {
-				destroy_op_array((zend_op_array *) ai->fn[i] TSRMLS_CC);
+			if (accs[i]) {
+				destroy_op_array((zend_op_array *) accs[i] TSRMLS_CC);
 			}
 		}
 
-		efree(ai);
+		efree(accs);
 	}
 }
 /* }}} */
@@ -1591,14 +1589,9 @@ void zend_declare_accessor(znode *var_name TSRMLS_DC) { /* {{{ */
 	CG(active_class_entry)->ce_flags = orig_ce_flags;
 
 	if (zend_hash_find(&CG(active_class_entry)->properties_info, property_name, property_name_len + 1, (void **) &property_info)==SUCCESS) {
-		if (property_info->ai != NULL) {
-			zend_error_noreturn(E_COMPILE_ERROR, "property_info for %s::$%s already has accessor_info created, should not happen in zend_declare_accessor()", CG(active_class_entry)->name, property_name);
-		}
-
-		property_info->ai = ecalloc(1, sizeof(zend_accessor_info));
-
 		/* Add back final/abstract flags that were skipped previously */
 		property_info->flags |= CG(access_type);
+		property_info->accs = ecalloc(ZEND_ACCESSOR_COUNT, sizeof(zend_function *));
 
 		CG(current_property_info) = property_info;
 		efree(property_name);
@@ -1643,7 +1636,7 @@ void zend_do_begin_accessor_declaration(znode *function_token, znode *modifiers,
 
 		/* Declare Function */
 		zend_do_begin_function_declaration(function_token, function_token, 1, return_reference, modifiers TSRMLS_CC);
-		property_info->ai->fn[ZEND_ACCESSOR_GET] = (zend_function *) CG(active_op_array);
+		property_info->accs[ZEND_ACCESSOR_GET] = (zend_function *) CG(active_op_array);
 	} else if (Z_TYPE(function_token->u.constant) == IS_STRING && strcasecmp("set", Z_STRVAL(function_token->u.constant)) == 0) {
 		znode unused_node, unused_node2, value_node;
 
@@ -1655,7 +1648,7 @@ void zend_do_begin_accessor_declaration(znode *function_token, znode *modifiers,
 		}
 		/* Declare Function */
 		zend_do_begin_function_declaration(function_token, function_token, 1, ZEND_RETURN_VAL, modifiers TSRMLS_CC);
-		property_info->ai->fn[ZEND_ACCESSOR_SET] = (zend_function *) CG(active_op_array);
+		property_info->accs[ZEND_ACCESSOR_SET] = (zend_function *) CG(active_op_array);
 
 		if (!has_params) {
 			/* Add $value parameter to __setHours() */
@@ -1675,7 +1668,7 @@ void zend_do_begin_accessor_declaration(znode *function_token, znode *modifiers,
 
 		/* Declare Function */
 		zend_do_begin_function_declaration(function_token, function_token, 1, ZEND_RETURN_VAL, modifiers TSRMLS_CC);
-		property_info->ai->fn[ZEND_ACCESSOR_ISSET] = (zend_function *) CG(active_op_array);
+		property_info->accs[ZEND_ACCESSOR_ISSET] = (zend_function *) CG(active_op_array);
 	} else if (Z_TYPE(function_token->u.constant) == IS_LONG && Z_LVAL(function_token->u.constant) == T_UNSET) {
 		ZVAL_STRING(&function_token->u.constant, create_accessor_function_name(property_name, "unset"), 0);
 
@@ -1685,7 +1678,7 @@ void zend_do_begin_accessor_declaration(znode *function_token, znode *modifiers,
 
 		/* Declare Function */
 		zend_do_begin_function_declaration(function_token, function_token, 1, ZEND_RETURN_VAL, modifiers TSRMLS_CC);
-		property_info->ai->fn[ZEND_ACCESSOR_UNSET] = (zend_function *) CG(active_op_array);
+		property_info->accs[ZEND_ACCESSOR_UNSET] = (zend_function *) CG(active_op_array);
 	} else {
 		zend_error(E_COMPILE_ERROR, "Unknown accessor '%s', expecting get or set for variable $%s", Z_STRVAL(function_token->u.constant), property_name);
 	}
@@ -1708,7 +1701,7 @@ void zend_do_end_accessor_declaration(znode *function_token, const znode *body T
 		 * ->fn slot it is in */
 		zend_uchar acc;
 		for (acc = 0; acc < ZEND_ACCESSOR_COUNT; ++acc) {
-			if (property_info->ai->fn[acc] == (zend_function *) CG(active_op_array)) {
+			if (property_info->accs[acc] == (zend_function *) CG(active_op_array)) {
 				break;
 			}
 		}
@@ -1774,7 +1767,7 @@ void zend_do_end_accessor_declaration(znode *function_token, const znode *body T
 void zend_finalize_accessor(TSRMLS_D) { /* {{{ */
 	zend_property_info *property_info = CG(current_property_info);
 
-	if (!property_info->ai->fn[ZEND_ACCESSOR_ISSET] && property_info->ai->fn[ZEND_ACCESSOR_GET]) {
+	if (!property_info->accs[ZEND_ACCESSOR_ISSET] && property_info->accs[ZEND_ACCESSOR_GET]) {
 		znode zn_fntoken, zn_modifiers, zn_body;
 		INIT_ZNODE(zn_fntoken);
 		ZVAL_LONG(&zn_fntoken.u.constant, T_ISSET);
@@ -1788,7 +1781,7 @@ void zend_finalize_accessor(TSRMLS_D) { /* {{{ */
 		zend_do_begin_accessor_declaration(&zn_fntoken, &zn_modifiers, 0, 0 TSRMLS_CC);
 		zend_do_end_accessor_declaration(&zn_fntoken, &zn_body TSRMLS_CC);
 	}
-	if (!property_info->ai->fn[ZEND_ACCESSOR_UNSET] && property_info->ai->fn[ZEND_ACCESSOR_SET]) {
+	if (!property_info->accs[ZEND_ACCESSOR_UNSET] && property_info->accs[ZEND_ACCESSOR_SET]) {
 		znode zn_fntoken, zn_modifiers, zn_body;
 		INIT_ZNODE(zn_fntoken);
 		ZVAL_LONG(&zn_fntoken.u.constant, T_UNSET);
@@ -3789,12 +3782,12 @@ static zend_bool do_inherit_property_access_check(HashTable *target_ht, zend_pro
 			ce->default_properties_table[child_info->offset] = NULL;
 			child_info->offset = parent_info->offset;
 
-			if (parent_info->ai && child_info->ai) {
+			if (parent_info->accs && child_info->accs) {
 				int i;
 				TSRMLS_FETCH();
 
 				for (i = 0; i < ZEND_ACCESSOR_COUNT; ++i) {
-					do_inherit_accessor(&child_info->ai->fn[i], parent_info->ai->fn[i], ce TSRMLS_CC);
+					do_inherit_accessor(&child_info->accs[i], parent_info->accs[i], ce TSRMLS_CC);
 				}
 			}
 		}
@@ -3802,10 +3795,10 @@ static zend_bool do_inherit_property_access_check(HashTable *target_ht, zend_pro
 	} else {
 		/* Make sure that when we copy abstract accessors the class is marked
 		 * abstract too */
-		if (parent_info->ai) {
+		if (parent_info->accs) {
 			int i;
 			for (i = 0; i < ZEND_ACCESSOR_COUNT; ++i) {
-				zend_function *fn = parent_info->ai->fn[i];
+				zend_function *fn = parent_info->accs[i];
 				if (fn && (fn->common.fn_flags & ZEND_ACC_ABSTRACT)) {
 					ce->ce_flags |= ZEND_ACC_IMPLICIT_ABSTRACT_CLASS;
 				}
@@ -4640,14 +4633,14 @@ static void zend_do_traits_property_binding(zend_class_entry *ce TSRMLS_DC) /* {
 			zend_declare_property_ex(ce, prop_name, prop_name_length, 
 									 prop_value, flags, 
 								     doc_comment, property_info->doc_comment_len TSRMLS_CC);
-			if (property_info->ai) {
+			if (property_info->accs) {
 				zend_property_info *created_property_info;
 				if (zend_hash_find(&ce->properties_info, prop_name, prop_name_length+1, (void**) &created_property_info) == SUCCESS) {
 					int j;
-					created_property_info->ai = ecalloc(1, sizeof(zend_accessor_info));
+					created_property_info->accs = ecalloc(ZEND_ACCESSOR_COUNT, sizeof(zend_function *));
 
 					for (j = 0; j < ZEND_ACCESSOR_COUNT; ++j) {
-						zend_do_trait_inherit_accessor(&created_property_info->ai->fn[j], property_info->ai->fn[j], ce, ce->traits[i], &overridden TSRMLS_CC);
+						zend_do_trait_inherit_accessor(&created_property_info->accs[j], property_info->accs[j], ce, ce->traits[i], &overridden TSRMLS_CC);
 					}
 				}
 			}

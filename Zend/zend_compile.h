@@ -236,7 +236,7 @@ typedef struct _zend_try_catch_element {
 /* Declares that the function is an accessor zend_function.fn_flags */
 #define ZEND_ACC_ACCESSOR				0x10000000
 
-/* Offsets into zend_accessor_info->fn */
+/* Offsets into zend_property_info->accs */
 #define ZEND_ACCESSOR_GET   0
 #define ZEND_ACCESSOR_SET   1
 #define ZEND_ACCESSOR_ISSET 2
@@ -252,7 +252,7 @@ typedef struct _zend_property_info {
 	const char *doc_comment;
 	int doc_comment_len;
 	zend_class_entry *ce;
-	struct _zend_accessor_info *ai;
+	union _zend_function **accs;
 } zend_property_info;
 
 
@@ -378,10 +378,6 @@ typedef union _zend_function {
 	zend_op_array op_array;
 	zend_internal_function internal_function;
 } zend_function;
-
-typedef struct _zend_accessor_info {
-	zend_function *fn[4];
-} zend_accessor_info;
 
 typedef struct _zend_function_state {
 	zend_function *function;

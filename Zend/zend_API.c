@@ -3401,7 +3401,7 @@ ZEND_API int zend_declare_property_ex(zend_class_entry *ce, const char *name, in
 	property_info.doc_comment_len = doc_comment_len;
 
 	property_info.ce = ce;
-	property_info.ai = NULL;
+	property_info.accs = NULL;
 
 	zend_hash_quick_update(&ce->properties_info, name, name_length+1, h, &property_info, sizeof(zend_property_info), NULL);
 

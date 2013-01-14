@@ -929,7 +929,7 @@ static void _property_string(string *str, zend_property_info *prop, char *prop_n
 {
 	const char *class_name;
 
-	if (prop && prop->ai) {
+	if (prop && prop->accs) {
 		_property_accessor_string(str, prop, indent TSRMLS_CC);
 		return;
 	}
@@ -974,13 +974,13 @@ static void _property_string(string *str, zend_property_info *prop, char *prop_n
 /* {{{ _property_accessor_string */
 static void _property_accessor_string(string *str, zend_property_info *prop, char *indent TSRMLS_DC)
 {
-	zend_accessor_info *ai = prop->ai;
+	zend_function **accs = prop->accs;
 	string sub_indent;
 	string_init(&sub_indent);
 	string_printf(&sub_indent, "%s    ", indent);
 
 	string_printf(str, "%sAccessor [ ", indent);
-	if (ai) {
+	if (accs) {
 		int i;
 
 		/* These are mutually exclusive */
@@ -1002,8 +1002,8 @@ static void _property_accessor_string(string *str, zend_property_info *prop, cha
 		string_printf(str, "$%s ] {\n", prop->name);
 
 		for (i = 0; i < ZEND_ACCESSOR_COUNT; ++i) {
-			if (ai->fn[i]) {
-				_function_string(str, ai->fn[i], ai->fn[i]->common.scope, sub_indent.string TSRMLS_CC);
+			if (accs[i]) {
+				_function_string(str, accs[i], accs[i]->common.scope, sub_indent.string TSRMLS_CC);
 			}
 		}	
 
@@ -1374,7 +1374,7 @@ static void reflection_property_factory(zend_class_entry *ce, zend_property_info
 
 	zend_unmangle_property_name(prop->name, prop->name_length, &class_name, &prop_name);
 
-	if (!prop->ai) {
+	if (!prop->accs) {
 		/* Not sure what this code does, maybe dead code? Leaving it in place
 		 * just in case it's fixing some crazy, untested bugs. */
 		if (!(prop->flags & ZEND_ACC_PRIVATE)) {
@@ -3922,7 +3922,7 @@ ZEND_METHOD(reflection_class, getProperty)
 			property_info_tmp.name_length = name_len;
 			property_info_tmp.h = zend_get_hash_value(name, name_len+1);
 			property_info_tmp.doc_comment = NULL;
-			property_info_tmp.ai = NULL;
+			property_info_tmp.accs = NULL;
 			property_info_tmp.ce = ce;
 
 			reflection_property_factory(ce, &property_info_tmp, return_value TSRMLS_CC);
@@ -5213,8 +5213,8 @@ static void get_accessor_function_impl(INTERNAL_FUNCTION_PARAMETERS, zend_uchar 
 	METHOD_NOTSTATIC(reflection_property_ptr);
 	GET_REFLECTION_OBJECT_PTR(ref);
 
-	if (ref->prop.ai->fn[acc]) {
-		reflection_method_factory(ref->ce, ref->prop.ai->fn[acc], NULL, return_value TSRMLS_CC);
+	if (ref->prop.accs[acc]) {
+		reflection_method_factory(ref->ce, ref->prop.accs[acc], NULL, return_value TSRMLS_CC);
 		return;
 	}
 	RETURN_FALSE
@@ -5261,7 +5261,7 @@ ZEND_METHOD(reflection_property, hasAccessors)
 	property_reference *ref;
 
 	GET_REFLECTION_OBJECT_PTR(ref);
-	if(ref->prop.ai)
+	if (ref->prop.accs)
 		RETURN_TRUE;
 	RETURN_FALSE;
 }
