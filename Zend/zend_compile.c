@@ -1767,13 +1767,19 @@ void zend_do_end_accessor_declaration(znode *function_token, const znode *body T
 void zend_finalize_accessor(TSRMLS_D) { /* {{{ */
 	zend_property_info *property_info = CG(current_property_info);
 
+	zend_uint keep_flags = 0;
+	if ((CG(active_class_entry)->ce_flags & ZEND_ACC_INTERFACE) == 0) {
+		keep_flags = ZEND_ACC_PPP_MASK|ZEND_ACC_FINAL|ZEND_ACC_ABSTRACT;
+	}
+
 	if (!property_info->accs[ZEND_ACCESSOR_ISSET] && property_info->accs[ZEND_ACCESSOR_GET]) {
 		znode zn_fntoken, zn_modifiers, zn_body;
 		INIT_ZNODE(zn_fntoken);
 		ZVAL_LONG(&zn_fntoken.u.constant, T_ISSET);
 
 		INIT_ZNODE(zn_modifiers);
-		Z_LVAL(zn_modifiers.u.constant) = 0;
+		Z_LVAL(zn_modifiers.u.constant)
+			= property_info->accs[ZEND_ACCESSOR_GET]->common.fn_flags & keep_flags;
 
 		INIT_ZNODE(zn_body);
 		Z_LVAL(zn_body.u.constant) = ZEND_ACC_ABSTRACT;
@@ -1787,7 +1793,8 @@ void zend_finalize_accessor(TSRMLS_D) { /* {{{ */
 		ZVAL_LONG(&zn_fntoken.u.constant, T_UNSET);
 
 		INIT_ZNODE(zn_modifiers);
-		Z_LVAL(zn_modifiers.u.constant) = 0;
+		Z_LVAL(zn_modifiers.u.constant)
+			= property_info->accs[ZEND_ACCESSOR_SET]->common.fn_flags & keep_flags;
 
 		INIT_ZNODE(zn_body);
 		Z_LVAL(zn_body.u.constant) = ZEND_ACC_ABSTRACT;
