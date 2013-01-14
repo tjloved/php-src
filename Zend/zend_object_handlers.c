@@ -444,7 +444,7 @@ zend_always_inline struct _zend_property_info *zend_get_property_info_quick(zend
 		}
 		return scope_property_info;
 	} else if (property_info) {
-		if (UNEXPECTED(denied_access != 0)) {
+		if (!property_info->ai && UNEXPECTED(denied_access != 0)) {
 			/* Information was available, but we were denied access.  Error out. */
 			if (!silent) {
 				zend_error_noreturn(E_ERROR, "Cannot access %s property %s::$%s", zend_visibility_string(property_info->flags), ce->name, Z_STRVAL_P(member));
