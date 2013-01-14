@@ -1617,14 +1617,18 @@ void zend_do_begin_accessor_declaration(znode *function_token, znode *modifiers,
 	const char *property_name = zend_get_property_name(property_info);
 	zend_uint property_flags;
 
-	/* Inherit property modifiers, allowing to override PPP. This check
-	 * can be improved depending on just what exactly we want to allow
-	 * (this will become important once we support abstract). */
+	/* Inherit property modifiers, allowing to override PPP */
 	property_flags = property_info->flags;
 	if ((Z_LVAL(modifiers->u.constant) & ZEND_ACC_PPP_MASK) != 0) {
 		property_flags &= ~ZEND_ACC_PPP_MASK;
 	}
 	Z_LVAL(modifiers->u.constant) |= property_flags | ZEND_ACC_ACCESSOR;
+
+	if ((Z_LVAL(modifiers->u.constant) & ZEND_ACC_ABSTRACT)
+	    && (Z_LVAL(modifiers->u.constant) & ZEND_ACC_FINAL)
+	) {
+		zend_error_noreturn(E_COMPILE_ERROR, "Abstract and final modifiers are mutually exclusive");
+	}
 
 	if (Z_TYPE(function_token->u.constant) == IS_STRING && strcasecmp("get", Z_STRVAL(function_token->u.constant)) == 0) {
 		efree(Z_STRVAL(function_token->u.constant));
