@@ -1,5 +1,5 @@
 --TEST--
-ReflectionPropertyAccessor::getGet();
+ReflectionProperty::getUnset();
 --CREDITS--
 Clint Priest <php-dev@zerocue.com>
 --FILE--
@@ -18,21 +18,21 @@ Clint Priest <php-dev@zerocue.com>
 	}
 	$rc = new ReflectionClass('TimePeriod');
 	foreach($rc->getProperties() as $objProperty) {
-		var_dump($objProperty->getGet());
+		var_dump($objProperty->getUnset());
 	}
 ?>
 ==DONE==
---EXPECT--
-object(ReflectionMethodAccessor)#5 (2) {
+--EXPECTF--
+bool(false)
+object(ReflectionMethod)#5 (2) {
   ["name"]=>
-  string(8) "$a1->get"
+  string(%d) "$a2->unset"
   ["class"]=>
   string(10) "TimePeriod"
 }
-bool(false)
-object(ReflectionMethodAccessor)#5 (2) {
+object(ReflectionMethod)#5 (2) {
   ["name"]=>
-  string(8) "$a3->get"
+  string(%d) "$a3->unset"
   ["class"]=>
   string(10) "TimePeriod"
 }

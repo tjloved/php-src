@@ -233,8 +233,8 @@ typedef struct _zend_try_catch_element {
 #define ZEND_ACC_RETURN_REFERENCE		0x4000000
 #define ZEND_ACC_DONE_PASS_TWO			0x8000000
 
+/* Declares that the function is an accessor zend_function.fn_flags */
 #define ZEND_ACC_ACCESSOR				0x10000000
-#define ZEND_ACC_AUTO_IMPLEMENTED		0x20000000
 
 /* Offsets into zend_accessor_info->fn */
 #define ZEND_ACCESSOR_GET   0

@@ -1,5 +1,5 @@
 --TEST--
-ReflectionPropertyAccessor::getSet();
+ReflectionProperty::getIsset();
 --CREDITS--
 Clint Priest <php-dev@zerocue.com>
 --FILE--
@@ -18,21 +18,21 @@ Clint Priest <php-dev@zerocue.com>
 	}
 	$rc = new ReflectionClass('TimePeriod');
 	foreach($rc->getProperties() as $objProperty) {
-		var_dump($objProperty->getSet());
+		var_dump($objProperty->getIsset());
 	}
 ?>
 ==DONE==
---EXPECT--
-bool(false)
-object(ReflectionMethodAccessor)#5 (2) {
+--EXPECTF--
+object(ReflectionMethod)#5 (2) {
   ["name"]=>
-  string(8) "$a2->set"
+  string(%d) "$a1->isset"
   ["class"]=>
   string(10) "TimePeriod"
 }
-object(ReflectionMethodAccessor)#5 (2) {
+bool(false)
+object(ReflectionMethod)#5 (2) {
   ["name"]=>
-  string(8) "$a3->set"
+  string(%d) "$a3->isset"
   ["class"]=>
   string(10) "TimePeriod"
 }

@@ -1763,7 +1763,6 @@ void zend_do_end_accessor_declaration(znode *function_token, const znode *body T
 			efree(buffer);
 			zend_do_extended_info(TSRMLS_C);
 		}
-		CG(active_op_array)->fn_flags |= ZEND_ACC_AUTO_IMPLEMENTED;
 		CG(compiler_options) = original_compiler_options;
 	}
 

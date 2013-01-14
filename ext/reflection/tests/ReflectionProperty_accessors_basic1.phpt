@@ -1,18 +1,18 @@
 --TEST--
-Test usage of ReflectionPropertyAccessor methods __toString(), export(), getName(), isPublic(), isPrivate(), isProtected(), isStatic(), getValue() and setValue().
+Test usage of ReflectionProperty methods __toString(), export(), getName(), isPublic(), isPrivate(), isProtected(), isStatic(), getValue() and setValue().
 --FILE--
 <?php
 
 function reflectProperty($class, $property) {
-    $propInfo = new ReflectionPropertyAccessor($class, $property);
+    $propInfo = new ReflectionProperty($class, $property);
     echo "**********************************\n";
     echo "Reflecting on property $class::$property\n\n";
     echo "__toString():\n";
     var_dump($propInfo->__toString());
     echo "export():\n";
-    var_dump(ReflectionPropertyAccessor::export($class, $property, true));
+    var_dump(ReflectionProperty::export($class, $property, true));
     echo "export():\n";
-    var_dump(ReflectionPropertyAccessor::export($class, $property, false));
+    var_dump(ReflectionProperty::export($class, $property, false));
     echo "getName():\n";
     var_dump($propInfo->getName());
     echo "isPublic():\n";
@@ -46,14 +46,14 @@ class TestClass {
 	private $_a1 = 'b1', $_a2 = 'b2', $_a3 = 'b3', $_a4 = 'b4';
 	
 	public $a1 {
-		get { return $this->_a1; }
+		get { echo __METHOD__.'() = '; return $this->_a1; }
 	}
 	public $a2 {
-		set { $this->_a2 = $value; }
+		set { echo __METHOD__."($value)".PHP_EOL; $this->_a2 = $value; }
 	}
 	public $a3 {
-		get { return $this->_a3; }
-		set { $this->_a3 = $value; }
+		get { echo __METHOD__.'() = '; return $this->_a3; }
+		set { echo __METHOD__."($value)".PHP_EOL; $this->_a3 = $value; }
 	}
 /*	Commented out until static accessors are supported
 	public static $a4 {
@@ -121,7 +121,7 @@ bool(false)
 isDefault():
 bool(true)
 getValue():
-string(2) "b1"
+TestClass::$a1->get() = string(2) "b1"
 
 **********************************
 **********************************
@@ -186,6 +186,7 @@ bool(false)
 isDefault():
 bool(true)
 setValue("NewValue"):
+TestClass::$a2->set(NewValue)
 
 **********************************
 **********************************
@@ -268,9 +269,10 @@ bool(false)
 isDefault():
 bool(true)
 getValue():
-string(2) "b3"
+TestClass::$a3->get() = string(2) "b3"
 setValue("NewValue"):
+TestClass::$a3->set(NewValue)
 getValue() after a setValue():
-string(8) "NewValue"
+TestClass::$a3->get() = string(8) "NewValue"
 
 **********************************
