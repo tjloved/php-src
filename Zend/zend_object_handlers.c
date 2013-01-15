@@ -332,19 +332,17 @@ static zend_always_inline zend_bool is_derived_class(zend_class_entry *child_cla
 }
 /* }}} */
 
-static zend_function *zend_get_accessor_from_ce(zend_class_entry *ce, const char *name, int name_len, ulong name_hash, AccessorFuncIndex acc) /* {{{ */
+static zend_function *zend_get_accessor_from_ce(zend_property_info *property_info, zend_class_entry *ce, zend_acc_index acc) /* {{{ */
 {
-	zend_property_info *prop;
-
-	if (zend_hash_quick_find(&ce->properties_info, name, name_len+1, name_hash, (void **) &prop) == FAILURE) {
+	if (zend_hash_quick_find(&ce->properties_info, property_info->name, property_info->name_length+1, property_info->h, (void **) &property_info) == FAILURE) {
 		return NULL;
 	}
 
-	return prop->accs ? prop->accs[acc] : NULL;
+	return property_info->accs ? property_info->accs[acc] : NULL;
 }
 /* }}} */
 
-static zend_function *zend_get_accessor(zend_property_info *property_info, zend_class_entry *ce, AccessorFuncIndex acc TSRMLS_DC) /* {{{ */
+static zend_function *zend_get_accessor(zend_property_info *property_info, zend_class_entry *ce, zend_acc_index acc TSRMLS_DC) /* {{{ */
 {
 	zend_function *fbc = property_info->accs[acc];
 
@@ -356,7 +354,7 @@ static zend_function *zend_get_accessor(zend_property_info *property_info, zend_
 			while (ce) {
 				if (ce == EG(scope)) {
 					zend_function *fbc_parent;
-					fbc_parent = zend_get_accessor_from_ce(ce, property_info->name, property_info->name_length, property_info->h, acc);
+					fbc_parent = zend_get_accessor_from_ce(property_info, ce, acc);
 					if (fbc_parent) {
 						return fbc_parent;
 					}
@@ -371,7 +369,7 @@ static zend_function *zend_get_accessor(zend_property_info *property_info, zend_
 	if ((fbc->op_array.fn_flags & ZEND_ACC_CHANGED)
 	    && EG(scope) && is_derived_class(fbc->common.scope, EG(scope))
 	) {
-		zend_function *private_fbc = zend_get_accessor_from_ce(ce, property_info->name, property_info->name_length, property_info->h, acc);
+		zend_function *private_fbc = zend_get_accessor_from_ce(property_info, ce, acc);
 		if (private_fbc) fbc = private_fbc;
 	}
 

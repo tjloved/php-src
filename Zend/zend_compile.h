@@ -242,8 +242,8 @@ typedef enum {
 	ZEND_ACCESSOR_SET,
 	ZEND_ACCESSOR_ISSET,
 	ZEND_ACCESSOR_UNSET,
-	ZEND_NUM_ACCESSORS,
-} AccessorFuncIndex;
+} zend_acc_index;
+#define ZEND_NUM_ACCESSORS 4
 
 typedef struct _zend_property_info {
 	zend_uint flags;

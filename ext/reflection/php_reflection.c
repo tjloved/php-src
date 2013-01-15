@@ -5205,7 +5205,7 @@ ZEND_METHOD(reflection_property, setAccessible)
 }
 /* }}} */
 
-static void get_accessor_function_impl(INTERNAL_FUNCTION_PARAMETERS, zend_uchar acc) /* {{{ */
+static void get_accessor_function_impl(INTERNAL_FUNCTION_PARAMETERS, zend_acc_index acc) /* {{{ */
 {
 	reflection_object *intern;
 	property_reference *ref;
