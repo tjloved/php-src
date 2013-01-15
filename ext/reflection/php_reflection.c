@@ -1001,7 +1001,7 @@ static void _property_accessor_string(string *str, zend_property_info *prop, cha
 
 		string_printf(str, "$%s ] {\n", prop->name);
 
-		for (i = 0; i < ZEND_ACCESSOR_COUNT; ++i) {
+		for (i = 0; i < ZEND_NUM_ACCESSORS; ++i) {
 			if (accs[i]) {
 				_function_string(str, accs[i], accs[i]->common.scope, sub_indent.string TSRMLS_CC);
 			}

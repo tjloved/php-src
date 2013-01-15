@@ -141,8 +141,8 @@ static void zend_duplicate_property_info(zend_property_info *property_info) /* {
 	if (orig_accs) {
 		int i;
 
-		property_info->accs = ecalloc(ZEND_ACCESSOR_COUNT, sizeof(zend_function *));
-		for (i = 0; i < ZEND_ACCESSOR_COUNT; ++i) {
+		property_info->accs = ecalloc(ZEND_NUM_ACCESSORS, sizeof(zend_function *));
+		for (i = 0; i < ZEND_NUM_ACCESSORS; ++i) {
 			if (orig_accs[i]) {
 				property_info->accs[i] = duplicate_accessor_function(orig_accs[i]);
 			}
@@ -171,7 +171,7 @@ static void zend_destroy_property_info(zend_property_info *property_info) /* {{{
 		int i;
 		TSRMLS_FETCH();
 
-		for (i = 0; i < ZEND_ACCESSOR_COUNT; ++i) {
+		for (i = 0; i < ZEND_NUM_ACCESSORS; ++i) {
 			if (accs[i]) {
 				destroy_op_array((zend_op_array *) accs[i] TSRMLS_CC);
 			}
@@ -1591,7 +1591,7 @@ void zend_declare_accessor(znode *var_name TSRMLS_DC) { /* {{{ */
 	if (zend_hash_find(&CG(active_class_entry)->properties_info, property_name, property_name_len + 1, (void **) &property_info)==SUCCESS) {
 		/* Add back final/abstract flags that were skipped previously */
 		property_info->flags |= CG(access_type);
-		property_info->accs = ecalloc(ZEND_ACCESSOR_COUNT, sizeof(zend_function *));
+		property_info->accs = ecalloc(ZEND_NUM_ACCESSORS, sizeof(zend_function *));
 
 		CG(current_property_info) = property_info;
 		efree(property_name);
@@ -1704,7 +1704,7 @@ void zend_do_end_accessor_declaration(znode *function_token, const znode *body T
 		/* Find out what kind of accessor this is by checking in which
 		 * ->fn slot it is in */
 		zend_uchar acc;
-		for (acc = 0; acc < ZEND_ACCESSOR_COUNT; ++acc) {
+		for (acc = 0; acc < ZEND_NUM_ACCESSORS; ++acc) {
 			if (property_info->accs[acc] == (zend_function *) CG(active_op_array)) {
 				break;
 			}
@@ -3797,7 +3797,7 @@ static zend_bool do_inherit_property_access_check(HashTable *target_ht, zend_pro
 				int i;
 				TSRMLS_FETCH();
 
-				for (i = 0; i < ZEND_ACCESSOR_COUNT; ++i) {
+				for (i = 0; i < ZEND_NUM_ACCESSORS; ++i) {
 					do_inherit_accessor(&child_info->accs[i], parent_info->accs[i], ce TSRMLS_CC);
 				}
 			}
@@ -3808,7 +3808,7 @@ static zend_bool do_inherit_property_access_check(HashTable *target_ht, zend_pro
 		 * abstract too */
 		if (parent_info->accs) {
 			int i;
-			for (i = 0; i < ZEND_ACCESSOR_COUNT; ++i) {
+			for (i = 0; i < ZEND_NUM_ACCESSORS; ++i) {
 				zend_function *fn = parent_info->accs[i];
 				if (fn && (fn->common.fn_flags & ZEND_ACC_ABSTRACT)) {
 					ce->ce_flags |= ZEND_ACC_IMPLICIT_ABSTRACT_CLASS;
@@ -4648,9 +4648,9 @@ static void zend_do_traits_property_binding(zend_class_entry *ce TSRMLS_DC) /* {
 				zend_property_info *created_property_info;
 				if (zend_hash_find(&ce->properties_info, prop_name, prop_name_length+1, (void**) &created_property_info) == SUCCESS) {
 					int j;
-					created_property_info->accs = ecalloc(ZEND_ACCESSOR_COUNT, sizeof(zend_function *));
+					created_property_info->accs = ecalloc(ZEND_NUM_ACCESSORS, sizeof(zend_function *));
 
-					for (j = 0; j < ZEND_ACCESSOR_COUNT; ++j) {
+					for (j = 0; j < ZEND_NUM_ACCESSORS; ++j) {
 						zend_do_trait_inherit_accessor(&created_property_info->accs[j], property_info->accs[j], ce, ce->traits[i], &overridden TSRMLS_CC);
 					}
 				}

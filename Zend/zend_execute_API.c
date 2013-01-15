@@ -1644,7 +1644,7 @@ static int zend_verify_abstract_class_property(zend_property_info *prop, zend_ab
 {
 	if (prop->accs) {
 		int i;
-		for (i = 0; i < ZEND_ACCESSOR_COUNT; ++i) {
+		for (i = 0; i < ZEND_NUM_ACCESSORS; ++i) {
 			if (prop->accs[i]) {
 				zend_verify_abstract_class_function(prop->accs[i], ai TSRMLS_CC);
 			}

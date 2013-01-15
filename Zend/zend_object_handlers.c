@@ -332,7 +332,7 @@ static zend_always_inline zend_bool is_derived_class(zend_class_entry *child_cla
 }
 /* }}} */
 
-static zend_function *zend_get_accessor_from_ce(zend_class_entry *ce, const char *name, int name_len, ulong name_hash, zend_uchar acc) /* {{{ */
+static zend_function *zend_get_accessor_from_ce(zend_class_entry *ce, const char *name, int name_len, ulong name_hash, AccessorFuncIndex acc) /* {{{ */
 {
 	zend_property_info *prop;
 
@@ -344,7 +344,7 @@ static zend_function *zend_get_accessor_from_ce(zend_class_entry *ce, const char
 }
 /* }}} */
 
-static zend_function *zend_get_accessor(zend_property_info *property_info, zend_class_entry *ce, zend_uchar acc TSRMLS_DC) /* {{{ */
+static zend_function *zend_get_accessor(zend_property_info *property_info, zend_class_entry *ce, AccessorFuncIndex acc TSRMLS_DC) /* {{{ */
 {
 	zend_function *fbc = property_info->accs[acc];
 

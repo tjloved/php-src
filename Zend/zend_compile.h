@@ -237,11 +237,13 @@ typedef struct _zend_try_catch_element {
 #define ZEND_ACC_ACCESSOR				0x10000000
 
 /* Offsets into zend_property_info->accs */
-#define ZEND_ACCESSOR_GET   0
-#define ZEND_ACCESSOR_SET   1
-#define ZEND_ACCESSOR_ISSET 2
-#define ZEND_ACCESSOR_UNSET 3
-#define ZEND_ACCESSOR_COUNT 4
+typedef enum {
+	ZEND_ACCESSOR_GET,
+	ZEND_ACCESSOR_SET,
+	ZEND_ACCESSOR_ISSET,
+	ZEND_ACCESSOR_UNSET,
+	ZEND_NUM_ACCESSORS,
+} AccessorFuncIndex;
 
 typedef struct _zend_property_info {
 	zend_uint flags;
