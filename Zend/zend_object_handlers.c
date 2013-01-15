@@ -344,20 +344,21 @@ static zend_function *zend_get_accessor_from_ce(zend_class_entry *ce, const char
 }
 /* }}} */
 
-static zend_function *zend_get_accessor(zend_property_info *prop, zend_class_entry *ce, zend_uchar acc TSRMLS_DC) /* {{{ */
+static zend_function *zend_get_accessor(zend_property_info *property_info, zend_class_entry *ce, zend_uchar acc TSRMLS_DC) /* {{{ */
 {
-	zend_function *fbc = prop->accs[acc];
+	zend_function *fbc = property_info->accs[acc];
 
 	if (fbc->common.fn_flags & ZEND_ACC_PRIVATE) {
-		if (fbc->common.scope == ce && EG(scope) == ce) {
+		if (fbc->common.scope == EG(scope) || (fbc->common.scope == ce && EG(scope) == ce)) {
 			return fbc;
 		} else {
 			ce = ce->parent;
 			while (ce) {
 				if (ce == EG(scope)) {
-					fbc = zend_get_accessor_from_ce(ce, prop->name, prop->name_length, prop->h, acc);
-					if (fbc) {
-						return fbc;
+					zend_function *fbc_parent;
+					fbc_parent = zend_get_accessor_from_ce(ce, property_info->name, property_info->name_length, property_info->h, acc);
+					if (fbc_parent) {
+						return fbc_parent;
 					}
 				}
 				ce = ce->parent;
@@ -370,7 +371,7 @@ static zend_function *zend_get_accessor(zend_property_info *prop, zend_class_ent
 	if ((fbc->op_array.fn_flags & ZEND_ACC_CHANGED)
 	    && EG(scope) && is_derived_class(fbc->common.scope, EG(scope))
 	) {
-		zend_function *private_fbc = zend_get_accessor_from_ce(ce, prop->name, prop->name_length, prop->h, acc);
+		zend_function *private_fbc = zend_get_accessor_from_ce(ce, property_info->name, property_info->name_length, property_info->h, acc);
 		if (private_fbc) fbc = private_fbc;
 	}
 
@@ -408,6 +409,10 @@ zend_always_inline struct _zend_property_info *zend_get_property_info_quick(zend
 	property_info = NULL;
 	h = key ? key->hash_value : zend_get_hash_value(Z_STRVAL_P(member), Z_STRLEN_P(member) + 1);
 	if (zend_hash_quick_find(&ce->properties_info, Z_STRVAL_P(member), Z_STRLEN_P(member)+1, h, (void **) &property_info)==SUCCESS) {
+		/* If we have accessors, even if property is private, defer access checks to accessors */
+		if(property_info->accs) {
+			return property_info;
+		}
 		if (UNEXPECTED((property_info->flags & ZEND_ACC_SHADOW) != 0)) {
 			/* if it's a shadow - go to access it's private */
 			property_info = NULL;
