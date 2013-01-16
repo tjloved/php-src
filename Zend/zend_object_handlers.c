@@ -347,36 +347,31 @@ static zend_function *zend_get_accessor_from_ce(const zend_class_entry *ce, cons
 }
 /* }}} */
 
-static zend_function *zend_get_accessor(const zend_property_info *property_info, const zend_class_entry *ce, const zval *member, const zend_literal *key, zend_acc_index acc TSRMLS_DC) /* {{{ */
+static zend_function *zend_get_accessor(const zend_property_info *property_info, zend_class_entry *ce, const zval *member, const zend_literal *key, zend_acc_index acc TSRMLS_DC) /* {{{ */
 {
 	zend_function *fbc = property_info->accs[acc];
 
 	if (fbc->common.fn_flags & ZEND_ACC_PRIVATE) {
 		if (fbc->common.scope == ce && EG(scope) == ce) {
 			return fbc;
-		} else {
-			ce = ce->parent;
-			while (ce) {
-				if (ce == EG(scope)) {
-					zend_function *parent_fbc = zend_get_accessor_from_ce(ce, member, key, acc);
-					if (parent_fbc && parent_fbc->common.scope == EG(scope)) {
-						return parent_fbc;
-					}
-					break;
-				}
-				ce = ce->parent;
+		} else if (EG(scope) && is_derived_class(ce, EG(scope))) {
+			zend_function *real_fbc = zend_get_accessor_from_ce(EG(scope), member, key, acc);
+			if (real_fbc && real_fbc->common.scope == EG(scope)) {
+				return real_fbc;
 			}
-
-			zend_error_noreturn(E_ERROR, "Call to %s accessor %s::%s() from context '%s'", zend_visibility_string(fbc->common.fn_flags), ZEND_FN_SCOPE_NAME(fbc), fbc->common.function_name, EG(scope) ? EG(scope)->name : "");
 		}
+
+		zend_error_noreturn(E_ERROR, "Call to %s accessor %s::%s() from context '%s'", zend_visibility_string(fbc->common.fn_flags), ZEND_FN_SCOPE_NAME(fbc), fbc->common.function_name, EG(scope) ? EG(scope)->name : "");
 	}
 
-	if ((fbc->op_array.fn_flags & ZEND_ACC_CHANGED)
-	    && EG(scope) && is_derived_class(fbc->common.scope, EG(scope))
-	) {
-		zend_function *private_fbc = zend_get_accessor_from_ce(EG(scope), member, key, acc);
-		if (private_fbc) {
-			fbc = private_fbc;
+	if (EG(scope) && is_derived_class(fbc->common.scope, EG(scope))) {
+		zend_function *real_fbc = zend_get_accessor_from_ce(EG(scope), member, key, acc);
+		if (real_fbc) {
+			if (!(real_fbc->common.fn_flags & ZEND_ACC_PRIVATE)
+				|| real_fbc->common.scope == EG(scope)
+			) {
+				fbc = real_fbc;
+			}
 		}
 	}
 
