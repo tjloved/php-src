@@ -373,7 +373,7 @@ static zend_function *zend_get_accessor(const zend_property_info *property_info,
 	if ((fbc->op_array.fn_flags & ZEND_ACC_CHANGED)
 	    && EG(scope) && is_derived_class(fbc->common.scope, EG(scope))
 	) {
-		zend_function *private_fbc = zend_get_accessor_from_ce(ce, member, key, acc);
+		zend_function *private_fbc = zend_get_accessor_from_ce(EG(scope), member, key, acc);
 		if (private_fbc) {
 			fbc = private_fbc;
 		}
