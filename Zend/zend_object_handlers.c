@@ -359,9 +359,10 @@ static zend_function *zend_get_accessor(const zend_property_info *property_info,
 			while (ce) {
 				if (ce == EG(scope)) {
 					zend_function *parent_fbc = zend_get_accessor_from_ce(ce, member, key, acc);
-					if (parent_fbc) {
+					if (parent_fbc && parent_fbc->common.scope == EG(scope)) {
 						return parent_fbc;
 					}
+					break;
 				}
 				ce = ce->parent;
 			}
