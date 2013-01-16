@@ -332,9 +332,14 @@ static zend_always_inline zend_bool is_derived_class(zend_class_entry *child_cla
 }
 /* }}} */
 
-static zend_function *zend_get_accessor_from_ce(zend_property_info *property_info, zend_class_entry *ce, zend_acc_index acc) /* {{{ */
+static zend_function *zend_get_accessor_from_ce(const zend_class_entry *ce, const zval *member, const zend_literal *key, zend_acc_index acc) /* {{{ */
 {
-	if (zend_hash_quick_find(&ce->properties_info, property_info->name, property_info->name_length+1, property_info->h, (void **) &property_info) == FAILURE) {
+	zend_property_info *property_info;
+	const char *name = Z_STRVAL_P(member);
+	int name_len = Z_STRLEN_P(member) + 1;
+	zend_ulong h = key ? key->hash_value : zend_get_hash_value(name, name_len);
+
+	if (zend_hash_quick_find(&ce->properties_info, name, name_len, h, (void **) &property_info) == FAILURE) {
 		return NULL;
 	}
 
@@ -342,21 +347,20 @@ static zend_function *zend_get_accessor_from_ce(zend_property_info *property_inf
 }
 /* }}} */
 
-static zend_function *zend_get_accessor(zend_property_info *property_info, zend_class_entry *ce, zend_acc_index acc TSRMLS_DC) /* {{{ */
+static zend_function *zend_get_accessor(const zend_property_info *property_info, const zend_class_entry *ce, const zval *member, const zend_literal *key, zend_acc_index acc TSRMLS_DC) /* {{{ */
 {
 	zend_function *fbc = property_info->accs[acc];
 
 	if (fbc->common.fn_flags & ZEND_ACC_PRIVATE) {
-		if (fbc->common.scope == EG(scope) || (fbc->common.scope == ce && EG(scope) == ce)) {
+		if (fbc->common.scope == ce && EG(scope) == ce) {
 			return fbc;
 		} else {
 			ce = ce->parent;
 			while (ce) {
 				if (ce == EG(scope)) {
-					zend_function *fbc_parent;
-					fbc_parent = zend_get_accessor_from_ce(property_info, ce, acc);
-					if (fbc_parent) {
-						return fbc_parent;
+					zend_function *parent_fbc = zend_get_accessor_from_ce(ce, member, key, acc);
+					if (parent_fbc) {
+						return parent_fbc;
 					}
 				}
 				ce = ce->parent;
@@ -369,8 +373,10 @@ static zend_function *zend_get_accessor(zend_property_info *property_info, zend_
 	if ((fbc->op_array.fn_flags & ZEND_ACC_CHANGED)
 	    && EG(scope) && is_derived_class(fbc->common.scope, EG(scope))
 	) {
-		zend_function *private_fbc = zend_get_accessor_from_ce(property_info, ce, acc);
-		if (private_fbc) fbc = private_fbc;
+		zend_function *private_fbc = zend_get_accessor_from_ce(ce, member, key, acc);
+		if (private_fbc) {
+			fbc = private_fbc;
+		}
 	}
 
 	if ((fbc->common.fn_flags & ZEND_ACC_PROTECTED)
@@ -589,8 +595,10 @@ zval *zend_std_read_property(zval *object, zval *member, int type, const zend_li
 			}
 			retval = &EG(uninitialized_zval_ptr);
 		} else if(zend_get_property_guard(zobj, property_info, member, &guard) == SUCCESS) {
-			zend_function *getter = zend_get_accessor(property_info, zobj->ce, ZEND_ACCESSOR_GET TSRMLS_CC);
-			if(getter) {
+			zend_function *getter = zend_get_accessor(
+				property_info, zobj->ce, member, key, ZEND_ACCESSOR_GET TSRMLS_CC
+			);
+			if (getter) {
 				if(guard->in_get == 0) {
 					guard->in_get = 1;
 					rv = zend_std_call_getter(object, member, getter, type TSRMLS_CC);
@@ -672,8 +680,10 @@ ZEND_API void zend_std_write_property(zval *object, zval *member, zval *value, c
 			zend_error(E_WARNING, "Cannot set property %s::$%s, no setter defined", zobj->ce->name, Z_STRVAL_P(member));
 			handled = 1;
 		} else if(zend_get_property_guard(zobj, property_info, member, &guard) == SUCCESS) {
-			zend_function *setter = zend_get_accessor(property_info, zobj->ce, ZEND_ACCESSOR_SET TSRMLS_CC);
-			if(setter) {
+			zend_function *setter = zend_get_accessor(
+				property_info, zobj->ce, member, key, ZEND_ACCESSOR_SET TSRMLS_CC
+			);
+			if (setter) {
 				if(guard->in_set == 0) {
 					guard->in_set = 1;
 					zend_std_call_setter(object, member, value, setter TSRMLS_CC);
@@ -879,8 +889,10 @@ static zval **zend_std_get_property_ptr_ptr(zval *object, zval *member, const ze
 		}
 
 		if(zend_get_property_guard(zobj, property_info, member, &guard) == SUCCESS && guard->in_get == 0) {
-			zend_function *getter = zend_get_accessor(property_info, zobj->ce, ZEND_ACCESSOR_GET TSRMLS_CC);
-			if(getter) {
+			zend_function *getter = zend_get_accessor(
+				property_info, zobj->ce, member, key, ZEND_ACCESSOR_GET TSRMLS_CC
+			);
+			if (getter) {
 				/* we do have getter - fail and let it try again with usual get/set */
 				retval = NULL;
 			}
@@ -957,8 +969,10 @@ static void zend_std_unset_property(zval *object, zval *member, const zend_liter
 			zend_error(E_WARNING, "Cannot unset guarded property %s::$%s, no unset defined.", zobj->ce->name, Z_STRVAL_P(member));
 			handled = 1;
 		} else if(zend_get_property_guard(zobj, property_info, member, &guard) == SUCCESS) {
-			zend_function *unsetter = zend_get_accessor(property_info, zobj->ce, ZEND_ACCESSOR_UNSET TSRMLS_CC);
-			if(unsetter) {
+			zend_function *unsetter = zend_get_accessor(
+				property_info, zobj->ce, member, key, ZEND_ACCESSOR_UNSET TSRMLS_CC
+			);
+			if (unsetter) {
 				if(guard->in_unset == 0) {
 					guard->in_unset = 1;
 					zend_std_call_unsetter(object, member, unsetter TSRMLS_CC);
@@ -1570,8 +1584,10 @@ static int zend_std_has_property(zval *object, zval *member, int has_set_exists,
 			/* Have property but no issetter, just return and do not throw error */
 			result = has_set_exists == 2;
 		} else if(zend_get_property_guard(zobj, property_info, member, &guard) == SUCCESS) {
-			zend_function *issetter = zend_get_accessor(property_info, zobj->ce, ZEND_ACCESSOR_ISSET TSRMLS_CC);
-			if(issetter) {
+			zend_function *issetter = zend_get_accessor(
+				property_info, zobj->ce, member, key, ZEND_ACCESSOR_ISSET TSRMLS_CC
+			);
+			if (issetter) {
 				if(guard->in_isset == 0) {
 					guard->in_isset = 1;
 					result = zend_std_call_issetter(object, member, has_set_exists, issetter, key TSRMLS_CC);
