@@ -21,8 +21,8 @@ class TimePeriod {
 	public $Seconds3 {
 		set($x) { $this->_Seconds = $x; }
 	}
-	public $Object {
-		set(TestClass $y) { $this->_Seconds = $y; }
+	public TestClass $Object {
+		set($y) { $this->_Seconds = $y; }
 	}
 }
 

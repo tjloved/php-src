@@ -587,7 +587,9 @@ class_statement_list:
 
 
 class_statement:
-		variable_modifiers { CG(access_type) = Z_LVAL($1.u.constant); } class_variable_accessor_declarations
+		variable_modifiers { CG(access_type) = Z_LVAL($1.u.constant); }
+		optional_class_type { CG(typehint_node) = &$3; }
+		class_variable_accessor_declarations
 	|	class_constant_declaration ';'
 	|	trait_use_statement
 	|	method_modifiers function is_reference T_STRING { zend_do_begin_function_declaration(&$2, &$4, 1, $3.op_type, &$1 TSRMLS_CC); }
@@ -708,21 +710,21 @@ accessor_optional_parens:
 accessor_function:
 		accessor_modifiers T_ISSET accessor_optional_parens
 			{ 	Z_LVAL($2.u.constant) = T_ISSET;
-				zend_do_begin_accessor_declaration(&$2, &$1, 0, 0 TSRMLS_CC); }
+				zend_do_begin_accessor_declaration(&$2, &$1, NULL, 0 TSRMLS_CC); }
 		method_body
 			{ zend_do_end_accessor_declaration(&$2, &$5 TSRMLS_CC); }
 	|	accessor_modifiers T_UNSET accessor_optional_parens
 			{ 	Z_LVAL($2.u.constant) = T_UNSET;
-				zend_do_begin_accessor_declaration(&$2, &$1, 0, 0 TSRMLS_CC); }
+				zend_do_begin_accessor_declaration(&$2, &$1, NULL, 0 TSRMLS_CC); }
 		method_body
 			{ zend_do_end_accessor_declaration(&$2, &$5 TSRMLS_CC); }
 	|	accessor_modifiers is_reference T_STRING accessor_optional_parens
-			{ zend_do_begin_accessor_declaration(&$3, &$1, $2.op_type, 0 TSRMLS_CC); }
+			{ zend_do_begin_accessor_declaration(&$3, &$1, NULL, $2.op_type TSRMLS_CC); }
 		method_body
 			{ zend_do_end_accessor_declaration(&$3, &$6 TSRMLS_CC); }
-	|	accessor_modifiers is_reference T_STRING '(' 
-			{ zend_do_begin_accessor_declaration(&$3, &$1, $2.op_type, 1 TSRMLS_CC); }
-		non_empty_parameter_list ')' method_body
+	|	accessor_modifiers is_reference T_STRING '(' T_VARIABLE ')'
+			{ zend_do_begin_accessor_declaration(&$3, &$1, &$5, $2.op_type TSRMLS_CC); }
+		method_body
 			{ zend_do_end_accessor_declaration(&$3, &$8 TSRMLS_CC); }
 ;
 

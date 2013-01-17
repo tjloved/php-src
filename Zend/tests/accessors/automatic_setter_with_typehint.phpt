@@ -4,8 +4,8 @@ Automatic setters can have typehints
 <?php
 
 class Test {
-    public $test {
-        get; set(stdClass $obj);
+    public stdClass $test {
+        get; set;
     }
 }
 

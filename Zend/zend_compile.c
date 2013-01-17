@@ -1612,7 +1612,7 @@ static inline char *create_accessor_function_name(const char *property_name, cha
 }
 /* }}} */
 
-void zend_do_begin_accessor_declaration(znode *function_token, znode *modifiers, int return_reference, int has_params TSRMLS_DC) /* {{{ */
+void zend_do_begin_accessor_declaration(znode *function_token, znode *modifiers, znode *param, int return_reference TSRMLS_DC) /* {{{ */
 {
 	zend_property_info *property_info = CG(current_property_info);
 	const char *property_name = zend_get_property_name(property_info);
@@ -1635,7 +1635,7 @@ void zend_do_begin_accessor_declaration(znode *function_token, znode *modifiers,
 		efree(Z_STRVAL(function_token->u.constant));
 		ZVAL_STRING(&function_token->u.constant, create_accessor_function_name(property_name, "get"), 0);
 
-		if (has_params) {
+		if (param) {
 			zend_error(E_COMPILE_ERROR, "Getters do not accept parameters for variable %s::$%s", CG(active_class_entry)->name, property_name);
 		}
 
@@ -1643,8 +1643,6 @@ void zend_do_begin_accessor_declaration(znode *function_token, znode *modifiers,
 		zend_do_begin_function_declaration(function_token, function_token, 1, return_reference, modifiers TSRMLS_CC);
 		property_info->accs[ZEND_ACCESSOR_GET] = (zend_function *) CG(active_op_array);
 	} else if (Z_TYPE(function_token->u.constant) == IS_STRING && strcasecmp("set", Z_STRVAL(function_token->u.constant)) == 0) {
-		znode unused_node, unused_node2, value_node;
-
 		efree(Z_STRVAL(function_token->u.constant));
 		ZVAL_STRING(&function_token->u.constant, create_accessor_function_name(property_name, "set"), 0);
 
@@ -1655,19 +1653,24 @@ void zend_do_begin_accessor_declaration(znode *function_token, znode *modifiers,
 		zend_do_begin_function_declaration(function_token, function_token, 1, ZEND_RETURN_VAL, modifiers TSRMLS_CC);
 		property_info->accs[ZEND_ACCESSOR_SET] = (zend_function *) CG(active_op_array);
 
-		if (!has_params) {
-			/* Add $value parameter to __setHours() */
-			unused_node.op_type = unused_node2.op_type = IS_UNUSED;
-			unused_node.u.op.num = unused_node2.u.op.num = 1;
+		{
+			znode offset_node, *varname_node, varname_node_local;
+			offset_node.op_type = IS_UNUSED;
+			offset_node.u.op.num = 1;
 
-			ZVAL_STRINGL(&value_node.u.constant, "value", 5, 1);
+			if (param) {
+				varname_node = param;
+			} else {
+				ZVAL_STRINGL(&varname_node_local.u.constant, "value", 5, 1);
+				varname_node = &varname_node_local;
+			}
 
-			zend_do_receive_arg(ZEND_RECV, &value_node, &unused_node, NULL, &unused_node2, 0 TSRMLS_CC);
+			zend_do_receive_arg(ZEND_RECV, varname_node, &offset_node, NULL, CG(typehint_node), 0 TSRMLS_CC);
 		}
 	} else if (Z_TYPE(function_token->u.constant) == IS_LONG && Z_LVAL(function_token->u.constant) == T_ISSET) {
 		ZVAL_STRING(&function_token->u.constant, create_accessor_function_name(property_name, "isset"), 0);
 
-		if (has_params) {
+		if (param) {
 			zend_error(E_COMPILE_ERROR, "Issetters do not accept parameters for variable %s::$%s", CG(active_class_entry)->name, property_name);
 		}
 
@@ -1677,7 +1680,7 @@ void zend_do_begin_accessor_declaration(znode *function_token, znode *modifiers,
 	} else if (Z_TYPE(function_token->u.constant) == IS_LONG && Z_LVAL(function_token->u.constant) == T_UNSET) {
 		ZVAL_STRING(&function_token->u.constant, create_accessor_function_name(property_name, "unset"), 0);
 
-		if (has_params) {
+		if (param) {
 			zend_error(E_COMPILE_ERROR, "Unsetters do not accept parameters for variable %s::$%s", CG(active_class_entry)->name, property_name);
 		}
 

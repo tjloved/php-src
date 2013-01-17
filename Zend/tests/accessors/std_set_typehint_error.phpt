@@ -10,8 +10,8 @@ class TestClass {
 }
 
 class TimePeriod {
-	public $Object {
-		set(TestClass2 $y) { $this->_Seconds = $y; }
+	public TestClass2 $Object {
+		set($y) { $this->_Seconds = $y; }
 	}
 }
 

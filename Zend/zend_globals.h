@@ -122,6 +122,7 @@ struct _zend_compiler_globals {
 
 	znode implementing_class;
 	zend_property_info *current_property_info;
+	znode *typehint_node;
 
 	zend_uint access_type;
 
