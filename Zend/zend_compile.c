@@ -1572,32 +1572,30 @@ int zend_do_verify_access_types(const znode *current_access_type, const znode *n
 
 void zend_declare_accessor(znode *var_name TSRMLS_DC) { /* {{{ */
 	zend_property_info *property_info;
-	char *property_name;
-	int property_name_len;
-	zend_uint orig_ce_flags = CG(active_class_entry)->ce_flags;
+	zval *default_value;
 
 	if (CG(access_type) & ZEND_ACC_STATIC) {
 		zend_error_noreturn(E_COMPILE_ERROR, "Cannot define static accessor %s::$%s, not supported at this time", CG(active_class_entry)->name, Z_STRVAL(var_name->u.constant));
 	}
 
-	/* zend_do_declare_property free's the string, so copy it */
-	property_name_len = Z_STRLEN(var_name->u.constant);
-	property_name = estrndup(Z_STRVAL(var_name->u.constant), property_name_len);
+	if (zend_hash_exists(&CG(active_class_entry)->properties_info, Z_STRVAL(var_name->u.constant), Z_STRLEN(var_name->u.constant) + 1)) {
+		zend_error(E_COMPILE_ERROR, "Cannot redeclare %s::$%s", CG(active_class_entry)->name, Z_STRVAL(var_name->u.constant));
+	}
 
-	/* Hide that we're working with an interface during property accessor declaration */
-	CG(active_class_entry)->ce_flags &= ~ZEND_ACC_INTERFACE;
-	zend_do_declare_property(var_name, NULL, CG(access_type) & ~(ZEND_ACC_FINAL|ZEND_ACC_ABSTRACT) TSRMLS_CC);
-	CG(active_class_entry)->ce_flags = orig_ce_flags;
+	ALLOC_INIT_ZVAL(default_value);
 
-	if (zend_hash_find(&CG(active_class_entry)->properties_info, property_name, property_name_len + 1, (void **) &property_info)==SUCCESS) {
-		/* Add back final/abstract flags that were skipped previously */
-		property_info->flags |= CG(access_type);
+	zend_declare_property_ex(CG(active_class_entry), zend_new_interned_string(Z_STRVAL(var_name->u.constant), Z_STRLEN(var_name->u.constant) + 1, 0 TSRMLS_CC), Z_STRLEN(var_name->u.constant), default_value, CG(access_type), CG(doc_comment), CG(doc_comment_len) TSRMLS_CC);
+
+	CG(doc_comment) = NULL;
+	CG(doc_comment_len) = 0;
+
+	if (zend_hash_find(&CG(active_class_entry)->properties_info, Z_STRVAL(var_name->u.constant), Z_STRLEN(var_name->u.constant) + 1, (void **) &property_info) == SUCCESS) {
 		property_info->accs = ecalloc(ZEND_NUM_ACCESSORS, sizeof(zend_function *));
 
 		CG(current_property_info) = property_info;
-		efree(property_name);
+		efree(Z_STRVAL(var_name->u.constant));
 	} else {
-		zend_error_noreturn(E_COMPILE_ERROR, "Property_info for %s::$%s is not present, should not happen in zend_declare_accessor()", CG(active_class_entry)->name, property_name);
+		zend_error_noreturn(E_COMPILE_ERROR, "Property_info for %s::$%s is not present, should not happen in zend_declare_accessor()", CG(active_class_entry)->name, Z_STRVAL(var_name->u.constant));
 	}
 }
 /* }}} */
