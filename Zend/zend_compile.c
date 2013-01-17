@@ -1570,7 +1570,7 @@ int zend_do_verify_access_types(const znode *current_access_type, const znode *n
 }
 /* }}} */
 
-void zend_declare_accessor(znode *var_name TSRMLS_DC) { /* {{{ */
+void zend_declare_accessor(const znode *var_name TSRMLS_DC) { /* {{{ */
 	zend_property_info *property_info;
 	zval *default_value;
 
@@ -1770,7 +1770,23 @@ void zend_do_end_accessor_declaration(znode *function_token, const znode *body T
 }
 /* }}} */
 
-void zend_finalize_accessor(TSRMLS_D) { /* {{{ */
+static void zend_declare_accessor_method_helper(znode *function_token, long additional_modifiers TSRMLS_DC) /* {{{ */
+{
+	znode zn_modifiers, zn_body;
+
+	INIT_ZNODE(zn_modifiers);
+	Z_LVAL(zn_modifiers.u.constant) = additional_modifiers;
+
+	INIT_ZNODE(zn_body);
+	Z_LVAL(zn_body.u.constant) = ZEND_ACC_ABSTRACT;
+
+	zend_do_begin_accessor_declaration(function_token, &zn_modifiers, NULL, 0 TSRMLS_CC);
+	zend_do_end_accessor_declaration(function_token, &zn_body TSRMLS_CC);
+}
+/* }}} */
+
+void zend_finalize_accessor(TSRMLS_D) /* {{{ */
+{
 	zend_property_info *property_info = CG(current_property_info);
 
 	zend_uint keep_flags = 0;
@@ -1779,34 +1795,18 @@ void zend_finalize_accessor(TSRMLS_D) { /* {{{ */
 	}
 
 	if (!property_info->accs[ZEND_ACCESSOR_ISSET] && property_info->accs[ZEND_ACCESSOR_GET]) {
-		znode zn_fntoken, zn_modifiers, zn_body;
+		znode zn_fntoken;
 		INIT_ZNODE(zn_fntoken);
 		ZVAL_LONG(&zn_fntoken.u.constant, T_ISSET);
 
-		INIT_ZNODE(zn_modifiers);
-		Z_LVAL(zn_modifiers.u.constant)
-			= property_info->accs[ZEND_ACCESSOR_GET]->common.fn_flags & keep_flags;
-
-		INIT_ZNODE(zn_body);
-		Z_LVAL(zn_body.u.constant) = ZEND_ACC_ABSTRACT;
-
-		zend_do_begin_accessor_declaration(&zn_fntoken, &zn_modifiers, 0, 0 TSRMLS_CC);
-		zend_do_end_accessor_declaration(&zn_fntoken, &zn_body TSRMLS_CC);
+		zend_declare_accessor_method_helper(&zn_fntoken, property_info->accs[ZEND_ACCESSOR_GET]->common.fn_flags & keep_flags TSRMLS_CC);
 	}
 	if (!property_info->accs[ZEND_ACCESSOR_UNSET] && property_info->accs[ZEND_ACCESSOR_SET]) {
-		znode zn_fntoken, zn_modifiers, zn_body;
+		znode zn_fntoken;
 		INIT_ZNODE(zn_fntoken);
 		ZVAL_LONG(&zn_fntoken.u.constant, T_UNSET);
 
-		INIT_ZNODE(zn_modifiers);
-		Z_LVAL(zn_modifiers.u.constant)
-			= property_info->accs[ZEND_ACCESSOR_SET]->common.fn_flags & keep_flags;
-
-		INIT_ZNODE(zn_body);
-		Z_LVAL(zn_body.u.constant) = ZEND_ACC_ABSTRACT;
-
-		zend_do_begin_accessor_declaration(&zn_fntoken, &zn_modifiers, 0, 0 TSRMLS_CC);
-		zend_do_end_accessor_declaration(&zn_fntoken, &zn_body TSRMLS_CC);
+		zend_declare_accessor_method_helper(&zn_fntoken, property_info->accs[ZEND_ACCESSOR_SET]->common.fn_flags & keep_flags TSRMLS_CC);
 	}
 
 	CG(current_property_info) = NULL;
@@ -5597,6 +5597,19 @@ void zend_do_declare_property(const znode *var_name, const znode *value, zend_ui
 	if (access_type & ZEND_ACC_FINAL) {
 		zend_error(E_COMPILE_ERROR, "Cannot declare property %s::$%s final, the final modifier is allowed only for methods and classes",
 				   CG(active_class_entry)->name, var_name->u.constant.value.str.val);
+	}
+
+	if (CG(typehint_node)->op_type != IS_UNUSED) {
+		znode function_token;
+
+		zend_declare_accessor(var_name TSRMLS_CC);
+		MAKE_ZNODE(function_token, "get");
+		zend_declare_accessor_method_helper(&function_token, 0 TSRMLS_CC);
+		MAKE_ZNODE(function_token, "set");
+		zend_declare_accessor_method_helper(&function_token, 0 TSRMLS_CC);
+		zend_finalize_accessor(TSRMLS_C);
+
+		return;
 	}
 
 	if (zend_hash_find(&CG(active_class_entry)->properties_info, var_name->u.constant.value.str.val, var_name->u.constant.value.str.len+1, (void **) &existing_property_info)==SUCCESS) {
