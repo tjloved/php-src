@@ -233,8 +233,11 @@ typedef struct _zend_try_catch_element {
 #define ZEND_ACC_RETURN_REFERENCE		0x4000000
 #define ZEND_ACC_DONE_PASS_TWO			0x8000000
 
-/* Declares that the function is an accessor zend_function.fn_flags */
+/* fn_flag that declares that the function is an accessor zend_function.fn_flags */
 #define ZEND_ACC_ACCESSOR				0x10000000
+/* fn_flag that declares that the function is on the stack and is being guarded from recursive calls */
+#define ZEND_ACC_CALL_GUARD				0x20000000
+
 
 /* Offsets into zend_property_info->accs */
 typedef enum {
