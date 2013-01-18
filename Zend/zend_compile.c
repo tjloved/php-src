@@ -174,6 +174,7 @@ static void zend_destroy_property_info(zend_property_info *property_info) /* {{{
 		for (i = 0; i < ZEND_NUM_ACCESSORS; ++i) {
 			if (accs[i]) {
 				destroy_op_array((zend_op_array *) accs[i] TSRMLS_CC);
+				pefree(accs[i], 1);
 			}
 		}
 
