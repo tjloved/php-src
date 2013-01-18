@@ -730,7 +730,7 @@ accessor_function:
 
 class_variable_accessor_declarations:
 		T_VARIABLE '{'
-			{ zend_declare_accessor(&$1 TSRMLS_CC); }
+			{ zend_declare_accessor(&$1, NULL TSRMLS_CC); }
 			accessors
 			{ zend_finalize_accessor(TSRMLS_C); }
 		'}'

@@ -1570,7 +1570,7 @@ int zend_do_verify_access_types(const znode *current_access_type, const znode *n
 }
 /* }}} */
 
-void zend_declare_accessor(const znode *var_name TSRMLS_DC) { /* {{{ */
+void zend_declare_accessor(const znode *var_name, const znode *value TSRMLS_DC) { /* {{{ */
 	zend_property_info *property_info;
 	zval *default_value;
 
@@ -1583,6 +1583,12 @@ void zend_declare_accessor(const znode *var_name TSRMLS_DC) { /* {{{ */
 	}
 
 	ALLOC_INIT_ZVAL(default_value);
+	if (value) {
+		*default_value = value->u.constant;
+		CG(typehint_node)->EA = 1;
+	} else {
+		CG(typehint_node)->EA = 0;
+	}
 
 	zend_declare_property_ex(CG(active_class_entry), zend_new_interned_string(Z_STRVAL(var_name->u.constant), Z_STRLEN(var_name->u.constant) + 1, 0 TSRMLS_CC), Z_STRLEN(var_name->u.constant), default_value, CG(access_type), CG(doc_comment), CG(doc_comment_len) TSRMLS_CC);
 
@@ -1663,7 +1669,20 @@ void zend_do_begin_accessor_declaration(znode *function_token, znode *modifiers,
 				varname_node = &varname_node_local;
 			}
 
-			zend_do_receive_arg(ZEND_RECV, varname_node, &offset_node, NULL, CG(typehint_node), 0 TSRMLS_CC);
+			/* The EA specifies whether an explicit default value was given or if it's just
+			 * implicit NULL */
+			if (CG(typehint_node)->EA) {
+				znode init_node;
+				INIT_ZNODE(init_node);
+				MAKE_COPY_ZVAL(
+					&CG(active_class_entry)->default_properties_table[property_info->offset],
+					&init_node.u.constant
+				);
+
+				zend_do_receive_arg(ZEND_RECV_INIT, varname_node, &offset_node, &init_node, CG(typehint_node), 0 TSRMLS_CC);
+			} else {
+				zend_do_receive_arg(ZEND_RECV, varname_node, &offset_node, NULL, CG(typehint_node), 0 TSRMLS_CC);
+			}
 		}
 	} else if (Z_TYPE(function_token->u.constant) == IS_LONG && Z_LVAL(function_token->u.constant) == T_ISSET) {
 		ZVAL_STRING(&function_token->u.constant, create_accessor_function_name(property_name, "isset"), 0);
@@ -5602,7 +5621,7 @@ void zend_do_declare_property(const znode *var_name, const znode *value, zend_ui
 	if (CG(typehint_node)->op_type != IS_UNUSED) {
 		znode function_token;
 
-		zend_declare_accessor(var_name TSRMLS_CC);
+		zend_declare_accessor(var_name, value TSRMLS_CC);
 		MAKE_ZNODE(function_token, "get");
 		zend_declare_accessor_method_helper(&function_token, 0 TSRMLS_CC);
 		MAKE_ZNODE(function_token, "set");

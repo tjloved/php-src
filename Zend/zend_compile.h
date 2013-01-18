@@ -546,7 +546,7 @@ void zend_do_return(znode *expr, int do_end_vparse TSRMLS_DC);
 void zend_do_yield(znode *result, znode *value, const znode *key, zend_bool is_variable TSRMLS_DC);
 void zend_do_handle_exception(TSRMLS_D);
 
-void zend_declare_accessor(const znode *var_name TSRMLS_DC);
+void zend_declare_accessor(const znode *var_name, const znode *value TSRMLS_DC);
 void zend_do_begin_accessor_declaration(znode *function_token, znode *modifiers, znode *param, int return_reference TSRMLS_DC);
 void zend_do_end_accessor_declaration(znode *function_token, const znode *body TSRMLS_DC);
 void zend_finalize_accessor(TSRMLS_D);
