@@ -1570,7 +1570,15 @@ int zend_do_verify_access_types(const znode *current_access_type, const znode *n
 }
 /* }}} */
 
-void zend_declare_accessor(const znode *var_name, const znode *value TSRMLS_DC) { /* {{{ */
+void zend_do_check_accessor_default_value(const znode *value TSRMLS_DC) /* {{{ */
+{
+	if (Z_TYPE(value->u.constant) != IS_NULL && (Z_TYPE(value->u.constant) != IS_CONSTANT || strcasecmp(Z_STRVAL(value->u.constant), "NULL") != 0)) {
+		zend_error(E_COMPILE_ERROR, "Only null is allowed as a default value for properties with accessors");
+	}
+}
+/* }}} */
+
+void zend_do_declare_accessor(const znode *var_name, const znode *value TSRMLS_DC) { /* {{{ */
 	zend_property_info *property_info;
 	zval *default_value;
 
@@ -1583,7 +1591,7 @@ void zend_declare_accessor(const znode *var_name, const znode *value TSRMLS_DC) 
 	}
 
 	ALLOC_INIT_ZVAL(default_value);
-	if (value) {
+	if (value && value->op_type != IS_UNUSED) {
 		*default_value = value->u.constant;
 		CG(typehint_node)->EA = 1;
 	} else {
@@ -1804,7 +1812,7 @@ static void zend_declare_accessor_method_helper(znode *function_token, long addi
 }
 /* }}} */
 
-void zend_finalize_accessor(TSRMLS_D) /* {{{ */
+void zend_do_finalize_accessor(TSRMLS_D) /* {{{ */
 {
 	zend_property_info *property_info = CG(current_property_info);
 
@@ -5621,12 +5629,12 @@ void zend_do_declare_property(const znode *var_name, const znode *value, zend_ui
 	if (CG(typehint_node)->op_type != IS_UNUSED) {
 		znode function_token;
 
-		zend_declare_accessor(var_name, value TSRMLS_CC);
+		zend_do_declare_accessor(var_name, value TSRMLS_CC);
 		MAKE_ZNODE(function_token, "get");
 		zend_declare_accessor_method_helper(&function_token, 0 TSRMLS_CC);
 		MAKE_ZNODE(function_token, "set");
 		zend_declare_accessor_method_helper(&function_token, 0 TSRMLS_CC);
-		zend_finalize_accessor(TSRMLS_C);
+		zend_do_finalize_accessor(TSRMLS_C);
 
 		return;
 	}

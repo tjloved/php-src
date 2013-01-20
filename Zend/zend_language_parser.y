@@ -728,11 +728,15 @@ accessor_function:
 			{ zend_do_end_accessor_declaration(&$3, &$8 TSRMLS_CC); }
 ;
 
+optional_null:
+		/* empty */			{ $$.op_type = IS_UNUSED; }
+	|	'=' static_scalar	{ $$ = $2; zend_do_check_accessor_default_value(&$2 TSRMLS_CC); }
+
 class_variable_accessor_declarations:
-		T_VARIABLE '{'
-			{ zend_declare_accessor(&$1, NULL TSRMLS_CC); }
+		T_VARIABLE optional_null '{'
+			{ zend_do_declare_accessor(&$1, &$2 TSRMLS_CC); }
 			accessors
-			{ zend_finalize_accessor(TSRMLS_C); }
+			{ zend_do_finalize_accessor(TSRMLS_C); }
 		'}'
 	|	class_variable_declaration ';'
 ;
