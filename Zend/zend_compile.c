@@ -2678,7 +2678,7 @@ static int generate_free_foreach_copy(const zend_op *foreach_copy TSRMLS_DC) /* 
 
 	opline = get_next_op(CG(active_op_array) TSRMLS_CC);
 
-	opline->opcode = (foreach_copy->result_type == IS_TMP_VAR) ? ZEND_FREE : ZEND_SWITCH_FREE;
+	opline->opcode = ZEND_FOREACH_FREE;
 	COPY_NODE(opline->op1, foreach_copy->result);
 	SET_UNUSED(opline->op2);
 	opline->extended_value = 1;
@@ -6226,18 +6226,13 @@ void zend_do_instanceof(znode *result, const znode *expr, const znode *class_zno
 void zend_do_foreach_begin(znode *foreach_token, znode *open_brackets_token, znode *array, znode *as_token, int variable TSRMLS_DC) /* {{{ */
 {
 	zend_op *opline;
-	zend_bool is_variable;
 	zend_bool push_container = 0;
 	zend_op dummy_opline;
 
+	/* save the location of FETCH_W instruction(s) */
+	open_brackets_token->u.op.opline_num = get_next_op_number(CG(active_op_array));
+
 	if (variable) {
-		if (zend_is_function_or_method_call(array)) {
-			is_variable = 0;
-		} else {
-			is_variable = 1;
-		}
-		/* save the location of FETCH_W instruction(s) */
-		open_brackets_token->u.op.opline_num = get_next_op_number(CG(active_op_array));
 		zend_do_end_variable_parse(array, BP_VAR_W, 0 TSRMLS_CC);
 		if (CG(active_op_array)->last > 0 &&
 		    CG(active_op_array)->opcodes[CG(active_op_array)->last-1].opcode == ZEND_FETCH_OBJ_W) {
@@ -6247,9 +6242,6 @@ void zend_do_foreach_begin(znode *foreach_token, znode *open_brackets_token, zno
 				push_container = 1;
 			}
 		}
-	} else {
-		is_variable = 0;
-		open_brackets_token->u.op.opline_num = get_next_op_number(CG(active_op_array));
 	}
 
 	/* save the location of FE_RESET */
@@ -6263,7 +6255,6 @@ void zend_do_foreach_begin(znode *foreach_token, znode *open_brackets_token, zno
 	opline->result.var = get_temporary_variable(CG(active_op_array));
 	SET_NODE(opline->op1, array);
 	SET_UNUSED(opline->op2);
-	opline->extended_value = is_variable ? ZEND_FE_RESET_VARIABLE : 0;
 
 	COPY_NODE(dummy_opline.result, opline->result);
 	if (push_container) {
@@ -6281,7 +6272,6 @@ void zend_do_foreach_begin(znode *foreach_token, znode *open_brackets_token, zno
 	opline->result_type = IS_VAR;
 	opline->result.var = get_temporary_variable(CG(active_op_array));
 	COPY_NODE(opline->op1, dummy_opline.result);
-	opline->extended_value = 0;
 	SET_UNUSED(opline->op2);
 
 	opline = get_next_op(CG(active_op_array) TSRMLS_CC);
@@ -6332,7 +6322,6 @@ void zend_do_foreach_cont(znode *foreach_token, const znode *open_brackets_token
 		zend_op	*end = &CG(active_op_array)->opcodes[open_brackets_token->u.op.opline_num];
 
 		/* Change "write context" into "read context" */
-		fetch->extended_value = 0;  /* reset ZEND_FE_RESET_VARIABLE */
 		while (fetch != end) {
 			--fetch;
 			if (fetch->opcode == ZEND_FETCH_DIM_W && fetch->op2_type == IS_UNUSED) {

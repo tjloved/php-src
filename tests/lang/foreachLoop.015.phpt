@@ -71,7 +71,6 @@ withRefValue(4, $transform);
 
 ?>
 --EXPECTF--
-
 Popping elements off end of a referenced array, using &$value
 ---( Array with 1 element(s): )---
 --> State of referenced array before loop:
@@ -95,9 +94,10 @@ array(2) {
 }
 --> Do loop:
      iteration 0:  $k=0; $v=v.0
-     iteration 1:  $k=0; $v=v.0
 --> State of array after loop:
-array(0) {
+array(1) {
+  [0]=>
+  &string(3) "v.0"
 }
 
 ---( Array with 3 element(s): )---
@@ -134,10 +134,12 @@ array(4) {
 --> Do loop:
      iteration 0:  $k=0; $v=v.0
      iteration 1:  $k=1; $v=v.1
-     iteration 2:  $k=0; $v=v.0
-     iteration 3:  $k=0; $v=v.0
 --> State of array after loop:
-array(0) {
+array(2) {
+  [0]=>
+  string(3) "v.0"
+  [1]=>
+  &string(3) "v.1"
 }
 
 
@@ -289,12 +291,28 @@ array(1) {
 }
 --> Do loop:
      iteration 0:  $k=0; $v=v.0
+     iteration 1:  $k=1; $v=new.0
+     iteration 2:  $k=2; $v=new.1
+     iteration 3:  $k=3; $v=new.2
+     iteration 4:  $k=4; $v=new.3
+     iteration 5:  $k=5; $v=new.4
+  ** Stuck in a loop! **
 --> State of array after loop:
-array(2) {
+array(7) {
   [0]=>
-  &string(3) "v.0"
+  string(3) "v.0"
   [1]=>
   string(5) "new.0"
+  [2]=>
+  string(5) "new.1"
+  [3]=>
+  string(5) "new.2"
+  [4]=>
+  string(5) "new.3"
+  [5]=>
+  &string(5) "new.4"
+  [6]=>
+  string(5) "new.5"
 }
 
 ---( Array with 2 element(s): )---
@@ -428,12 +446,28 @@ array(1) {
 }
 --> Do loop:
      iteration 0:  $k=0; $v=v.0
+     iteration 1:  $k=0; $v=new.0
+     iteration 2:  $k=0; $v=new.1
+     iteration 3:  $k=0; $v=new.2
+     iteration 4:  $k=0; $v=new.3
+     iteration 5:  $k=0; $v=new.4
+  ** Stuck in a loop! **
 --> State of array after loop:
-array(2) {
+array(7) {
   [0]=>
-  string(5) "new.0"
+  string(5) "new.5"
   [1]=>
-  &string(3) "v.0"
+  &string(5) "new.4"
+  [2]=>
+  string(5) "new.3"
+  [3]=>
+  string(5) "new.2"
+  [4]=>
+  string(5) "new.1"
+  [5]=>
+  string(5) "new.0"
+  [6]=>
+  string(3) "v.0"
 }
 
 ---( Array with 2 element(s): )---

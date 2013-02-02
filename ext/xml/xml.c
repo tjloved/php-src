@@ -960,11 +960,11 @@ void _xml_characterDataHandler(void *userData, const XML_Char *s, int len)
 				} else {
 					zval *tag;
 					zval **curtag, **mytype, **myval;
-					HashPosition hpos=NULL;
+					HashPosition hpos;
 
 					zend_hash_internal_pointer_end_ex(Z_ARRVAL_P(parser->data), &hpos);
 
-					if (hpos && (zend_hash_get_current_data_ex(Z_ARRVAL_P(parser->data), (void **) &curtag, &hpos) == SUCCESS)) {
+					if (zend_hash_get_current_data_ex(Z_ARRVAL_P(parser->data), (void **) &curtag, &hpos) == SUCCESS) {
 						if (zend_hash_find(Z_ARRVAL_PP(curtag),"type",sizeof("type"),(void **) &mytype) == SUCCESS) {
 							if (!strcmp(Z_STRVAL_PP(mytype), "cdata")) {
 								if (zend_hash_find(Z_ARRVAL_PP(curtag),"value",sizeof("value"),(void **) &myval) == SUCCESS) {

@@ -39,9 +39,45 @@
 	if (!(ht)->pListHead) {									\
 		(ht)->pListHead = (element);						\
 	}														\
-	if ((ht)->pInternalPointer == NULL) {					\
-		(ht)->pInternalPointer = (element);					\
+	zend_tracked_positions_cmp_set((ht), NULL, (element));
+
+#define BEFORE_FIRST_POS ((Bucket *) 1)
+#define INVALIDATED_POS  ((Bucket *) 2)
+
+static zend_always_inline void zend_tracked_positions_cmp_set(HashTable *ht, Bucket *cmp, Bucket *set)
+{
+	if (ht->pInternalPointer == cmp) {
+		ht->pInternalPointer = set;
 	}
+
+	{
+		HashPosition *cur = ht->hashPos;
+		while (cur != NULL) {
+			if (cur->pos == cmp) {
+				cur->pos = set;
+			}
+			cur = cur->next;
+		}
+	}
+}
+
+static zend_always_inline void zend_tracked_positions_set(HashTable *ht, Bucket *p)
+{
+	ht->pInternalPointer = p;
+
+	{
+		HashPosition *cur = ht->hashPos;
+		while (cur != NULL) {
+			cur->pos = p;
+			cur = cur->next;
+		}
+	}
+}
+
+static zend_always_inline void zend_tracked_positions_update(HashTable *ht, Bucket *p)
+{
+	zend_tracked_positions_cmp_set(ht, p, p->pListLast ? p->pListLast : BEFORE_FIRST_POS);
+}
 
 #if ZEND_DEBUG
 #define HT_OK				0
@@ -169,6 +205,7 @@ ZEND_API int _zend_hash_init(HashTable *ht, uint nSize, hash_func_t pHashFunctio
 	ht->nNumOfElements = 0;
 	ht->nNextFreeElement = 0;
 	ht->pInternalPointer = NULL;
+	ht->hashPos = NULL;
 	ht->persistent = persistent;
 	ht->nApplyCount = 0;
 	ht->bApplyProtection = 1;
@@ -524,9 +561,7 @@ ZEND_API int zend_hash_del_key_or_index(HashTable *ht, const char *arKey, uint n
 			} else {
 				ht->pListTail = p->pListLast;
 			}
-			if (ht->pInternalPointer == p) {
-				ht->pInternalPointer = p->pListNext;
-			}
+			zend_tracked_positions_update(ht, p);
 			if (ht->pDestructor) {
 				ht->pDestructor(p->pData);
 			}
@@ -568,6 +603,14 @@ ZEND_API void zend_hash_destroy(HashTable *ht)
 		pefree(ht->arBuckets, ht->persistent);
 	}
 
+	{
+		HashPosition *cur = ht->hashPos;
+		while (cur != NULL) {
+			cur->pos = INVALIDATED_POS;
+			cur = cur->next;
+		}
+	}
+
 	SET_INCONSISTENT(HT_DESTROYED);
 }
 
@@ -587,7 +630,8 @@ ZEND_API void zend_hash_clean(HashTable *ht)
 	ht->pListTail = NULL;
 	ht->nNumOfElements = 0;
 	ht->nNextFreeElement = 0;
-	ht->pInternalPointer = NULL;
+
+	zend_tracked_positions_set(ht, NULL);
 
 	while (p != NULL) {
 		q = p;
@@ -640,9 +684,7 @@ static Bucket *zend_hash_apply_deleter(HashTable *ht, Bucket *p)
 	} else {
 		ht->pListTail = p->pListLast;
 	}
-	if (ht->pInternalPointer == p) {
-		ht->pInternalPointer = p->pListNext;
-	}
+	zend_tracked_positions_update(ht, p);
 	ht->nNumOfElements--;
 	HANDLE_UNBLOCK_INTERRUPTIONS();
 
@@ -836,9 +878,8 @@ ZEND_API void zend_hash_copy(HashTable *target, HashTable *source, copy_ctor_fun
 		}
 		p = p->pListNext;
 	}
-	if (!target->pInternalPointer) {
-		target->pInternalPointer = target->pListHead;
-	}
+
+	zend_tracked_positions_cmp_set(target, NULL, target->pListHead);
 }
 
 
@@ -864,7 +905,8 @@ ZEND_API void _zend_hash_merge(HashTable *target, HashTable *source, copy_ctor_f
 		}
 		p = p->pListNext;
 	}
-	target->pInternalPointer = target->pListHead;
+
+	zend_tracked_positions_set(target, target->pListHead);
 }
 
 
@@ -896,7 +938,8 @@ ZEND_API void zend_hash_merge_ex(HashTable *target, HashTable *source, copy_ctor
 		}
 		p = p->pListNext;
 	}
-	target->pInternalPointer = target->pListHead;
+
+	zend_tracked_positions_set(target, target->pListHead);
 }
 
 
@@ -1057,100 +1100,115 @@ ZEND_API int zend_hash_num_elements(const HashTable *ht)
 	return ht->nNumOfElements;
 }
 
-
-ZEND_API int zend_hash_get_pointer(const HashTable *ht, HashPointer *ptr)
+ZEND_API void zend_track_hash_position(HashTable *ht, HashPosition *pos)
 {
-	ptr->pos = ht->pInternalPointer;
-	if (ht->pInternalPointer) {
-		ptr->h = ht->pInternalPointer->h;
-		return 1;
-	} else {
-		ptr->h = 0;
-		return 0;
+	pos->next = ht->hashPos;
+	ht->hashPos = pos;
+}
+
+ZEND_API void zend_untrack_hash_position(HashTable *ht, HashPosition *pos)
+{
+	HashPosition **cur = &ht->hashPos;
+
+	if (pos->pos == INVALIDATED_POS) {
+		return;
+	}
+
+	while (*cur != NULL) {
+		if (*cur == pos) {
+			*cur = (*cur)->next;
+			return;
+		}
+		cur = &(*cur)->next;
 	}
 }
 
-ZEND_API int zend_hash_set_pointer(HashTable *ht, const HashPointer *ptr)
+static zend_always_inline Bucket **zend_get_raw_hash_position(HashTable *ht, HashPosition *pos)
 {
-	if (ptr->pos == NULL) {
-		ht->pInternalPointer = NULL;
-	} else if (ht->pInternalPointer != ptr->pos) {
-		Bucket *p;
+	IS_CONSISTENT(ht);
 
-		IS_CONSISTENT(ht);
-		p = ht->arBuckets[ptr->h & ht->nTableMask];
-		while (p != NULL) {
-			if (p == ptr->pos) {
-				ht->pInternalPointer = p;
-				return 1;
-			}
-			p = p->pNext;
-		}
-		return 0;
+	if (pos == NULL) {
+		return &ht->pInternalPointer;
+	} else {
+		return &pos->pos;
 	}
-	return 1;
+}
+
+static zend_always_inline Bucket *zend_get_hash_position(HashTable *ht, HashPosition *pos)
+{
+	Bucket **p = zend_get_raw_hash_position(ht, pos);
+
+	if (*p == INVALIDATED_POS) {
+		return NULL;
+	}
+
+	if (*p == BEFORE_FIRST_POS) {
+		*p = ht->pListHead;
+	}
+
+	return *p;
+}
+
+ZEND_API zend_bool zend_hash_position_is_invalidated(HashPosition *pos)
+{
+	return pos->pos == INVALIDATED_POS;
 }
 
 ZEND_API void zend_hash_internal_pointer_reset_ex(HashTable *ht, HashPosition *pos)
 {
-	IS_CONSISTENT(ht);
+	Bucket **p = zend_get_raw_hash_position(ht, pos);
 
-	if (pos)
-		*pos = ht->pListHead;
-	else
-		ht->pInternalPointer = ht->pListHead;
+	*p = ht->pListHead;
 }
 
 
-/* This function will be extremely optimized by remembering 
- * the end of the list
- */
 ZEND_API void zend_hash_internal_pointer_end_ex(HashTable *ht, HashPosition *pos)
 {
-	IS_CONSISTENT(ht);
+	Bucket **p = zend_get_raw_hash_position(ht, pos);
 
-	if (pos)
-		*pos = ht->pListTail;
-	else
-		ht->pInternalPointer = ht->pListTail;
+	*p = ht->pListTail;
+}
+
+ZEND_API void zend_hash_internal_pointer_reset_before_first_ex(HashTable *ht, HashPosition *pos)
+{
+	Bucket **p = zend_get_raw_hash_position(ht, pos);
+
+	*p = BEFORE_FIRST_POS;
 }
 
 
 ZEND_API int zend_hash_move_forward_ex(HashTable *ht, HashPosition *pos)
 {
-	HashPosition *current = pos ? pos : &ht->pInternalPointer;
+	Bucket **p = zend_get_raw_hash_position(ht, pos);
 
-	IS_CONSISTENT(ht);
-
-	if (*current) {
-		*current = (*current)->pListNext;
+	if (*p == BEFORE_FIRST_POS) {
+		*p = ht->pListHead;
 		return SUCCESS;
-	} else
+	} else if (*p && *p != INVALIDATED_POS) {
+		*p = (*p)->pListNext;
+		return SUCCESS;
+	} else {
 		return FAILURE;
+	}
 }
 
 ZEND_API int zend_hash_move_backwards_ex(HashTable *ht, HashPosition *pos)
 {
-	HashPosition *current = pos ? pos : &ht->pInternalPointer;
+	Bucket **p = zend_get_raw_hash_position(ht, pos);
 
-	IS_CONSISTENT(ht);
-
-	if (*current) {
-		*current = (*current)->pListLast;
+	if (*p && *p != INVALIDATED_POS) {
+		*p = (*p)->pListLast;
 		return SUCCESS;
-	} else
+	} else {
 		return FAILURE;
+	}
 }
 
 
 /* This function should be made binary safe  */
-ZEND_API int zend_hash_get_current_key_ex(const HashTable *ht, char **str_index, uint *str_length, ulong *num_index, zend_bool duplicate, HashPosition *pos)
+ZEND_API int zend_hash_get_current_key_ex(HashTable *ht, char **str_index, uint *str_length, ulong *num_index, zend_bool duplicate, HashPosition *pos)
 {
-	Bucket *p;
-
-	p = pos ? (*pos) : ht->pInternalPointer;
-
-	IS_CONSISTENT(ht);
+	Bucket *p = zend_get_hash_position(ht, pos);
 
 	if (p) {
 		if (p->nKeyLength) {
@@ -1171,12 +1229,8 @@ ZEND_API int zend_hash_get_current_key_ex(const HashTable *ht, char **str_index,
 	return HASH_KEY_NON_EXISTANT;
 }
 
-ZEND_API void zend_hash_get_current_key_zval_ex(const HashTable *ht, zval *key, HashPosition *pos) {
-	Bucket *p;
-
-	IS_CONSISTENT(ht);
-
-	p = pos ? (*pos) : ht->pInternalPointer;
+ZEND_API void zend_hash_get_current_key_zval_ex(HashTable *ht, zval *key, HashPosition *pos) {
+	Bucket *p = zend_get_hash_position(ht, pos);
 
 	if (!p) {
 		Z_TYPE_P(key) = IS_NULL;
@@ -1192,11 +1246,7 @@ ZEND_API void zend_hash_get_current_key_zval_ex(const HashTable *ht, zval *key, 
 
 ZEND_API int zend_hash_get_current_key_type_ex(HashTable *ht, HashPosition *pos)
 {
-	Bucket *p;
-
-	p = pos ? (*pos) : ht->pInternalPointer;
-
-	IS_CONSISTENT(ht);
+	Bucket *p = zend_get_hash_position(ht, pos);
 
 	if (p) {
 		if (p->nKeyLength) {
@@ -1211,11 +1261,7 @@ ZEND_API int zend_hash_get_current_key_type_ex(HashTable *ht, HashPosition *pos)
 
 ZEND_API int zend_hash_get_current_data_ex(HashTable *ht, void **pData, HashPosition *pos)
 {
-	Bucket *p;
-
-	p = pos ? (*pos) : ht->pInternalPointer;
-
-	IS_CONSISTENT(ht);
+	Bucket *p = zend_get_hash_position(ht, pos);
 
 	if (p) {
 		*pData = p->pData;
@@ -1236,9 +1282,7 @@ ZEND_API int zend_hash_update_current_key_ex(HashTable *ht, int key_type, const 
 	TSRMLS_FETCH();
 #endif
 
-	p = pos ? (*pos) : ht->pInternalPointer;
-
-	IS_CONSISTENT(ht);
+	p = zend_get_hash_position(ht, pos);
 
 	if (p) {
 		if (key_type == HASH_KEY_IS_LONG) {
@@ -1317,9 +1361,7 @@ ZEND_API int zend_hash_update_current_key_ex(HashTable *ht, int key_type, const 
 					} else {
 						ht->pListTail = p->pListLast;
 					}
-					if (ht->pInternalPointer == p) {
-						ht->pInternalPointer = p->pListNext;
-					}
+					zend_tracked_positions_update(ht, p);
 					if (ht->pDestructor) {
 						ht->pDestructor(p->pData);
 					}
@@ -1352,9 +1394,7 @@ ZEND_API int zend_hash_update_current_key_ex(HashTable *ht, int key_type, const 
 			} else {
 				ht->pListTail = q->pListLast;
 			}
-			if (ht->pInternalPointer == q) {
-				ht->pInternalPointer = q->pListNext;
-			}
+			zend_tracked_positions_update(ht, q);
 			if (ht->pDestructor) {
 				ht->pDestructor(q->pData);
 			}
@@ -1403,11 +1443,9 @@ ZEND_API int zend_hash_update_current_key_ex(HashTable *ht, int key_type, const 
 			} else {
 				ht->pListHead = q;
 			}
-			if (ht->pInternalPointer == p) {
-				ht->pInternalPointer = q;
-			}
+			zend_tracked_positions_cmp_set(ht, p, q);
 			if (pos) {
-				*pos = q;
+				pos->pos = q;
 			}
 			pefree(p, ht->persistent);
 			p = q;
@@ -1465,7 +1503,8 @@ ZEND_API int zend_hash_sort(HashTable *ht, sort_func_t sort_func,
 	HANDLE_BLOCK_INTERRUPTIONS();
 	ht->pListHead = arTmp[0];
 	ht->pListTail = NULL;
-	ht->pInternalPointer = ht->pListHead;
+
+	zend_tracked_positions_set(ht, ht->pListHead);
 
 	arTmp[0]->pListLast = NULL;
 	if (i > 1) {

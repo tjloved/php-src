@@ -1409,6 +1409,54 @@ static void zend_fetch_property_address(temp_variable *result, zval **container_
 	}
 }
 
+static inline void i_handle_free_op(zend_op *opline, const zend_execute_data *execute_data TSRMLS_DC) /* {{{ */
+{
+	switch (opline->opcode) {
+		case ZEND_SWITCH_FREE:
+			if (!(opline->extended_value & EXT_TYPE_FREE_ON_RETURN)) {
+				zval_ptr_dtor(&EX_T(opline->op1.var).var.ptr);
+			}
+			break;
+		case ZEND_FREE:
+			if (!(opline->extended_value & EXT_TYPE_FREE_ON_RETURN)) {
+				zendi_zval_dtor(EX_T(opline->op1.var).tmp_var);
+			}
+			break;
+		case ZEND_FOREACH_FREE:
+			if (!(opline->extended_value & EXT_TYPE_FREE_ON_RETURN)) {
+				zval *array = EX_T(opline->op1.var).fe.ptr;
+				zend_object_iterator *iter_dummy;
+
+				switch (zend_iterator_unwrap(array, &iter_dummy TSRMLS_CC)) {
+					case ZEND_ITER_PLAIN_OBJECT:
+					case ZEND_ITER_PLAIN_ARRAY:
+						zend_untrack_hash_position(HASH_OF(array), &EX_T(opline->op1.var).fe.fe_pos);
+					default:
+						break;
+				}
+
+				zval_ptr_dtor(&array);
+			}
+			break;
+	}
+}
+/* }}} */
+
+void zend_handle_free_op(zend_op *opline, const zend_execute_data *execute_data TSRMLS_DC) /* {{{ */
+{
+	i_handle_free_op(opline, execute_data TSRMLS_CC);
+}
+/* }}} */
+
+static inline void zend_foreach_check_ht(HashTable *new_ht, HashTable **orig_ht_ptr, HashPosition *pos) {
+	if (new_ht != *orig_ht_ptr || zend_hash_position_is_invalidated(pos)) {
+		zend_untrack_hash_position(*orig_ht_ptr, pos);
+		zend_track_hash_position(new_ht, pos);
+		zend_hash_internal_pointer_reset_before_first_ex(new_ht, pos);
+		*orig_ht_ptr = new_ht;
+	}
+}
+
 static inline zend_brk_cont_element* zend_brk_cont(int nest_levels, int array_offset, const zend_op_array *op_array, const zend_execute_data *execute_data TSRMLS_DC)
 {
 	int original_nest_levels = nest_levels;
@@ -1420,20 +1468,7 @@ static inline zend_brk_cont_element* zend_brk_cont(int nest_levels, int array_of
 		}
 		jmp_to = &op_array->brk_cont_array[array_offset];
 		if (nest_levels>1) {
-			zend_op *brk_opline = &op_array->opcodes[jmp_to->brk];
-
-			switch (brk_opline->opcode) {
-				case ZEND_SWITCH_FREE:
-					if (!(brk_opline->extended_value & EXT_TYPE_FREE_ON_RETURN)) {
-						zval_ptr_dtor(&EX_T(brk_opline->op1.var).var.ptr);
-					}
-					break;
-				case ZEND_FREE:
-					if (!(brk_opline->extended_value & EXT_TYPE_FREE_ON_RETURN)) {
-						zendi_zval_dtor(EX_T(brk_opline->op1.var).tmp_var);
-					}
-					break;
-			}
+			i_handle_free_op(&op_array->opcodes[jmp_to->brk], execute_data TSRMLS_CC);
 		}
 		array_offset = jmp_to->parent;
 	} while (--nest_levels > 0);

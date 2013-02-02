@@ -40,9 +40,9 @@ typedef union _temp_variable {
 		zend_uint offset;
 	} str_offset;
 	struct {
-		zval **ptr_ptr; /* shared with var.ptr_ptr */
-		zval *ptr;      /* shared with var.ptr */
-		HashPointer fe_pos;
+		zval *ptr;
+		HashTable *orig_ht;
+		HashPosition fe_pos;
 	} fe;
 	zend_class_entry *class_entry;
 } temp_variable;
@@ -393,6 +393,7 @@ ZEND_API zval **zend_get_zval_ptr_ptr(int op_type, const znode_op *node, const z
 
 ZEND_API int zend_do_fcall(ZEND_OPCODE_HANDLER_ARGS);
 
+void zend_handle_free_op(zend_op *opline, const zend_execute_data *execute_data TSRMLS_DC);
 void zend_clean_and_cache_symbol_table(HashTable *symbol_table TSRMLS_DC);
 void zend_free_compiled_variables(zend_execute_data *execute_data);
 

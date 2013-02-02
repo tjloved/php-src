@@ -67,7 +67,7 @@ typedef struct _spl_array_object {
 	zval              *array;
 	zval              *retval;
 	HashPosition      pos;
-	ulong             pos_h;
+	HashTable         *orig_hash;
 	int               ar_flags;
 	int               is_self;
 	zend_function     *fptr_offset_get;
@@ -101,53 +101,14 @@ static inline HashTable *spl_array_get_hash_table(spl_array_object* intern, int 
 
 static void spl_array_rewind(spl_array_object *intern TSRMLS_DC);
 
-static void spl_array_update_pos(spl_array_object* intern) /* {{{ */
-{
-	Bucket *pos = intern->pos;
-	if (pos != NULL) {
-		intern->pos_h = pos->h;
-	}
-} /* }}} */
-
-static void spl_array_set_pos(spl_array_object* intern, HashPosition pos) /* {{{ */
-{
-	intern->pos = pos;
-	spl_array_update_pos(intern);
-} /* }}} */
-
-SPL_API int spl_hash_verify_pos_ex(spl_array_object * intern, HashTable * ht TSRMLS_DC) /* {{{ */
-{
-	Bucket *p;
-
-/*	IS_CONSISTENT(ht);*/
-
-/*	HASH_PROTECT_RECURSION(ht);*/
-	p = ht->arBuckets[intern->pos_h & ht->nTableMask];
-	while (p != NULL) {
-		if (p == intern->pos) {
-			return SUCCESS;
-		}
-		p = p->pNext;
-	}
-/*	HASH_UNPROTECT_RECURSION(ht); */
-	spl_array_rewind(intern TSRMLS_CC);
-	return FAILURE;
-
-} /* }}} */
-
-SPL_API int spl_hash_verify_pos(spl_array_object * intern TSRMLS_DC) /* {{{ */
-{
-	HashTable *ht = spl_array_get_hash_table(intern, 0 TSRMLS_CC);
-	return spl_hash_verify_pos_ex(intern, ht TSRMLS_CC);
-}
-/* }}} */
-
 /* {{{ spl_array_object_free_storage */
 static void spl_array_object_free_storage(void *object TSRMLS_DC)
 {
 	spl_array_object *intern = (spl_array_object *)object;
 
 	zend_object_std_dtor(&intern->std TSRMLS_CC);
+
+	zend_untrack_hash_position(intern->orig_hash, &intern->pos);
 
 	zval_ptr_dtor(&intern->array);
 	zval_ptr_dtor(&intern->retval);
@@ -267,7 +228,10 @@ static zend_object_value spl_array_object_new_ex(zend_class_entry *class_type, s
 		}
 	}
 
+	intern->orig_hash = spl_array_get_hash_table(intern, 0 TSRMLS_CC);
+	zend_track_hash_position(intern->orig_hash, &intern->pos);
 	spl_array_rewind(intern TSRMLS_CC);
+
 	return retval;
 }
 /* }}} */
@@ -581,7 +545,6 @@ static void spl_array_unset_dimension_ex(int check_inherited, zval *object, zval
 		zend_error(E_WARNING, "Illegal offset type");
 		return;
 	}
-	spl_hash_verify_pos(intern TSRMLS_CC); /* call rewind on FAILURE */
 } /* }}} */
 
 static void spl_array_unset_dimension(zval *object, zval *offset TSRMLS_DC) /* {{{ */
@@ -664,11 +627,20 @@ static inline int spl_array_object_verify_pos_ex(spl_array_object *object, HashT
 {
 	if (!ht) {
 		php_error_docref(NULL TSRMLS_CC, E_NOTICE, "%sArray was modified outside object and is no longer an array", msg_prefix);
+
+		zend_untrack_hash_position(object->orig_hash, &object->pos);
+		object->orig_hash = NULL;
+
 		return FAILURE;
 	}
 
-	if (object->pos && (object->ar_flags & SPL_ARRAY_IS_REF) && spl_hash_verify_pos_ex(object, ht TSRMLS_CC) == FAILURE) {
+	if (ht != object->orig_hash) {
 		php_error_docref(NULL TSRMLS_CC, E_NOTICE, "%sArray was modified outside object and internal position is no longer valid", msg_prefix);
+
+		zend_untrack_hash_position(object->orig_hash, &object->pos);
+		object->orig_hash = ht;
+		zend_track_hash_position(object->orig_hash, &object->pos);
+
 		return FAILURE;
 	}
 
@@ -734,9 +706,6 @@ void spl_array_iterator_append(zval *object, zval *append_value TSRMLS_DC) /* {{
 	}
 
 	spl_array_write_dimension(object, NULL, append_value TSRMLS_CC);
-	if (!intern->pos) {
-		spl_array_set_pos(intern, aht->pListTail);
-	}
 } /* }}} */
 
 /* {{{ proto void ArrayObject::append(mixed $newval)
@@ -932,7 +901,6 @@ static int spl_array_skip_protected(spl_array_object *intern, HashTable *aht TSR
 				return FAILURE;
 			}
 			zend_hash_move_forward_ex(aht, &intern->pos);
-			spl_array_update_pos(intern);
 		} while (1);
 	}
 	return FAILURE;
@@ -941,7 +909,6 @@ static int spl_array_skip_protected(spl_array_object *intern, HashTable *aht TSR
 static int spl_array_next_no_verify(spl_array_object *intern, HashTable *aht TSRMLS_DC) /* {{{ */
 {
 	zend_hash_move_forward_ex(aht, &intern->pos);
-	spl_array_update_pos(intern);
 	if (Z_TYPE_P(intern->array) == IS_OBJECT) {
 		return spl_array_skip_protected(intern, aht TSRMLS_CC);
 	} else {
@@ -951,8 +918,7 @@ static int spl_array_next_no_verify(spl_array_object *intern, HashTable *aht TSR
 
 static int spl_array_next_ex(spl_array_object *intern, HashTable *aht TSRMLS_DC) /* {{{ */
 {
-	if ((intern->ar_flags & SPL_ARRAY_IS_REF) && spl_hash_verify_pos_ex(intern, aht TSRMLS_CC) == FAILURE) {
-		php_error_docref(NULL TSRMLS_CC, E_NOTICE, "Array was modified outside object and internal position is no longer valid");
+	if (spl_array_object_verify_pos(intern, aht TSRMLS_CC) == FAILURE) {
 		return FAILURE;
 	}
 
@@ -1046,16 +1012,8 @@ static void spl_array_it_move_forward(zend_object_iterator *iter TSRMLS_DC) /* {
 		zend_user_it_move_forward(iter TSRMLS_CC);
 	} else {
 		zend_user_it_invalidate_current(iter TSRMLS_CC);
-		if (!aht) {
-			php_error_docref(NULL TSRMLS_CC, E_NOTICE, "ArrayIterator::current(): Array was modified outside object and is no longer an array");
-			return;
-		}
 
-		if ((object->ar_flags & SPL_ARRAY_IS_REF) && spl_hash_verify_pos_ex(object, aht TSRMLS_CC) == FAILURE) {
-			php_error_docref(NULL TSRMLS_CC, E_NOTICE, "ArrayIterator::next(): Array was modified outside object and internal position is no longer valid");
-		} else {
-			spl_array_next_no_verify(object, aht TSRMLS_CC);
-		}
+		spl_array_next_ex(object, aht TSRMLS_CC);
 	}
 }
 /* }}} */
@@ -1064,7 +1022,6 @@ static void spl_array_rewind_ex(spl_array_object *intern, HashTable *aht TSRMLS_
 {
 
 	zend_hash_internal_pointer_reset_ex(aht, &intern->pos);
-	spl_array_update_pos(intern);
 	spl_array_skip_protected(intern, aht TSRMLS_CC);
 
 } /* }}} */
@@ -1104,6 +1061,7 @@ static void spl_array_set_array(zval *object, spl_array_object *intern, zval **a
 	}
 
 	if (Z_TYPE_PP(array) == IS_OBJECT && (Z_OBJ_HT_PP(array) == &spl_handler_ArrayObject || Z_OBJ_HT_PP(array) == &spl_handler_ArrayIterator)) {
+		zend_untrack_hash_position(intern->orig_hash, &intern->pos);
 		zval_ptr_dtor(&intern->array);
 		if (just_array)	{
 			spl_array_object *other = (spl_array_object*)zend_object_store_get_object(*array TSRMLS_CC);
@@ -1116,6 +1074,7 @@ static void spl_array_set_array(zval *object, spl_array_object *intern, zval **a
 			zend_throw_exception(spl_ce_InvalidArgumentException, "Passed variable is not an array or object, using empty array instead", 0 TSRMLS_CC);
 			return;
 		}
+		zend_untrack_hash_position(intern->orig_hash, &intern->pos);
 		zval_ptr_dtor(&intern->array);
 		intern->array = *array;
 	}
@@ -1135,6 +1094,8 @@ static void spl_array_set_array(zval *object, spl_array_object *intern, zval **a
 		}
 	}
 
+	intern->orig_hash = spl_array_get_hash_table(intern, 0 TSRMLS_CC);
+	zend_track_hash_position(intern->orig_hash, &intern->pos);
 	spl_array_rewind(intern TSRMLS_CC);
 }
 /* }}} */
@@ -1367,7 +1328,6 @@ SPL_METHOD(Array, seek)
 int static spl_array_object_count_elements_helper(spl_array_object *intern, long *count TSRMLS_DC) /* {{{ */
 {
 	HashTable *aht = spl_array_get_hash_table(intern, 0 TSRMLS_CC);
-	HashPosition pos;
 
 	if (!aht) {
 		php_error_docref(NULL TSRMLS_CC, E_NOTICE, "Array was modified outside object and is no longer an array");
@@ -1378,13 +1338,13 @@ int static spl_array_object_count_elements_helper(spl_array_object *intern, long
 	if (Z_TYPE_P(intern->array) == IS_OBJECT) {
 		/* We need to store the 'pos' since we'll modify it in the functions
 		 * we're going to call and which do not support 'pos' as parameter. */
-		pos = intern->pos;
+		Bucket *pos = intern->pos.pos;
 		*count = 0;
 		spl_array_rewind(intern TSRMLS_CC);
-		while(intern->pos && spl_array_next(intern TSRMLS_CC) == SUCCESS) {
+		while (intern->pos.pos && spl_array_next(intern TSRMLS_CC) == SUCCESS) {
 			(*count)++;
 		}
-		spl_array_set_pos(intern, pos);
+		intern->pos.pos = pos;
 		return SUCCESS;
 	} else {
 		*count = zend_hash_num_elements(aht);
@@ -1771,11 +1731,14 @@ SPL_METHOD(Array, unserialize)
 		}
 		intern->ar_flags &= ~SPL_ARRAY_CLONE_MASK;
 		intern->ar_flags |= flags & SPL_ARRAY_CLONE_MASK;
+		zend_untrack_hash_position(intern->orig_hash, &intern->pos);
 		zval_ptr_dtor(&intern->array);
 		ALLOC_INIT_ZVAL(intern->array);
 		if (!php_var_unserialize(&intern->array, &p, s + buf_len, &var_hash TSRMLS_CC)) {
 			goto outexcept;
 		}
+		intern->orig_hash = spl_array_get_hash_table(intern, 0 TSRMLS_CC);
+		zend_track_hash_position(intern->orig_hash, &intern->pos);
 	}
 	if (*p != ';') {
 		goto outexcept;

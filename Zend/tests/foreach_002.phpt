@@ -18,3 +18,10 @@ array(1) {
     *RECURSION*
   }
 }
+array(1) {
+  ["a"]=>
+  &array(1) {
+    ["a"]=>
+    *RECURSION*
+  }
+}

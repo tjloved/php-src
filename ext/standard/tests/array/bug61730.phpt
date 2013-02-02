@@ -23,15 +23,14 @@ array_walk(
     }
 );
 
-
-
 print_r($myArray);
+
+?>
 --EXPECT--
 int(0)
-int(4)
-int(8)
+int(3)
+int(6)
+int(9)
 Array
 (
-    [3] => 1
-    [7] => 1
 )

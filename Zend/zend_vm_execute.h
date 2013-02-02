@@ -1022,29 +1022,16 @@ static int ZEND_FASTCALL  ZEND_HANDLE_EXCEPTION_SPEC_HANDLER(ZEND_OPCODE_HANDLER
 		EX(call) = NULL;
 	}
 
-	for (i=0; i<EX(op_array)->last_brk_cont; i++) {
-		if (EX(op_array)->brk_cont_array[i].start < 0) {
+	for (i = 0; i < EX(op_array)->last_brk_cont; i++) {
+		zend_brk_cont_element *cur = &EX(op_array)->brk_cont_array[i];
+		if (cur->start < 0) {
 			continue;
-		} else if (EX(op_array)->brk_cont_array[i].start > op_num) {
+		} else if (cur->start > op_num) {
 			/* further blocks will not be relevant... */
 			break;
-		} else if (op_num < EX(op_array)->brk_cont_array[i].brk) {
-			if (!catch_op_num ||
-			    catch_op_num >= EX(op_array)->brk_cont_array[i].brk) {
-				zend_op *brk_opline = &EX(op_array)->opcodes[EX(op_array)->brk_cont_array[i].brk];
-
-				switch (brk_opline->opcode) {
-					case ZEND_SWITCH_FREE:
-						if (!(brk_opline->extended_value & EXT_TYPE_FREE_ON_RETURN)) {
-							zval_ptr_dtor(&EX_T(brk_opline->op1.var).var.ptr);
-						}
-						break;
-					case ZEND_FREE:
-						if (!(brk_opline->extended_value & EXT_TYPE_FREE_ON_RETURN)) {
-							zendi_zval_dtor(EX_T(brk_opline->op1.var).tmp_var);
-						}
-						break;
-				}
+		} else if (op_num < cur->brk) {
+			if (!catch_op_num || catch_op_num >= cur->brk) {
+				i_handle_free_op(&EX(op_array)->opcodes[cur->brk], execute_data TSRMLS_CC);
 			}
 		}
 	}
@@ -1443,7 +1430,6 @@ static int ZEND_FASTCALL  ZEND_CONT_SPEC_CONST_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
 
 static int ZEND_FASTCALL  ZEND_GOTO_SPEC_CONST_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
 {
-	zend_op *brk_opline;
 	USE_OPLINE
 	zend_brk_cont_element *el;
 
@@ -1451,20 +1437,8 @@ static int ZEND_FASTCALL  ZEND_GOTO_SPEC_CONST_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
 	el = zend_brk_cont(Z_LVAL_P(opline->op2.zv), opline->extended_value,
  	                   EX(op_array), execute_data TSRMLS_CC);
 
-	brk_opline = EX(op_array)->opcodes + el->brk;
+	i_handle_free_op(EX(op_array)->opcodes + el->brk, execute_data TSRMLS_CC);
 
-	switch (brk_opline->opcode) {
-		case ZEND_SWITCH_FREE:
-			if (!(brk_opline->extended_value & EXT_TYPE_FREE_ON_RETURN)) {
-				zval_ptr_dtor(&EX_T(brk_opline->op1.var).var.ptr);
-			}
-			break;
-		case ZEND_FREE:
-			if (!(brk_opline->extended_value & EXT_TYPE_FREE_ON_RETURN)) {
-				zendi_zval_dtor(EX_T(brk_opline->op1.var).tmp_var);
-			}
-			break;
-	}
 	ZEND_VM_JMP(opline->op1.jmp_addr);
 }
 
@@ -2778,36 +2752,29 @@ static int ZEND_FASTCALL  ZEND_FE_RESET_SPEC_CONST_HANDLER(ZEND_OPCODE_HANDLER_A
 	SAVE_OPLINE();
 
 	if ((IS_CONST == IS_CV || IS_CONST == IS_VAR) &&
-	    (opline->extended_value & ZEND_FE_RESET_VARIABLE)) {
+	    (opline->extended_value & ZEND_FE_RESET_REFERENCE)) {
 		array_ptr_ptr = NULL;
 		if (array_ptr_ptr == NULL || array_ptr_ptr == &EG(uninitialized_zval_ptr)) {
 			MAKE_STD_ZVAL(array_ptr);
 			ZVAL_NULL(array_ptr);
 		} else if (Z_TYPE_PP(array_ptr_ptr) == IS_OBJECT) {
-			if(Z_OBJ_HT_PP(array_ptr_ptr)->get_class_entry == NULL) {
-				zend_error(E_WARNING, "foreach() cannot iterate over objects without PHP class");
-				ZEND_VM_JMP(EX(op_array)->opcodes+opline->op2.opline_num);
-			}
-
 			ce = Z_OBJCE_PP(array_ptr_ptr);
 			if (!ce || ce->get_iterator == NULL) {
-				SEPARATE_ZVAL_IF_NOT_REF(array_ptr_ptr);
+				SEPARATE_ZVAL_TO_MAKE_IS_REF(array_ptr_ptr);
 				Z_ADDREF_PP(array_ptr_ptr);
 			}
 			array_ptr = *array_ptr_ptr;
 		} else {
 			if (Z_TYPE_PP(array_ptr_ptr) == IS_ARRAY) {
-				SEPARATE_ZVAL_IF_NOT_REF(array_ptr_ptr);
-				if (opline->extended_value & ZEND_FE_FETCH_BYREF) {
-					Z_SET_ISREF_PP(array_ptr_ptr);
-				}
+				SEPARATE_ZVAL_TO_MAKE_IS_REF(array_ptr_ptr);
 			}
+
 			array_ptr = *array_ptr_ptr;
 			Z_ADDREF_P(array_ptr);
 		}
 	} else {
 		array_ptr = opline->op1.zv;
-		if (0) { /* IS_TMP_VAR */
+		if (IS_CONST == IS_TMP_VAR) {
 			zval *tmp;
 
 			ALLOC_ZVAL(tmp);
@@ -2824,10 +2791,7 @@ static int ZEND_FASTCALL  ZEND_FE_RESET_SPEC_CONST_HANDLER(ZEND_OPCODE_HANDLER_A
 			if (!ce || !ce->get_iterator) {
 				Z_ADDREF_P(array_ptr);
 			}
-		} else if (IS_CONST == IS_CONST ||
-		           ((IS_CONST == IS_CV || IS_CONST == IS_VAR) &&
-		            !Z_ISREF_P(array_ptr) &&
-		            Z_REFCOUNT_P(array_ptr) > 1)) {
+		} else if (IS_CONST == IS_CONST) {
 			zval *tmp;
 
 			ALLOC_ZVAL(tmp);
@@ -2874,26 +2838,11 @@ static int ZEND_FASTCALL  ZEND_FE_RESET_SPEC_CONST_HANDLER(ZEND_OPCODE_HANDLER_A
 		}
 		iter->index = -1; /* will be set to 0 before using next handler */
 	} else if ((fe_ht = HASH_OF(array_ptr)) != NULL) {
-		zend_hash_internal_pointer_reset(fe_ht);
-		if (ce) {
-			zend_object *zobj = zend_objects_get_address(array_ptr TSRMLS_CC);
-			while (zend_hash_has_more_elements(fe_ht) == SUCCESS) {
-				char *str_key;
-				uint str_key_len;
-				ulong int_key;
-				zend_uchar key_type;
-
-				key_type = zend_hash_get_current_key_ex(fe_ht, &str_key, &str_key_len, &int_key, 0, NULL);
-				if (key_type != HASH_KEY_NON_EXISTANT &&
-					(key_type == HASH_KEY_IS_LONG ||
-				     zend_check_property_access(zobj, str_key, str_key_len-1 TSRMLS_CC) == SUCCESS)) {
-					break;
-				}
-				zend_hash_move_forward(fe_ht);
-			}
-		}
-		is_empty = zend_hash_has_more_elements(fe_ht) != SUCCESS;
-		zend_hash_get_pointer(fe_ht, &EX_T(opline->result.var).fe.fe_pos);
+		HashPosition *pos = &EX_T(opline->result.var).fe.fe_pos;
+		EX_T(opline->result.var).fe.orig_ht = fe_ht;
+		zend_track_hash_position(fe_ht, pos);
+		zend_hash_internal_pointer_reset_before_first_ex(fe_ht, pos);
+		is_empty = zend_hash_num_elements(fe_ht) == 0;
 	} else {
 		zend_error(E_WARNING, "Invalid argument supplied for foreach()");
 		is_empty = 1;
@@ -8086,36 +8035,29 @@ static int ZEND_FASTCALL  ZEND_FE_RESET_SPEC_TMP_HANDLER(ZEND_OPCODE_HANDLER_ARG
 	SAVE_OPLINE();
 
 	if ((IS_TMP_VAR == IS_CV || IS_TMP_VAR == IS_VAR) &&
-	    (opline->extended_value & ZEND_FE_RESET_VARIABLE)) {
+	    (opline->extended_value & ZEND_FE_RESET_REFERENCE)) {
 		array_ptr_ptr = NULL;
 		if (array_ptr_ptr == NULL || array_ptr_ptr == &EG(uninitialized_zval_ptr)) {
 			MAKE_STD_ZVAL(array_ptr);
 			ZVAL_NULL(array_ptr);
 		} else if (Z_TYPE_PP(array_ptr_ptr) == IS_OBJECT) {
-			if(Z_OBJ_HT_PP(array_ptr_ptr)->get_class_entry == NULL) {
-				zend_error(E_WARNING, "foreach() cannot iterate over objects without PHP class");
-				ZEND_VM_JMP(EX(op_array)->opcodes+opline->op2.opline_num);
-			}
-
 			ce = Z_OBJCE_PP(array_ptr_ptr);
 			if (!ce || ce->get_iterator == NULL) {
-				SEPARATE_ZVAL_IF_NOT_REF(array_ptr_ptr);
+				SEPARATE_ZVAL_TO_MAKE_IS_REF(array_ptr_ptr);
 				Z_ADDREF_PP(array_ptr_ptr);
 			}
 			array_ptr = *array_ptr_ptr;
 		} else {
 			if (Z_TYPE_PP(array_ptr_ptr) == IS_ARRAY) {
-				SEPARATE_ZVAL_IF_NOT_REF(array_ptr_ptr);
-				if (opline->extended_value & ZEND_FE_FETCH_BYREF) {
-					Z_SET_ISREF_PP(array_ptr_ptr);
-				}
+				SEPARATE_ZVAL_TO_MAKE_IS_REF(array_ptr_ptr);
 			}
+
 			array_ptr = *array_ptr_ptr;
 			Z_ADDREF_P(array_ptr);
 		}
 	} else {
 		array_ptr = _get_zval_ptr_tmp(opline->op1.var, execute_data, &free_op1 TSRMLS_CC);
-		if (1) { /* IS_TMP_VAR */
+		if (IS_TMP_VAR == IS_TMP_VAR) {
 			zval *tmp;
 
 			ALLOC_ZVAL(tmp);
@@ -8132,10 +8074,7 @@ static int ZEND_FASTCALL  ZEND_FE_RESET_SPEC_TMP_HANDLER(ZEND_OPCODE_HANDLER_ARG
 			if (!ce || !ce->get_iterator) {
 				Z_ADDREF_P(array_ptr);
 			}
-		} else if (IS_TMP_VAR == IS_CONST ||
-		           ((IS_TMP_VAR == IS_CV || IS_TMP_VAR == IS_VAR) &&
-		            !Z_ISREF_P(array_ptr) &&
-		            Z_REFCOUNT_P(array_ptr) > 1)) {
+		} else if (IS_TMP_VAR == IS_CONST) {
 			zval *tmp;
 
 			ALLOC_ZVAL(tmp);
@@ -8182,26 +8121,11 @@ static int ZEND_FASTCALL  ZEND_FE_RESET_SPEC_TMP_HANDLER(ZEND_OPCODE_HANDLER_ARG
 		}
 		iter->index = -1; /* will be set to 0 before using next handler */
 	} else if ((fe_ht = HASH_OF(array_ptr)) != NULL) {
-		zend_hash_internal_pointer_reset(fe_ht);
-		if (ce) {
-			zend_object *zobj = zend_objects_get_address(array_ptr TSRMLS_CC);
-			while (zend_hash_has_more_elements(fe_ht) == SUCCESS) {
-				char *str_key;
-				uint str_key_len;
-				ulong int_key;
-				zend_uchar key_type;
-
-				key_type = zend_hash_get_current_key_ex(fe_ht, &str_key, &str_key_len, &int_key, 0, NULL);
-				if (key_type != HASH_KEY_NON_EXISTANT &&
-					(key_type == HASH_KEY_IS_LONG ||
-				     zend_check_property_access(zobj, str_key, str_key_len-1 TSRMLS_CC) == SUCCESS)) {
-					break;
-				}
-				zend_hash_move_forward(fe_ht);
-			}
-		}
-		is_empty = zend_hash_has_more_elements(fe_ht) != SUCCESS;
-		zend_hash_get_pointer(fe_ht, &EX_T(opline->result.var).fe.fe_pos);
+		HashPosition *pos = &EX_T(opline->result.var).fe.fe_pos;
+		EX_T(opline->result.var).fe.orig_ht = fe_ht;
+		zend_track_hash_position(fe_ht, pos);
+		zend_hash_internal_pointer_reset_before_first_ex(fe_ht, pos);
+		is_empty = zend_hash_num_elements(fe_ht) == 0;
 	} else {
 		zend_error(E_WARNING, "Invalid argument supplied for foreach()");
 		is_empty = 1;
@@ -13416,36 +13340,29 @@ static int ZEND_FASTCALL  ZEND_FE_RESET_SPEC_VAR_HANDLER(ZEND_OPCODE_HANDLER_ARG
 	SAVE_OPLINE();
 
 	if ((IS_VAR == IS_CV || IS_VAR == IS_VAR) &&
-	    (opline->extended_value & ZEND_FE_RESET_VARIABLE)) {
+	    (opline->extended_value & ZEND_FE_RESET_REFERENCE)) {
 		array_ptr_ptr = _get_zval_ptr_ptr_var(opline->op1.var, execute_data, &free_op1 TSRMLS_CC);
 		if (array_ptr_ptr == NULL || array_ptr_ptr == &EG(uninitialized_zval_ptr)) {
 			MAKE_STD_ZVAL(array_ptr);
 			ZVAL_NULL(array_ptr);
 		} else if (Z_TYPE_PP(array_ptr_ptr) == IS_OBJECT) {
-			if(Z_OBJ_HT_PP(array_ptr_ptr)->get_class_entry == NULL) {
-				zend_error(E_WARNING, "foreach() cannot iterate over objects without PHP class");
-				ZEND_VM_JMP(EX(op_array)->opcodes+opline->op2.opline_num);
-			}
-
 			ce = Z_OBJCE_PP(array_ptr_ptr);
 			if (!ce || ce->get_iterator == NULL) {
-				SEPARATE_ZVAL_IF_NOT_REF(array_ptr_ptr);
+				SEPARATE_ZVAL_TO_MAKE_IS_REF(array_ptr_ptr);
 				Z_ADDREF_PP(array_ptr_ptr);
 			}
 			array_ptr = *array_ptr_ptr;
 		} else {
 			if (Z_TYPE_PP(array_ptr_ptr) == IS_ARRAY) {
-				SEPARATE_ZVAL_IF_NOT_REF(array_ptr_ptr);
-				if (opline->extended_value & ZEND_FE_FETCH_BYREF) {
-					Z_SET_ISREF_PP(array_ptr_ptr);
-				}
+				SEPARATE_ZVAL_TO_MAKE_IS_REF(array_ptr_ptr);
 			}
+
 			array_ptr = *array_ptr_ptr;
 			Z_ADDREF_P(array_ptr);
 		}
 	} else {
 		array_ptr = _get_zval_ptr_var(opline->op1.var, execute_data, &free_op1 TSRMLS_CC);
-		if (0) { /* IS_TMP_VAR */
+		if (IS_VAR == IS_TMP_VAR) {
 			zval *tmp;
 
 			ALLOC_ZVAL(tmp);
@@ -13462,10 +13379,7 @@ static int ZEND_FASTCALL  ZEND_FE_RESET_SPEC_VAR_HANDLER(ZEND_OPCODE_HANDLER_ARG
 			if (!ce || !ce->get_iterator) {
 				Z_ADDREF_P(array_ptr);
 			}
-		} else if (IS_VAR == IS_CONST ||
-		           ((IS_VAR == IS_CV || IS_VAR == IS_VAR) &&
-		            !Z_ISREF_P(array_ptr) &&
-		            Z_REFCOUNT_P(array_ptr) > 1)) {
+		} else if (IS_VAR == IS_CONST) {
 			zval *tmp;
 
 			ALLOC_ZVAL(tmp);
@@ -13512,26 +13426,11 @@ static int ZEND_FASTCALL  ZEND_FE_RESET_SPEC_VAR_HANDLER(ZEND_OPCODE_HANDLER_ARG
 		}
 		iter->index = -1; /* will be set to 0 before using next handler */
 	} else if ((fe_ht = HASH_OF(array_ptr)) != NULL) {
-		zend_hash_internal_pointer_reset(fe_ht);
-		if (ce) {
-			zend_object *zobj = zend_objects_get_address(array_ptr TSRMLS_CC);
-			while (zend_hash_has_more_elements(fe_ht) == SUCCESS) {
-				char *str_key;
-				uint str_key_len;
-				ulong int_key;
-				zend_uchar key_type;
-
-				key_type = zend_hash_get_current_key_ex(fe_ht, &str_key, &str_key_len, &int_key, 0, NULL);
-				if (key_type != HASH_KEY_NON_EXISTANT &&
-					(key_type == HASH_KEY_IS_LONG ||
-				     zend_check_property_access(zobj, str_key, str_key_len-1 TSRMLS_CC) == SUCCESS)) {
-					break;
-				}
-				zend_hash_move_forward(fe_ht);
-			}
-		}
-		is_empty = zend_hash_has_more_elements(fe_ht) != SUCCESS;
-		zend_hash_get_pointer(fe_ht, &EX_T(opline->result.var).fe.fe_pos);
+		HashPosition *pos = &EX_T(opline->result.var).fe.fe_pos;
+		EX_T(opline->result.var).fe.orig_ht = fe_ht;
+		zend_track_hash_position(fe_ht, pos);
+		zend_hash_internal_pointer_reset_before_first_ex(fe_ht, pos);
+		is_empty = zend_hash_num_elements(fe_ht) == 0;
 	} else {
 		zend_error(E_WARNING, "Invalid argument supplied for foreach()");
 		is_empty = 1;
@@ -13553,6 +13452,7 @@ static int ZEND_FASTCALL  ZEND_FE_FETCH_SPEC_VAR_HANDLER(ZEND_OPCODE_HANDLER_ARG
 	zval *array = EX_T(opline->op1.var).fe.ptr;
 	zval **value;
 	HashTable *fe_ht;
+	HashPosition *pos;
 	zend_object_iterator *iter = NULL;
 
 	zval *key = NULL;
@@ -13565,6 +13465,9 @@ static int ZEND_FASTCALL  ZEND_FE_FETCH_SPEC_VAR_HANDLER(ZEND_OPCODE_HANDLER_ARG
 	switch (zend_iterator_unwrap(array, &iter TSRMLS_CC)) {
 		default:
 		case ZEND_ITER_INVALID:
+			zend_untrack_hash_position(
+				EX_T(opline->op1.var).fe.orig_ht, &EX_T(opline->op1.var).fe.fe_pos
+			);
 			zend_error(E_WARNING, "Invalid argument supplied for foreach()");
 			ZEND_VM_JMP(EX(op_array)->opcodes+opline->op2.opline_num);
 
@@ -13576,15 +13479,17 @@ static int ZEND_FASTCALL  ZEND_FE_FETCH_SPEC_VAR_HANDLER(ZEND_OPCODE_HANDLER_ARG
 			zend_ulong int_key;
 
 			fe_ht = Z_OBJPROP_P(array);
-			zend_hash_set_pointer(fe_ht, &EX_T(opline->op1.var).fe.fe_pos);
+			pos = &EX_T(opline->op1.var).fe.fe_pos;
+
+			zend_foreach_check_ht(fe_ht, &EX_T(opline->op1.var).fe.orig_ht, pos);
+
 			do {
-				if (zend_hash_get_current_data(fe_ht, (void **) &value)==FAILURE) {
+				zend_hash_move_forward_ex(fe_ht, pos);
+				if (zend_hash_get_current_data_ex(fe_ht, (void **) &value, pos)==FAILURE) {
 					/* reached end of iteration */
 					ZEND_VM_JMP(EX(op_array)->opcodes+opline->op2.opline_num);
 				}
-				key_type = zend_hash_get_current_key_ex(fe_ht, &str_key, &str_key_len, &int_key, 0, NULL);
-
-				zend_hash_move_forward(fe_ht);
+				key_type = zend_hash_get_current_key_ex(fe_ht, &str_key, &str_key_len, &int_key, 0, pos);
 			} while (key_type != HASH_KEY_IS_LONG &&
 			         zend_check_property_access(zobj, str_key, str_key_len - 1 TSRMLS_CC) != SUCCESS);
 
@@ -13601,27 +13506,27 @@ static int ZEND_FASTCALL  ZEND_FE_FETCH_SPEC_VAR_HANDLER(ZEND_OPCODE_HANDLER_ARG
 				}
 			}
 
-			zend_hash_get_pointer(fe_ht, &EX_T(opline->op1.var).fe.fe_pos);
 			break;
 		}
 
 		case ZEND_ITER_PLAIN_ARRAY:
 			fe_ht = Z_ARRVAL_P(array);
-			zend_hash_set_pointer(fe_ht, &EX_T(opline->op1.var).fe.fe_pos);
-			if (zend_hash_get_current_data(fe_ht, (void **) &value)==FAILURE) {
+			pos = &EX_T(opline->op1.var).fe.fe_pos;
+
+			zend_foreach_check_ht(fe_ht, &EX_T(opline->op1.var).fe.orig_ht, pos);
+
+			zend_hash_move_forward_ex(fe_ht, pos);
+			if (zend_hash_get_current_data_ex(fe_ht, (void **) &value, pos)==FAILURE) {
 				/* reached end of iteration */
 				ZEND_VM_JMP(EX(op_array)->opcodes+opline->op2.opline_num);
 			}
 			if (key) {
-				zend_hash_get_current_key_zval(fe_ht, key);
+				zend_hash_get_current_key_zval_ex(fe_ht, key, pos);
 			}
-			zend_hash_move_forward(fe_ht);
-			zend_hash_get_pointer(fe_ht, &EX_T(opline->op1.var).fe.fe_pos);
-			break;
+		break;
 
 		case ZEND_ITER_OBJECT:
-			/* !iter happens from exception */
-			if (iter && ++iter->index > 0) {
+			if (++iter->index > 0) {
 				/* This could cause an endless loop if index becomes zero again.
 				 * In case that ever happens we need an additional flag. */
 				iter->funcs->move_forward(iter TSRMLS_CC);
@@ -13629,16 +13534,17 @@ static int ZEND_FASTCALL  ZEND_FE_FETCH_SPEC_VAR_HANDLER(ZEND_OPCODE_HANDLER_ARG
 					zval_ptr_dtor(&array);
 					HANDLE_EXCEPTION();
 				}
-			}
-			/* If index is zero we come from FE_RESET and checked valid() already. */
-			if (!iter || (iter->index > 0 && iter->funcs->valid(iter TSRMLS_CC) == FAILURE)) {
-				/* reached end of iteration */
-				if (UNEXPECTED(EG(exception) != NULL)) {
-					zval_ptr_dtor(&array);
-					HANDLE_EXCEPTION();
+
+				if (iter->funcs->valid(iter TSRMLS_CC) == FAILURE) {
+					/* reached end of iteration */
+					if (UNEXPECTED(EG(exception) != NULL)) {
+						zval_ptr_dtor(&array);
+						HANDLE_EXCEPTION();
+					}
+					ZEND_VM_JMP(EX(op_array)->opcodes+opline->op2.opline_num);
 				}
-				ZEND_VM_JMP(EX(op_array)->opcodes+opline->op2.opline_num);
 			}
+
 			iter->funcs->get_current_data(iter, &value TSRMLS_CC);
 			if (UNEXPECTED(EG(exception) != NULL)) {
 				zval_ptr_dtor(&array);
@@ -13823,6 +13729,29 @@ static int ZEND_FASTCALL  ZEND_INSTANCEOF_SPEC_VAR_HANDLER(ZEND_OPCODE_HANDLER_A
 	}
 	ZVAL_BOOL(&EX_T(opline->result.var).tmp_var, result);
 	if (free_op1.var) {zval_ptr_dtor(&free_op1.var);};
+	CHECK_EXCEPTION();
+	ZEND_VM_NEXT_OPCODE();
+}
+
+static int ZEND_FASTCALL  ZEND_FOREACH_FREE_SPEC_VAR_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
+{
+	USE_OPLINE
+	zval *array;
+	zend_object_iterator *iter_dummy;
+
+	SAVE_OPLINE();
+
+	array = EX_T(opline->op1.var).fe.ptr;
+	switch (zend_iterator_unwrap(array, &iter_dummy TSRMLS_CC)) {
+		case ZEND_ITER_PLAIN_OBJECT:
+		case ZEND_ITER_PLAIN_ARRAY:
+			zend_untrack_hash_position(HASH_OF(array), &EX_T(opline->op1.var).fe.fe_pos);
+		default:
+			break;
+	}
+
+	zval_ptr_dtor(&array);
+
 	CHECK_EXCEPTION();
 	ZEND_VM_NEXT_OPCODE();
 }
@@ -31025,36 +30954,29 @@ static int ZEND_FASTCALL  ZEND_FE_RESET_SPEC_CV_HANDLER(ZEND_OPCODE_HANDLER_ARGS
 	SAVE_OPLINE();
 
 	if ((IS_CV == IS_CV || IS_CV == IS_VAR) &&
-	    (opline->extended_value & ZEND_FE_RESET_VARIABLE)) {
+	    (opline->extended_value & ZEND_FE_RESET_REFERENCE)) {
 		array_ptr_ptr = _get_zval_ptr_ptr_cv_BP_VAR_R(execute_data, opline->op1.var TSRMLS_CC);
 		if (array_ptr_ptr == NULL || array_ptr_ptr == &EG(uninitialized_zval_ptr)) {
 			MAKE_STD_ZVAL(array_ptr);
 			ZVAL_NULL(array_ptr);
 		} else if (Z_TYPE_PP(array_ptr_ptr) == IS_OBJECT) {
-			if(Z_OBJ_HT_PP(array_ptr_ptr)->get_class_entry == NULL) {
-				zend_error(E_WARNING, "foreach() cannot iterate over objects without PHP class");
-				ZEND_VM_JMP(EX(op_array)->opcodes+opline->op2.opline_num);
-			}
-
 			ce = Z_OBJCE_PP(array_ptr_ptr);
 			if (!ce || ce->get_iterator == NULL) {
-				SEPARATE_ZVAL_IF_NOT_REF(array_ptr_ptr);
+				SEPARATE_ZVAL_TO_MAKE_IS_REF(array_ptr_ptr);
 				Z_ADDREF_PP(array_ptr_ptr);
 			}
 			array_ptr = *array_ptr_ptr;
 		} else {
 			if (Z_TYPE_PP(array_ptr_ptr) == IS_ARRAY) {
-				SEPARATE_ZVAL_IF_NOT_REF(array_ptr_ptr);
-				if (opline->extended_value & ZEND_FE_FETCH_BYREF) {
-					Z_SET_ISREF_PP(array_ptr_ptr);
-				}
+				SEPARATE_ZVAL_TO_MAKE_IS_REF(array_ptr_ptr);
 			}
+
 			array_ptr = *array_ptr_ptr;
 			Z_ADDREF_P(array_ptr);
 		}
 	} else {
 		array_ptr = _get_zval_ptr_cv_BP_VAR_R(execute_data, opline->op1.var TSRMLS_CC);
-		if (0) { /* IS_TMP_VAR */
+		if (IS_CV == IS_TMP_VAR) {
 			zval *tmp;
 
 			ALLOC_ZVAL(tmp);
@@ -31071,10 +30993,7 @@ static int ZEND_FASTCALL  ZEND_FE_RESET_SPEC_CV_HANDLER(ZEND_OPCODE_HANDLER_ARGS
 			if (!ce || !ce->get_iterator) {
 				Z_ADDREF_P(array_ptr);
 			}
-		} else if (IS_CV == IS_CONST ||
-		           ((IS_CV == IS_CV || IS_CV == IS_VAR) &&
-		            !Z_ISREF_P(array_ptr) &&
-		            Z_REFCOUNT_P(array_ptr) > 1)) {
+		} else if (IS_CV == IS_CONST) {
 			zval *tmp;
 
 			ALLOC_ZVAL(tmp);
@@ -31121,26 +31040,11 @@ static int ZEND_FASTCALL  ZEND_FE_RESET_SPEC_CV_HANDLER(ZEND_OPCODE_HANDLER_ARGS
 		}
 		iter->index = -1; /* will be set to 0 before using next handler */
 	} else if ((fe_ht = HASH_OF(array_ptr)) != NULL) {
-		zend_hash_internal_pointer_reset(fe_ht);
-		if (ce) {
-			zend_object *zobj = zend_objects_get_address(array_ptr TSRMLS_CC);
-			while (zend_hash_has_more_elements(fe_ht) == SUCCESS) {
-				char *str_key;
-				uint str_key_len;
-				ulong int_key;
-				zend_uchar key_type;
-
-				key_type = zend_hash_get_current_key_ex(fe_ht, &str_key, &str_key_len, &int_key, 0, NULL);
-				if (key_type != HASH_KEY_NON_EXISTANT &&
-					(key_type == HASH_KEY_IS_LONG ||
-				     zend_check_property_access(zobj, str_key, str_key_len-1 TSRMLS_CC) == SUCCESS)) {
-					break;
-				}
-				zend_hash_move_forward(fe_ht);
-			}
-		}
-		is_empty = zend_hash_has_more_elements(fe_ht) != SUCCESS;
-		zend_hash_get_pointer(fe_ht, &EX_T(opline->result.var).fe.fe_pos);
+		HashPosition *pos = &EX_T(opline->result.var).fe.fe_pos;
+		EX_T(opline->result.var).fe.orig_ht = fe_ht;
+		zend_track_hash_position(fe_ht, pos);
+		zend_hash_internal_pointer_reset_before_first_ex(fe_ht, pos);
+		is_empty = zend_hash_num_elements(fe_ht) == 0;
 	} else {
 		zend_error(E_WARNING, "Invalid argument supplied for foreach()");
 		is_empty = 1;
@@ -45002,6 +44906,31 @@ void zend_init_opcodes_handlers(void)
   	ZEND_FAST_RET_SPEC_HANDLER,
   	ZEND_FAST_RET_SPEC_HANDLER,
   	ZEND_FAST_RET_SPEC_HANDLER,
+  	ZEND_NULL_HANDLER,
+  	ZEND_NULL_HANDLER,
+  	ZEND_NULL_HANDLER,
+  	ZEND_NULL_HANDLER,
+  	ZEND_NULL_HANDLER,
+  	ZEND_NULL_HANDLER,
+  	ZEND_NULL_HANDLER,
+  	ZEND_NULL_HANDLER,
+  	ZEND_NULL_HANDLER,
+  	ZEND_NULL_HANDLER,
+  	ZEND_FOREACH_FREE_SPEC_VAR_HANDLER,
+  	ZEND_FOREACH_FREE_SPEC_VAR_HANDLER,
+  	ZEND_FOREACH_FREE_SPEC_VAR_HANDLER,
+  	ZEND_FOREACH_FREE_SPEC_VAR_HANDLER,
+  	ZEND_FOREACH_FREE_SPEC_VAR_HANDLER,
+  	ZEND_NULL_HANDLER,
+  	ZEND_NULL_HANDLER,
+  	ZEND_NULL_HANDLER,
+  	ZEND_NULL_HANDLER,
+  	ZEND_NULL_HANDLER,
+  	ZEND_NULL_HANDLER,
+  	ZEND_NULL_HANDLER,
+  	ZEND_NULL_HANDLER,
+  	ZEND_NULL_HANDLER,
+  	ZEND_NULL_HANDLER,
   	ZEND_NULL_HANDLER
   };
   zend_opcode_handlers = (opcode_handler_t*)labels;

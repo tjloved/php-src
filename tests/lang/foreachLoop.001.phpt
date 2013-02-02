@@ -25,15 +25,6 @@ foreach (array("d","e","f") as $k => $v) {
 //check key and value after the loop.
 var_dump($k, $v);
 
-echo "\n";
-//Ensure counter is advanced during loop
-$a=array("a","b","c");
-foreach ($a as $v);
-var_dump(current($a));
-$a=array("a","b","c");
-foreach ($a as &$v);
-var_dump(current($a));
-
 ?>
 --EXPECT--
 string(1) "a"
@@ -59,6 +50,3 @@ int(2)
 string(1) "f"
 int(2)
 string(1) "f"
-
-bool(false)
-bool(false)

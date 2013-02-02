@@ -72,22 +72,7 @@ ZEND_API void zend_generator_close(zend_generator *generator, zend_bool finished
 				} else if (brk_cont->start > op_num) {
 					break;
 				} else if (brk_cont->brk > op_num) {
-					zend_op *brk_opline = op_array->opcodes + brk_cont->brk;
-
-					switch (brk_opline->opcode) {
-						case ZEND_SWITCH_FREE:
-							{
-								temp_variable *var = EX_TMP_VAR(execute_data, brk_opline->op1.var);
-								zval_ptr_dtor(&var->var.ptr);
-							}
-							break;
-						case ZEND_FREE:
-							{
-								temp_variable *var = EX_TMP_VAR(execute_data, brk_opline->op1.var);
-								zval_dtor(&var->tmp_var);
-							}
-							break;
-					}
+					zend_handle_free_op(op_array->opcodes + brk_cont->brk, execute_data TSRMLS_CC);
 				}
 			}
 		}
