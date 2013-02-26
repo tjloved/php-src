@@ -723,12 +723,6 @@ chaining_instance_call:
 	|	chaining_method_or_property { $$ = $1; }
 ;
 
-instance_call:
-		/* empty */ 		{ $$ = $0; }
-	|	{ zend_do_push_object(&$0 TSRMLS_CC); zend_do_begin_variable_parse(TSRMLS_C); }
-		chaining_instance_call	{ zend_do_pop_object(&$$ TSRMLS_CC); zend_do_end_variable_parse(&$2, BP_VAR_R, 0 TSRMLS_CC); }
-;
-
 new_expr:
 		T_NEW class_name_reference { zend_do_extended_fcall_begin(TSRMLS_C); zend_do_begin_new_object(&$1, &$2 TSRMLS_CC); } ctor_arguments { zend_do_end_new_object(&$$, &$1, &$4 TSRMLS_CC); zend_do_extended_fcall_end(TSRMLS_C);}
 ;
@@ -783,7 +777,7 @@ expr_without_variable:
 	|	expr '>' expr 					{ zend_do_binary_op(ZEND_IS_SMALLER, &$$, &$3, &$1 TSRMLS_CC); }
 	|	expr T_IS_GREATER_OR_EQUAL expr { zend_do_binary_op(ZEND_IS_SMALLER_OR_EQUAL, &$$, &$3, &$1 TSRMLS_CC); }
 	|	expr T_INSTANCEOF class_name_reference { zend_do_instanceof(&$$, &$1, &$3, 0 TSRMLS_CC); }
-	|	parenthesis_expr { $$ = $1; } instance_call { $$ = $3; }
+	|	parenthesis_expr { $$ = $1; }
 	|	new_expr		{ $$ = $1; }
 	|	expr '?' { zend_do_begin_qm_op(&$1, &$2 TSRMLS_CC); }
 		expr ':' { zend_do_qm_true(&$4, &$2, &$5 TSRMLS_CC); }
@@ -1019,6 +1013,8 @@ variable:
 			object_property { zend_do_push_object(&$4 TSRMLS_CC); } method_or_not variable_properties
 			{ zend_do_pop_object(&$$ TSRMLS_CC); $$.EA = $1.EA | ($7.EA ? $7.EA : $6.EA); }
 	|	base_variable_with_function_calls { $$ = $1; }
+	|	parenthesis_expr { zend_do_push_object(&$1 TSRMLS_CC); zend_do_begin_variable_parse(TSRMLS_C); }
+		chaining_instance_call { zend_do_pop_object(&$$ TSRMLS_CC); }
 ;
 
 variable_properties:

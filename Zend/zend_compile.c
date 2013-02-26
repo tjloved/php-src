@@ -1350,6 +1350,9 @@ void zend_do_end_variable_parse(znode *variable, int type, int arg_offset TSRMLS
 				opline->op1_type = IS_CV;
 				opline->op1.var = CG(active_op_array)->this_var;
 			}
+			if ((type != BP_VAR_R && type != BP_VAR_IS) && (opline->op1_type == IS_TMP_VAR || opline->op1_type == IS_CONST) && opline->opcode != ZEND_FETCH_W) {
+				zend_error_noreturn(E_COMPILE_ERROR, "Cannot use temporary expression in write context");
+			}
 			switch (type) {
 				case BP_VAR_R:
 					if (opline->opcode == ZEND_FETCH_DIM_W && opline->op2_type == IS_UNUSED) {
