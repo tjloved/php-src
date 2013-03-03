@@ -1013,7 +1013,7 @@ variable:
 			object_property { zend_do_push_object(&$4 TSRMLS_CC); } method_or_not variable_properties
 			{ zend_do_pop_object(&$$ TSRMLS_CC); $$.EA = $1.EA | ($7.EA ? $7.EA : $6.EA); }
 	|	base_variable_with_function_calls { $$ = $1; }
-	|	parenthesis_expr { zend_do_push_object(&$1 TSRMLS_CC); zend_do_begin_variable_parse(TSRMLS_C); }
+	|	parenthesis_expr { $1.EA = 0; zend_do_push_object(&$1 TSRMLS_CC); zend_do_begin_variable_parse(TSRMLS_C); }
 		chaining_instance_call { zend_do_pop_object(&$$ TSRMLS_CC); }
 ;
 
