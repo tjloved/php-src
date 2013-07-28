@@ -378,7 +378,7 @@ is_reference:
 
 unticked_function_declaration_statement:
 		function is_reference T_STRING { zend_do_begin_function_declaration(&$1, &$3, 0, $2.op_type, NULL TSRMLS_CC); }
-		'(' parameter_list ')'
+		'(' parameter_list ')' optional_return_type
 		'{' inner_statement_list '}' { zend_do_end_function_declaration(&$1 TSRMLS_CC); }
 ;
 
@@ -543,7 +543,9 @@ optional_class_type:
 
 optional_return_type:
 		/* empty */					{ $$.op_type = IS_UNUSED; }
-	|	':' optional_class_type                         { $$.op_type = IS_UNUSED; }
+	|	T_ARRAY						{ $$.op_type = IS_CONST; Z_TYPE($$.u.constant)=IS_ARRAY; }
+	|	T_CALLABLE					{ $$.op_type = IS_CONST; Z_TYPE($$.u.constant)=IS_CALLABLE; }
+	|	fully_qualified_class_name			{ $$ = $1; }
 ;
 
 function_call_parameter_list:
@@ -596,7 +598,7 @@ class_statement:
 	|	trait_use_statement
 	|	method_modifiers function is_reference T_STRING { zend_do_begin_function_declaration(&$2, &$4, 1, $3.op_type, &$1 TSRMLS_CC); }
 		'(' parameter_list ')' optional_return_type
-		method_body { zend_do_abstract_method(&$4, &$1, &$9 TSRMLS_CC); zend_do_end_function_declaration(&$2 TSRMLS_CC); }
+		method_body { zend_do_abstract_method(&$4, &$1, &$10 TSRMLS_CC); zend_do_end_function_declaration(&$2 TSRMLS_CC); }
 ;
 
 trait_use_statement:
@@ -814,10 +816,10 @@ expr_without_variable:
 	|	T_PRINT expr  { zend_do_print(&$$, &$2 TSRMLS_CC); }
 	|	T_YIELD { zend_do_yield(&$$, NULL, NULL, 0 TSRMLS_CC); }
 	|	function is_reference { zend_do_begin_lambda_function_declaration(&$$, &$1, $2.op_type, 0 TSRMLS_CC); }
-		'(' parameter_list ')' lexical_vars
+		'(' parameter_list ')' lexical_vars optional_return_type
 		'{' inner_statement_list '}' { zend_do_end_function_declaration(&$1 TSRMLS_CC); $$ = $3; }
 	|	T_STATIC function is_reference { zend_do_begin_lambda_function_declaration(&$$, &$2, $3.op_type, 1 TSRMLS_CC); }
-		'(' parameter_list ')' lexical_vars
+		'(' parameter_list ')' lexical_vars optional_return_type
 		'{' inner_statement_list '}' { zend_do_end_function_declaration(&$2 TSRMLS_CC); $$ = $4; }
 ;
 
