@@ -268,6 +268,7 @@ struct _zend_op_array {
 	zend_uint num_args;
 	zend_uint required_num_args;
 	zend_arg_info *arg_info;
+        zend_uchar return_type;
 	/* END of common elements */
 
 	zend_uint *refcount;

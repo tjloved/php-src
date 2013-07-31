@@ -1937,6 +1937,25 @@ void zend_do_receive_arg(zend_uchar op, znode *varname, const znode *offset, con
 }
 /* }}} */
 
+void zend_do_add_function_return_type(znode *class_type) /* {{{ */
+{
+	if (class_type->op_type == IS_CONST &&
+		Z_TYPE(class_type->u.constant) == IS_STRING &&
+		Z_STRLEN(class_type->u.constant) == 0) {
+		/* Usage of namespace as class name not in namespace */
+		zval_dtor(&class_type->u.constant);
+		zend_error(E_COMPILE_ERROR, "Cannot use 'namespace' as a class name");
+		return;
+	}
+
+    if (class_type->op_type == IS_UNUSED || class_type->u.constant.type == IS_NULL) {
+		return;
+	}
+
+	CG(active_op_array)->return_type = class_type->u.constant.type;
+}
+/* }}} */
+
 int zend_do_begin_function_call(znode *function_name, zend_bool check_namespace TSRMLS_DC) /* {{{ */
 {
 	zend_function *function;
