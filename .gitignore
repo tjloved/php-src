@@ -107,6 +107,7 @@ Zend/zend_language_parser.output
 ext/date/lib/timelib_config.h
 ext/iconv/php_iconv_aliased_libiconv.h
 ext/phar/phar.php
+ext/phar/phar/phar.inc
 main/php_config.h
 main/php_config.h.in
 
