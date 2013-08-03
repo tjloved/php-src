@@ -1948,11 +1948,13 @@ void zend_do_add_function_return_type(znode *class_type) /* {{{ */
 		return;
 	}
 
-    if (class_type->op_type == IS_UNUSED || class_type->u.constant.type == IS_NULL) {
+    if (class_type->op_type == IS_UNUSED || Z_TYPE(class_type->u.constant) == IS_NULL) {
+		CG(active_op_array)->return_type = IS_NULL;
+
 		return;
 	}
 
-	CG(active_op_array)->return_type = class_type->u.constant.type;
+	CG(active_op_array)->return_type = Z_TYPE(class_type->u.constant);
 }
 /* }}} */
 

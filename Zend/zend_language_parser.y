@@ -536,16 +536,18 @@ non_empty_parameter_list:
 
 optional_class_type:
 		/* empty */					{ $$.op_type = IS_UNUSED; }
-	|	T_ARRAY						{ $$.op_type = IS_CONST; Z_TYPE($$.u.constant)=IS_ARRAY; }
-	|	T_CALLABLE					{ $$.op_type = IS_CONST; Z_TYPE($$.u.constant)=IS_CALLABLE; }
-	|	fully_qualified_class_name			{ $$ = $1; }
+	|	type_hint					{ $$ = $1; }
 ;
 
 optional_return_type:
 		/* empty */					{ $$.op_type = IS_UNUSED; }
-	|	T_ARRAY						{ $$.op_type = IS_CONST; Z_TYPE($$.u.constant)=IS_ARRAY; }
+	|	':' type_hint				{ $$ = $2; }
+;
+
+type_hint:
+		T_ARRAY						{ $$.op_type = IS_CONST; Z_TYPE($$.u.constant)=IS_ARRAY; }
 	|	T_CALLABLE					{ $$.op_type = IS_CONST; Z_TYPE($$.u.constant)=IS_CALLABLE; }
-	|	fully_qualified_class_name			{ $$ = $1; }
+	|	fully_qualified_class_name	{ $$ = $1; }
 ;
 
 function_call_parameter_list:
@@ -598,7 +600,7 @@ class_statement:
 	|	trait_use_statement
 	|	method_modifiers function is_reference T_STRING { zend_do_begin_function_declaration(&$2, &$4, 1, $3.op_type, &$1 TSRMLS_CC); }
 		'(' parameter_list ')' optional_return_type { zend_do_add_function_return_type(&$4); }
-		method_body { zend_do_abstract_method(&$4, &$1, &$10 TSRMLS_CC); zend_do_end_function_declaration(&$2 TSRMLS_CC); }
+		method_body { zend_do_abstract_method(&$6, &$1, &$11 TSRMLS_CC); zend_do_end_function_declaration(&$2 TSRMLS_CC); }
 ;
 
 trait_use_statement:
