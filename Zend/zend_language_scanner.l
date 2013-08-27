@@ -1020,7 +1020,6 @@ NEWLINE ("\r"|"\n"|"\r\n")
 /* compute yyleng before each rule */
 <!*> := yyleng = YYCURSOR - SCNG(yy_text);
 
-
 <ST_IN_SCRIPTING>"exit" {
 	return T_EXIT;
 }
@@ -1213,6 +1212,10 @@ NEWLINE ("\r"|"\n"|"\r\n")
 
 <ST_IN_SCRIPTING>"\\" {
 	return T_NS_SEPARATOR;
+}
+
+<ST_IN_SCRIPTING>"..." {
+	return T_ELLIPSIS;
 }
 
 <ST_IN_SCRIPTING>"new" {
