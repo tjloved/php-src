@@ -1965,7 +1965,9 @@ ZEND_VM_HELPER(zend_do_fcall_common_helper, ANY, ANY)
 	}
 
 	EX(function_state).arguments = zend_vm_stack_top(TSRMLS_C);
-	zend_vm_stack_push((void*)(zend_uintptr_t)opline->extended_value TSRMLS_CC);
+	zend_vm_stack_push(
+		(void*)(zend_uintptr_t)(opline->extended_value + EX(call)->num_additional_args) TSRMLS_CC
+	);
 	LOAD_OPLINE();
 
 	if (fbc->type == ZEND_INTERNAL_FUNCTION) {
@@ -2494,6 +2496,8 @@ ZEND_VM_HANDLER(112, ZEND_INIT_METHOD_CALL, TMP|VAR|UNUSED|CV, CONST|TMP|VAR|CV)
 			call->object = this_ptr;
 		}
 	}
+
+	call->num_additional_args = 0;
 	call->is_ctor_call = 0;
 	EX(call) = call;
 
@@ -2620,6 +2624,8 @@ ZEND_VM_HANDLER(113, ZEND_INIT_STATIC_METHOD_CALL, CONST|VAR, CONST|TMP|VAR|UNUS
 			call->called_scope = Z_OBJCE_P(call->object);
 		}
 	}
+
+	call->num_additional_args = 0;
 	call->is_ctor_call = 0;
 	EX(call) = call;
 
@@ -2643,10 +2649,13 @@ ZEND_VM_HANDLER(59, ZEND_INIT_FCALL_BY_NAME, ANY, CONST|TMP|VAR|CV)
 		} else {
 			CACHE_PTR(opline->op2.literal->cache_slot, call->fbc);
 		}
+
 		call->object = NULL;
 		call->called_scope = NULL;
+		call->num_additional_args = 0;
 		call->is_ctor_call = 0;
 		EX(call) = call;
+
 		/*CHECK_EXCEPTION();*/
 		ZEND_VM_NEXT_OPCODE();
 	} else {
@@ -2671,10 +2680,13 @@ ZEND_VM_HANDLER(59, ZEND_INIT_FCALL_BY_NAME, ANY, CONST|TMP|VAR|CV)
 			}
 			efree(lcname);
 			FREE_OP2();
+
 			call->object = NULL;
 			call->called_scope = NULL;
+			call->num_additional_args = 0;
 			call->is_ctor_call = 0;
 			EX(call) = call;
+
 			CHECK_EXCEPTION();
 			ZEND_VM_NEXT_OPCODE();
 		} else if (OP2_TYPE != IS_CONST && OP2_TYPE != IS_TMP_VAR &&
@@ -2691,8 +2703,11 @@ ZEND_VM_HANDLER(59, ZEND_INIT_FCALL_BY_NAME, ANY, CONST|TMP|VAR|CV)
 			} else {
 				FREE_OP2();
 			}
+
+			call->num_additional_args = 0;
 			call->is_ctor_call = 0;
 			EX(call) = call;
+
 			CHECK_EXCEPTION();
 			ZEND_VM_NEXT_OPCODE();
 		} else if (OP2_TYPE != IS_CONST &&
@@ -2758,8 +2773,11 @@ ZEND_VM_HANDLER(59, ZEND_INIT_FCALL_BY_NAME, ANY, CONST|TMP|VAR|CV)
 			if (UNEXPECTED(call->fbc == NULL)) {
 				zend_error_noreturn(E_ERROR, "Call to undefined method %s::%s()", ce->name, Z_STRVAL_PP(method));
 			}
+
+			call->num_additional_args = 0;
 			call->is_ctor_call = 0;
 			EX(call) = call;
+
 			FREE_OP2();
 			CHECK_EXCEPTION();
 			ZEND_VM_NEXT_OPCODE();
@@ -2797,7 +2815,9 @@ ZEND_VM_HANDLER(69, ZEND_INIT_NS_FCALL_BY_NAME, ANY, CONST)
 
 	call->object = NULL;
 	call->called_scope = NULL;
+	call->num_additional_args = 0;
 	call->is_ctor_call = 0;
+
 	EX(call) = call;
 	ZEND_VM_NEXT_OPCODE();
 }
@@ -2823,9 +2843,11 @@ ZEND_VM_HANDLER(60, ZEND_DO_FCALL, CONST, ANY)
 	} else {
 		CACHE_PTR(opline->op1.literal->cache_slot, EX(function_state).function);
 	}
+
 	call->fbc = EX(function_state).function;
 	call->object = NULL;
 	call->called_scope = NULL;
+	call->num_additional_args = 0;
 	call->is_ctor_call = 0;
 	EX(call) = call;
 
@@ -3056,10 +3078,13 @@ ZEND_VM_HANDLER(65, ZEND_SEND_VAL, CONST|TMP, ANY)
 	USE_OPLINE
 
 	SAVE_OPLINE();
-	if (opline->extended_value==ZEND_DO_FCALL_BY_NAME
-		&& ARG_MUST_BE_SENT_BY_REF(EX(call)->fbc, opline->op2.opline_num)) {
-			zend_error_noreturn(E_ERROR, "Cannot pass parameter %d by reference", opline->op2.opline_num);
+	if (opline->extended_value == ZEND_DO_FCALL_BY_NAME) {
+		int arg_num = opline->op2.num + EX(call)->num_additional_args;
+		if (ARG_MUST_BE_SENT_BY_REF(EX(call)->fbc, arg_num)) {
+			zend_error_noreturn(E_ERROR, "Cannot pass parameter %d by reference", arg_num);
+		}
 	}
+
 	{
 		zval *valptr;
 		zval *value;
@@ -3117,14 +3142,18 @@ ZEND_VM_HANDLER(106, ZEND_SEND_VAR_NO_REF, VAR|CV, ANY)
 	USE_OPLINE
 	zend_free_op free_op1;
 	zval *varptr;
+	int arg_num;
 
 	SAVE_OPLINE();
 	if (opline->extended_value & ZEND_ARG_COMPILE_TIME_BOUND) { /* Had function_ptr at compile_time */
 		if (!(opline->extended_value & ZEND_ARG_SEND_BY_REF)) {
 			ZEND_VM_DISPATCH_TO_HELPER(zend_send_by_var_helper);
 		}
-	} else if (!ARG_SHOULD_BE_SENT_BY_REF(EX(call)->fbc, opline->op2.opline_num)) {
-		ZEND_VM_DISPATCH_TO_HELPER(zend_send_by_var_helper);
+	} else {
+		arg_num = opline->op2.num + EX(call)->num_additional_args;
+		if (!ARG_SHOULD_BE_SENT_BY_REF(EX(call)->fbc, arg_num)) {
+			ZEND_VM_DISPATCH_TO_HELPER(zend_send_by_var_helper);
+		}
 	}
 
 	varptr = GET_OP1_ZVAL_PTR(BP_VAR_R);
@@ -3142,7 +3171,7 @@ ZEND_VM_HANDLER(106, ZEND_SEND_VAR_NO_REF, VAR|CV, ANY)
 
 		if ((opline->extended_value & ZEND_ARG_COMPILE_TIME_BOUND) ?
 			!(opline->extended_value & ZEND_ARG_SEND_SILENT) :
-			!ARG_MAY_BE_SENT_BY_REF(EX(call)->fbc, opline->op2.opline_num)) {
+			!ARG_MAY_BE_SENT_BY_REF(EX(call)->fbc, arg_num)) {
 			zend_error(E_STRICT, "Only variables should be passed by reference");
 		}
 		ALLOC_ZVAL(valptr);
@@ -3179,9 +3208,11 @@ ZEND_VM_HANDLER(67, ZEND_SEND_REF, VAR|CV, ANY)
 	}
 
 	if (opline->extended_value == ZEND_DO_FCALL_BY_NAME &&
-	    EX(function_state).function->type == ZEND_INTERNAL_FUNCTION &&
-	    !ARG_SHOULD_BE_SENT_BY_REF(EX(call)->fbc, opline->op2.opline_num)) {
-		ZEND_VM_DISPATCH_TO_HELPER(zend_send_by_var_helper);
+	    EX(function_state).function->type == ZEND_INTERNAL_FUNCTION) { 
+		int arg_num = opline->op2.num + EX(call)->num_additional_args;
+	    if (!ARG_SHOULD_BE_SENT_BY_REF(EX(call)->fbc, arg_num)) {
+			ZEND_VM_DISPATCH_TO_HELPER(zend_send_by_var_helper);
+		}
 	}
 
 	SEPARATE_ZVAL_TO_MAKE_IS_REF(varptr_ptr);
@@ -3198,12 +3229,136 @@ ZEND_VM_HANDLER(66, ZEND_SEND_VAR, VAR|CV, ANY)
 {
 	USE_OPLINE
 
-	if ((opline->extended_value == ZEND_DO_FCALL_BY_NAME)
-		&& ARG_SHOULD_BE_SENT_BY_REF(EX(call)->fbc, opline->op2.opline_num)) {
-		ZEND_VM_DISPATCH_TO_HANDLER(ZEND_SEND_REF);
+	if (opline->extended_value == ZEND_DO_FCALL_BY_NAME) {
+		int arg_num = opline->op2.num + EX(call)->num_additional_args;
+		if (ARG_SHOULD_BE_SENT_BY_REF(EX(call)->fbc, arg_num)) {
+			ZEND_VM_DISPATCH_TO_HANDLER(ZEND_SEND_REF);
+		}
 	}
 	SAVE_OPLINE();
 	ZEND_VM_DISPATCH_TO_HELPER(zend_send_by_var_helper);
+}
+
+ZEND_VM_HANDLER(165, ZEND_SEND_UNPACK, ANY, ANY)
+{
+	USE_OPLINE
+	zend_free_op free_op1;
+	zval *args;
+	int arg_num;
+	SAVE_OPLINE();
+
+	args = GET_OP1_ZVAL_PTR(BP_VAR_R);
+	arg_num = opline->op2.num + EX(call)->num_additional_args + 1;
+
+	switch (Z_TYPE_P(args)) {
+		case IS_ARRAY: {
+			HashTable *ht = Z_ARRVAL_P(args);
+			HashPosition pos;
+			zval **arg_ptr, *arg;
+
+			long num_args = zend_hash_num_elements(ht);
+			ZEND_VM_STACK_GROW_IF_NEEDED(num_args);
+			EX(call)->num_additional_args += num_args;
+
+			for (zend_hash_internal_pointer_reset_ex(ht, &pos);
+			     zend_hash_get_current_data_ex(ht, (void **) &arg_ptr, &pos) == SUCCESS;
+				 zend_hash_move_forward_ex(ht, &pos), ++arg_num
+			) {
+				if (ARG_SHOULD_BE_SENT_BY_REF(EX(call)->fbc, arg_num)) {
+					SEPARATE_ZVAL_TO_MAKE_IS_REF(arg_ptr);
+					arg = *arg_ptr;
+					Z_ADDREF_P(arg);
+				} else if (Z_ISREF_PP(arg_ptr)) {
+					ALLOC_ZVAL(arg);
+					MAKE_COPY_ZVAL(arg_ptr, arg);
+				} else {
+					arg = *arg_ptr;
+					Z_ADDREF_P(arg);
+				}
+
+				zend_vm_stack_push(arg TSRMLS_CC);
+			}
+			break;
+		}
+		case IS_OBJECT: {
+			zend_class_entry *ce = Z_OBJCE_P(args);
+			zend_object_iterator *iter;
+			long num_args = 0;
+
+			if (!ce || !ce->get_iterator) {
+				zend_error(E_WARNING, "Only arrays and Traversables can be unpacked");
+				break;
+			}
+
+			iter = ce->get_iterator(ce, args, 0 TSRMLS_CC);
+			if (UNEXPECTED(!iter)) {
+				FREE_OP1();
+				if (!EG(exception)) {
+					zend_throw_exception_ex(
+						NULL, 0 TSRMLS_CC, "Object of type %s did not create an Iterator", ce->name
+					);
+				}
+				HANDLE_EXCEPTION();
+			}
+
+			if (iter->funcs->rewind) {
+				iter->funcs->rewind(iter TSRMLS_CC);
+				if (UNEXPECTED(EG(exception) != NULL)) {
+					ZEND_VM_C_GOTO(unpack_iter_dtor);
+				}
+			}
+
+			for (; iter->funcs->valid(iter TSRMLS_CC) == SUCCESS; ++arg_num, ++num_args) {
+				zval **arg_ptr, *arg;
+
+				if (UNEXPECTED(EG(exception) != NULL)) {
+					ZEND_VM_C_GOTO(unpack_iter_dtor);
+				}
+
+				iter->funcs->get_current_data(iter, &arg_ptr TSRMLS_CC);
+				if (UNEXPECTED(EG(exception) != NULL)) {
+					ZEND_VM_C_GOTO(unpack_iter_dtor);
+				}
+
+				if (ARG_MUST_BE_SENT_BY_REF(EX(call)->fbc, arg_num)) {
+					zend_throw_exception_ex(
+						NULL, 0 TSRMLS_CC, "Cannot pass by-reference argument "
+						"%d of %s%s%s() by unpacking a Traversable", arg_num,
+						EX(call)->fbc->common.scope ? EX(call)->fbc->common.scope->name : "",
+						EX(call)->fbc->common.scope ? "::" : "",
+						EX(call)->fbc->common.function_name
+					);
+					ZEND_VM_C_GOTO(unpack_iter_dtor);
+				} else if (Z_ISREF_PP(arg_ptr)) {
+					ALLOC_ZVAL(arg);
+					MAKE_COPY_ZVAL(arg_ptr, arg);
+				} else {
+					arg = *arg_ptr;
+					Z_ADDREF_P(arg);
+				}
+
+				ZEND_VM_STACK_GROW_IF_NEEDED(1);
+				zend_vm_stack_push(arg TSRMLS_CC);
+
+				iter->funcs->move_forward(iter TSRMLS_CC);
+				if (UNEXPECTED(EG(exception) != NULL)) {
+					ZEND_VM_C_GOTO(unpack_iter_dtor);
+				}
+			}
+
+			EX(call)->num_additional_args += num_args;
+
+ZEND_VM_C_LABEL(unpack_iter_dtor):
+			iter->funcs->dtor(iter TSRMLS_CC);
+			break;
+		}
+		default:
+			zend_error(E_WARNING, "Only arrays and Traversables can be unpacked");
+	}
+
+	FREE_OP1();
+	CHECK_EXCEPTION();
+	ZEND_VM_NEXT_OPCODE();
 }
 
 ZEND_VM_HANDLER(63, ZEND_RECV, ANY, ANY)
@@ -3442,6 +3597,7 @@ ZEND_VM_HANDLER(68, ZEND_NEW, ANY, ANY)
 		call->fbc = constructor;
 		call->object = object_zval;
 		call->called_scope = EX_T(opline->op1.var).class_entry;
+		call->num_additional_args = 0;
 		call->is_ctor_call = 1;
 		call->is_ctor_result_used = RETURN_VALUE_USED(opline);
 		EX(call) = call;
