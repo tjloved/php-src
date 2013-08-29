@@ -754,8 +754,13 @@ static int ZEND_FASTCALL  ZEND_RECV_VARIADIC_SPEC_HANDLER(ZEND_OPCODE_HANDLER_AR
 	var_ptr = _get_zval_ptr_ptr_cv_BP_VAR_W(execute_data, opline->result.var TSRMLS_CC);
 	Z_DELREF_PP(var_ptr);
 	MAKE_STD_ZVAL(params);
-	array_init_size(params, arg_count - arg_num + 1);
 	*var_ptr = params;
+
+	if (arg_num <= arg_count) {
+		array_init_size(params, arg_count - arg_num + 1);
+	} else {
+		array_init(params);
+	}
 
 	for (; arg_num <= arg_count; ++arg_num) {
 		zval **param = zend_vm_stack_get_arg(arg_num TSRMLS_CC);
