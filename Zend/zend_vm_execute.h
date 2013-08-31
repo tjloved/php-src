@@ -785,15 +785,16 @@ static int ZEND_FASTCALL  ZEND_SEND_UNPACK_SPEC_HANDLER(ZEND_OPCODE_HANDLER_ARGS
 				}
 
 				if (ARG_MUST_BE_SENT_BY_REF(EX(call)->fbc, arg_num)) {
-					zend_throw_exception_ex(
-						NULL, 0 TSRMLS_CC, "Cannot pass by-reference argument "
-						"%d of %s%s%s() by unpacking a Traversable", arg_num,
+					zend_error(
+						E_STRICT, "Cannot pass by-reference argument %d of %s%s%s()"
+						" by unpacking a Traversable, passing by-value instead", arg_num,
 						EX(call)->fbc->common.scope ? EX(call)->fbc->common.scope->name : "",
 						EX(call)->fbc->common.scope ? "::" : "",
 						EX(call)->fbc->common.function_name
 					);
-					goto unpack_iter_dtor;
-				} else if (Z_ISREF_PP(arg_ptr)) {
+				}
+
+				if (Z_ISREF_PP(arg_ptr)) {
 					ALLOC_ZVAL(arg);
 					MAKE_COPY_ZVAL(arg_ptr, arg);
 				} else {

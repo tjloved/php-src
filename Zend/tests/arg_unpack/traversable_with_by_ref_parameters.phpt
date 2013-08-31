@@ -18,22 +18,17 @@ var_dump($a);
 test(1, 2, 3, $b, ...gen([4, 5, 6]));
 var_dump($b);
 
-try {
-    test(...gen([1, 2, 3, 4]));
-} catch (Exception $e) { var_dump($e->getMessage()); }
-
-try {
-    test(1, 2, ...gen([3, 4]));
-} catch (Exception $e) { var_dump($e->getMessage()); }
-
-try {
-    test(...gen([1, 2]), ...gen([3, 4]));
-} catch (Exception $e) { var_dump($e->getMessage()); }
+test(...gen([1, 2, 3, 4]));
+test(1, 2, ...gen([3, 4]));
+test(...gen([1, 2]), ...gen([3, 4]));
 
 ?>
---EXPECT--
+--EXPECTF--
 int(42)
 int(42)
-string(72) "Cannot pass by-reference argument 4 of test() by unpacking a Traversable"
-string(72) "Cannot pass by-reference argument 4 of test() by unpacking a Traversable"
-string(72) "Cannot pass by-reference argument 4 of test() by unpacking a Traversable"
+
+Strict Standards: Cannot pass by-reference argument 4 of test() by unpacking a Traversable, passing by-value instead in %s on line %d
+
+Strict Standards: Cannot pass by-reference argument 4 of test() by unpacking a Traversable, passing by-value instead in %s on line %d
+
+Strict Standards: Cannot pass by-reference argument 4 of test() by unpacking a Traversable, passing by-value instead in %s on line %d
