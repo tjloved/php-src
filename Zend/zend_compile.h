@@ -382,7 +382,7 @@ typedef struct _call_slot {
 	zval              *object;
 	zend_class_entry  *called_scope;
 	void             **stack_base;
-	zend_uint          num_additional_args;
+	int                num_additional_args;
 	zend_bool          is_ctor_call;
 	zend_bool          is_ctor_result_used;
 } call_slot;

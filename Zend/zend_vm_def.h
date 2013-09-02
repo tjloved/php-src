@@ -1964,6 +1964,16 @@ ZEND_VM_HELPER(zend_do_fcall_common_helper, ANY, ANY)
 		EG(called_scope) = EX(call)->called_scope;
 	}
 
+	if (EX(call)->num_additional_args < 0) {
+		/* Due to use of named args there are trailing NULL args */
+		zend_uint i = 0;
+		while (*(EG(argument_stack)->top-1) == NULL) {
+			EG(argument_stack)->top--;
+			i++;
+		}
+		EX(call)->num_additional_args = -EX(call)->num_additional_args - i;
+	}
+
 	EX(function_state).arguments = zend_vm_stack_top(TSRMLS_C);
 	zend_vm_stack_push(
 		(void*)(zend_uintptr_t)(opline->extended_value + EX(call)->num_additional_args) TSRMLS_CC
@@ -3412,7 +3422,7 @@ ZEND_VM_HANDLER(63, ZEND_RECV, ANY, ANY)
 	zval **param = zend_vm_stack_get_arg(arg_num TSRMLS_CC);
 
 	SAVE_OPLINE();
-	if (UNEXPECTED(param == NULL)) {
+	if (UNEXPECTED(param == NULL || *param == NULL)) {
 		if (zend_verify_arg_type((zend_function *) EG(active_op_array), arg_num, NULL, opline->extended_value TSRMLS_CC)) {
 			const char *space;
 			const char *class_name;
@@ -3455,7 +3465,7 @@ ZEND_VM_HANDLER(64, ZEND_RECV_INIT, ANY, CONST)
 	zval **var_ptr;
 
 	SAVE_OPLINE();
-	if (param == NULL) {
+	if (param == NULL || *param == NULL) {
 		ALLOC_ZVAL(assignment_value);
 		*assignment_value = *opline->op2.zv;
 		if ((Z_TYPE_P(assignment_value) & IS_CONSTANT_TYPE_MASK) == IS_CONSTANT ||

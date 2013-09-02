@@ -108,7 +108,7 @@ ZEND_API zend_executor_globals executor_globals;
 typedef struct _zend_function_call_entry {
 	zend_function *fbc;
 	zend_uint arg_num;
-	zend_bool uses_named_args;
+	zend_uint named_arg_num;
 } zend_function_call_entry;
 
 static void zend_push_function_call_entry(zend_function *fbc TSRMLS_DC) /* {{{ */
@@ -2537,7 +2537,7 @@ void zend_do_end_function_call(znode *function_name, znode *result, int is_metho
 		opline = &CG(active_op_array)->opcodes[Z_LVAL(function_name->u.constant)];
 	} else {
 		opline = get_next_op(CG(active_op_array) TSRMLS_CC);
-		if (fcall->fbc) {
+		if (fcall->fbc && fcall->named_arg_num == 0) {
 			opline->opcode = ZEND_DO_FCALL;
 			SET_NODE(opline->op1, function_name);
 			SET_UNUSED(opline->op2);
@@ -2562,14 +2562,31 @@ void zend_do_end_function_call(znode *function_name, znode *result, int is_metho
 	opline->result.var = get_temporary_variable(CG(active_op_array));
 	opline->result_type = IS_VAR;
 	GET_NODE(result, opline->result);
-	opline->extended_value = fcall->arg_num;
+	opline->extended_value = fcall->arg_num - fcall->named_arg_num;
 
 	if (CG(context).used_stack + 1 > CG(active_op_array)->used_stack) {
 		CG(active_op_array)->used_stack = CG(context).used_stack + 1;
 	}
-	CG(context).used_stack -= fcall->arg_num;
+	CG(context).used_stack -= fcall->arg_num - fcall->named_arg_num;
 
 	zend_stack_del_top(&CG(function_call_stack));
+}
+/* }}} */
+
+void zend_do_delayed_begin_function_call(zend_function_call_entry *fcall TSRMLS_DC) /* {{{ */
+{
+	zval func_name;
+	zend_op *opline = get_next_op(CG(active_op_array) TSRMLS_CC);
+	ZVAL_STRING(&func_name, fcall->fbc->common.function_name, 1);
+
+	opline->opcode = ZEND_INIT_FCALL_BY_NAME;
+	opline->result.num = CG(context).nested_calls;
+	SET_UNUSED(opline->op1);
+	opline->op2_type = IS_CONST;
+	opline->op2.constant = zend_add_func_name_literal(CG(active_op_array), &func_name TSRMLS_CC);
+	GET_CACHE_SLOT(opline->op2.constant);
+
+	++CG(context).nested_calls;
 }
 /* }}} */
 
@@ -2587,9 +2604,13 @@ void zend_do_pass_param(znode *param, zend_uchar op, znode *named_arg TSRMLS_DC)
 	fcall->arg_num++;
 
 	if (named_arg != NULL) {
+		if (fcall->named_arg_num == 0 && function_ptr) {
+			zend_do_delayed_begin_function_call(fcall TSRMLS_CC);
+		}
+
 		/* For now no compile-time resolution of named args */
 		function_ptr = NULL;
-	} else if (fcall->uses_named_args) {
+	} else if (fcall->named_arg_num > 0) {
 		zend_error(E_COMPILE_ERROR, "Cannot pass positional arguments after named arguments");
 	}
 
@@ -2689,13 +2710,13 @@ void zend_do_pass_param(znode *param, zend_uchar op, znode *named_arg TSRMLS_DC)
 		SET_NODE(opline->op2, named_arg);
 
 		/* The first named argument gets an argument number to initialize the stack */
-		if (fcall->uses_named_args) {
+		if (fcall->named_arg_num > 0) {
 			opline->result.num = 0;
 		} else {
 			opline->result.num = fcall->arg_num;
 		}
 
-		fcall->uses_named_args = 1;
+		fcall->named_arg_num++;
 	}
 
 	if (++CG(context).used_stack > CG(active_op_array)->used_stack) {
@@ -2714,18 +2735,7 @@ void zend_do_unpack_params(znode *params TSRMLS_DC) /* {{{ */
 		/* If argument unpacking is used argument numbers and sending modes can no longer be
 		 * computed at compile time, thus we need access to EX(call). In order to have it we
 		 * retroactively emit a ZEND_INIT_FCALL_BY_NAME opcode. */
-		zval func_name;
-		ZVAL_STRING(&func_name, fcall->fbc->common.function_name, 1);
-
-		opline = get_next_op(CG(active_op_array) TSRMLS_CC);
-		opline->opcode = ZEND_INIT_FCALL_BY_NAME;
-		opline->result.num = CG(context).nested_calls;
-		SET_UNUSED(opline->op1);
-		opline->op2_type = IS_CONST;
-		opline->op2.constant = zend_add_func_name_literal(CG(active_op_array), &func_name TSRMLS_CC);
-		GET_CACHE_SLOT(opline->op2.constant);
-
-		++CG(context).nested_calls;
+		zend_do_delayed_begin_function_call(fcall TSRMLS_CC);
 		fcall->fbc = NULL;
 	}
 

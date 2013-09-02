@@ -4046,7 +4046,15 @@ ZEND_API int zend_get_arg_offset(zend_uint *arg_num_target, zend_function *fn, c
 		fn->common.arg_offsets = arg_offsets;
 	}
 
-	return zend_hash_find(arg_offsets, name, name_len+1, (void **) &arg_num_target);
+	{
+		zend_uint *arg_num;
+		if (zend_hash_find(arg_offsets, name, name_len + 1, (void **) &arg_num) == SUCCESS) {
+			*arg_num_target = *arg_num;
+			return SUCCESS;
+		} else {
+			return FAILURE;
+		}
+	}
 }
 /* }}} */
 

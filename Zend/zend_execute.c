@@ -1699,7 +1699,6 @@ zend_execute_data *zend_create_execute_data_from_op_array(zend_op_array *op_arra
 
 zend_always_inline void zend_init_call_slot(call_slot *call TSRMLS_DC) /* {{{ */
 {
-	call->stack_base = zend_vm_stack_top(TSRMLS_C);
 	call->num_additional_args = 0;
 }
 /* }}} */
@@ -1719,9 +1718,10 @@ inline void **zend_handle_named_arg(zend_uint *arg_num_target, call_slot *call, 
 		ZEND_VM_STACK_GROW_IF_NEEDED(num_init_args);
 		memset(EG(argument_stack)->top, 0, num_init_args * sizeof(void *));
 		EG(argument_stack)->top += num_init_args;
+		call->num_additional_args = -num_init_args;
 	}
 
-	target = call->stack_base + *arg_num_target - 1;
+	target = EG(argument_stack)->top - call->fbc->common.num_args + *arg_num_target - 1;
 	if (*target != NULL) {
 		zend_error(E_ERROR, "Parameter $%s already passed", name);
 	}
