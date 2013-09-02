@@ -481,6 +481,7 @@ static int ZEND_FASTCALL zend_do_fcall_common_helper_SPEC(ZEND_OPCODE_HANDLER_AR
 	USE_OPLINE
 	zend_bool should_change_scope = 0;
 	zend_function *fbc = EX(function_state).function;
+	zend_uint num_args;
 
 	SAVE_OPLINE();
 	EX(object) = EX(call)->object;
@@ -532,24 +533,22 @@ static int ZEND_FASTCALL zend_do_fcall_common_helper_SPEC(ZEND_OPCODE_HANDLER_AR
 			EG(argument_stack)->top--;
 			i++;
 		}
-		EX(call)->num_additional_args = -EX(call)->num_additional_args - i;
+		num_args = opline->extended_value - EX(call)->num_additional_args - i;
+	} else {
+		num_args = opline->extended_value + EX(call)->num_additional_args;
 	}
 
 	EX(function_state).arguments = zend_vm_stack_top(TSRMLS_C);
-	zend_vm_stack_push(
-		(void*)(zend_uintptr_t)(opline->extended_value + EX(call)->num_additional_args) TSRMLS_CC
-	);
+	zend_vm_stack_push((void*)(zend_uintptr_t) num_args TSRMLS_CC);
 	LOAD_OPLINE();
 
 	if (fbc->type == ZEND_INTERNAL_FUNCTION) {
 		if (fbc->common.arg_info) {
-			zend_uint i=0;
-			zval **p = (zval**)EX(function_state).arguments;
-			ulong arg_count = opline->extended_value;
+			zend_uint i;
+			void **p = EX(function_state).arguments - num_args;
 
-			while (arg_count>0) {
-				zend_verify_arg_type(fbc, ++i, *(p-arg_count), 0 TSRMLS_CC);
-				arg_count--;
+			for (i = 0; i < num_args; ++i, ++p) {
+				zend_verify_arg_type(fbc, i + 1, (zval*) *p, 0 TSRMLS_CC);
 			}
 		}
 
@@ -563,7 +562,7 @@ static int ZEND_FASTCALL zend_do_fcall_common_helper_SPEC(ZEND_OPCODE_HANDLER_AR
 
 			if (!zend_execute_internal) {
 				/* saves one function call if zend_execute_internal is not used */
-				fbc->internal_function.handler(opline->extended_value, ret->var.ptr, (fbc->common.fn_flags & ZEND_ACC_RETURN_REFERENCE) ? &ret->var.ptr : NULL, EX(object), RETURN_VALUE_USED(opline) TSRMLS_CC);
+				fbc->internal_function.handler(num_args, ret->var.ptr, (fbc->common.fn_flags & ZEND_ACC_RETURN_REFERENCE) ? &ret->var.ptr : NULL, EX(object), RETURN_VALUE_USED(opline) TSRMLS_CC);
 			} else {
 				zend_execute_internal(execute_data, NULL, RETURN_VALUE_USED(opline) TSRMLS_CC);
 			}
@@ -613,7 +612,7 @@ static int ZEND_FASTCALL zend_do_fcall_common_helper_SPEC(ZEND_OPCODE_HANDLER_AR
 
 		/* Not sure what should be done here if it's a static method */
 		if (EXPECTED(EX(object) != NULL)) {
-			Z_OBJ_HT_P(EX(object))->call_method(fbc->common.function_name, opline->extended_value, EX_T(opline->result.var).var.ptr, &EX_T(opline->result.var).var.ptr, EX(object), RETURN_VALUE_USED(opline) TSRMLS_CC);
+			Z_OBJ_HT_P(EX(object))->call_method(fbc->common.function_name, num_args, EX_T(opline->result.var).var.ptr, &EX_T(opline->result.var).var.ptr, EX(object), RETURN_VALUE_USED(opline) TSRMLS_CC);
 		} else {
 			zend_error_noreturn(E_ERROR, "Cannot call overloaded function for non-object");
 		}
@@ -843,7 +842,7 @@ static int ZEND_FASTCALL  ZEND_RECV_SPEC_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
 	zval **param = zend_vm_stack_get_arg(arg_num TSRMLS_CC);
 
 	SAVE_OPLINE();
-	if (UNEXPECTED(param == NULL || *param == NULL)) {
+	if (UNEXPECTED(param == NULL)) {
 		if (zend_verify_arg_type((zend_function *) EG(active_op_array), arg_num, NULL, opline->extended_value TSRMLS_CC)) {
 			const char *space;
 			const char *class_name;
@@ -1580,7 +1579,7 @@ static int ZEND_FASTCALL  ZEND_RECV_INIT_SPEC_CONST_HANDLER(ZEND_OPCODE_HANDLER_
 	zval **var_ptr;
 
 	SAVE_OPLINE();
-	if (param == NULL || *param == NULL) {
+	if (param == NULL) {
 		ALLOC_ZVAL(assignment_value);
 		*assignment_value = *opline->op2.zv;
 		if ((Z_TYPE_P(assignment_value) & IS_CONSTANT_TYPE_MASK) == IS_CONSTANT ||

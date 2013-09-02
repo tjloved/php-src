@@ -2066,6 +2066,7 @@ ZEND_API int zend_register_functions(zend_class_entry *scope, const zend_functio
 		internal_function->function_name = (char*)ptr->fname;
 		internal_function->scope = scope;
 		internal_function->prototype = NULL;
+		internal_function->arg_offsets = NULL;
 		if (ptr->flags) {
 			if (!(ptr->flags & ZEND_ACC_PPP_MASK)) {
 				if (ptr->flags != ZEND_ACC_DEPRECATED || scope) {
@@ -2096,10 +2097,9 @@ ZEND_API int zend_register_functions(zend_class_entry *scope, const zend_functio
 				internal_function->fn_flags |= ZEND_ACC_VARIADIC;
 			}
 		} else {
+			internal_function->arg_info = NULL;
 			internal_function->num_args = 0;
 			internal_function->required_num_args = 0;
-			internal_function->arg_info = NULL;
-			internal_function->arg_offsets = NULL;
 		}
 		if (ptr->flags & ZEND_ACC_ABSTRACT) {
 			if (scope) {
@@ -4037,8 +4037,8 @@ ZEND_API int zend_get_arg_offset(zend_uint *arg_num_target, zend_function *fn, c
 		zend_arg_info *arg_info = fn->common.arg_info;
 		zend_uint i, num_args = fn->common.num_args;
 
-		ALLOC_HASHTABLE(arg_offsets);
-		zend_hash_init(arg_offsets, num_args, NULL, NULL, 0);
+		arg_offsets = pemalloc(sizeof(HashTable), fn->type != ZEND_USER_FUNCTION);
+		zend_hash_init(arg_offsets, num_args, NULL, NULL, fn->type != ZEND_USER_FUNCTION);
 		for (i = 0; i < num_args; ++i) {
 			zend_hash_update(arg_offsets, arg_info[i].name, arg_info[i].name_len + 1, &i, sizeof(zend_uint), NULL);
 		}
