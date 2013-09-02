@@ -269,6 +269,7 @@ struct _zend_op_array {
 	zend_uint num_args;
 	zend_uint required_num_args;
 	zend_arg_info *arg_info;
+	HashTable *arg_offsets;
 	/* END of common elements */
 
 	zend_uint *refcount;
@@ -326,6 +327,7 @@ typedef struct _zend_internal_function {
 	zend_uint num_args;
 	zend_uint required_num_args;
 	zend_arg_info *arg_info;
+	HashTable *arg_offsets;
 	/* END of common elements */
 
 	void (*handler)(INTERNAL_FUNCTION_PARAMETERS);
@@ -346,6 +348,7 @@ typedef union _zend_function {
 		zend_uint num_args;
 		zend_uint required_num_args;
 		zend_arg_info *arg_info;
+		HashTable *arg_offsets;
 	} common;
 
 	zend_op_array op_array;
@@ -378,6 +381,7 @@ typedef struct _call_slot {
 	zend_function     *fbc;
 	zval              *object;
 	zend_class_entry  *called_scope;
+	void             **stack_base;
 	zend_uint          num_additional_args;
 	zend_bool          is_ctor_call;
 	zend_bool          is_ctor_result_used;
@@ -510,7 +514,7 @@ void zend_do_begin_dynamic_function_call(znode *function_name, int prefix_len TS
 void zend_do_fetch_class(znode *result, znode *class_name TSRMLS_DC);
 void zend_do_build_full_name(znode *result, znode *prefix, znode *name, int is_class_member TSRMLS_DC);
 int zend_do_begin_class_member_function_call(znode *class_name, znode *method_name TSRMLS_DC);
-void zend_do_end_function_call(znode *function_name, znode *result, const znode *argument_list, int is_method, int is_dynamic_fcall TSRMLS_DC);
+void zend_do_end_function_call(znode *function_name, znode *result, int is_method, int is_dynamic_fcall TSRMLS_DC);
 void zend_do_return(znode *expr, int do_end_vparse TSRMLS_DC);
 void zend_do_yield(znode *result, znode *value, const znode *key, zend_bool is_variable TSRMLS_DC);
 void zend_do_handle_exception(TSRMLS_D);
@@ -546,8 +550,8 @@ ZEND_API void zend_do_inheritance(zend_class_entry *ce, zend_class_entry *parent
 void zend_do_early_binding(TSRMLS_D);
 ZEND_API void zend_do_delayed_early_binding(const zend_op_array *op_array TSRMLS_DC);
 
-void zend_do_pass_param(znode *param, zend_uchar op, int offset TSRMLS_DC);
-void zend_do_unpack_params(znode *params, int offset TSRMLS_DC);
+void zend_do_pass_param(znode *param, zend_uchar op, znode *named_arg TSRMLS_DC);
+void zend_do_unpack_params(znode *params TSRMLS_DC);
 
 
 void zend_do_boolean_or_begin(znode *expr1, znode *op_token TSRMLS_DC);
@@ -577,7 +581,7 @@ void zend_do_pop_object(znode *object TSRMLS_DC);
 
 
 void zend_do_begin_new_object(znode *new_token, znode *class_type TSRMLS_DC);
-void zend_do_end_new_object(znode *result, const znode *new_token, const znode *argument_list TSRMLS_DC);
+void zend_do_end_new_object(znode *result, const znode *new_token TSRMLS_DC);
 
 void zend_do_fetch_constant(znode *result, znode *constant_container, znode *constant_name, int mode, zend_bool check_namespace TSRMLS_DC);
 

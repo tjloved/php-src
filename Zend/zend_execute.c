@@ -1697,6 +1697,38 @@ zend_execute_data *zend_create_execute_data_from_op_array(zend_op_array *op_arra
 }
 /* }}} */
 
+zend_always_inline void zend_init_call_slot(call_slot *call TSRMLS_DC) /* {{{ */
+{
+	call->stack_base = zend_vm_stack_top(TSRMLS_C);
+	call->num_additional_args = 0;
+}
+/* }}} */
+
+inline void **zend_handle_named_arg(zend_uint *arg_num_target, call_slot *call, char *name, int name_len, zend_uint orig_arg_num TSRMLS_DC) /* {{{ */
+{
+	void **target;
+
+	if (zend_get_arg_offset(arg_num_target, call->fbc, name, name_len TSRMLS_CC) == FAILURE) {
+		zend_error(E_ERROR, "TODO:NAMED");
+	}
+	(*arg_num_target)++;
+
+	/* If the argument number is set it means we have to initialize the stack */
+	if (orig_arg_num) {
+		zend_uint num_init_args = call->fbc->common.num_args - orig_arg_num + 1;
+		ZEND_VM_STACK_GROW_IF_NEEDED(num_init_args);
+		memset(EG(argument_stack)->top, 0, num_init_args * sizeof(void *));
+		EG(argument_stack)->top += num_init_args;
+	}
+
+	target = call->stack_base + *arg_num_target - 1;
+	if (*target != NULL) {
+		zend_error(E_ERROR, "Parameter $%s already passed", name);
+	}
+	return target;
+}
+/* }}} */
+
 #define ZEND_VM_NEXT_OPCODE() \
 	CHECK_SYMBOL_TABLES() \
 	ZEND_VM_INC_OPCODE(); \

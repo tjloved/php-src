@@ -2096,9 +2096,10 @@ ZEND_API int zend_register_functions(zend_class_entry *scope, const zend_functio
 				internal_function->fn_flags |= ZEND_ACC_VARIADIC;
 			}
 		} else {
-			internal_function->arg_info = NULL;
 			internal_function->num_args = 0;
 			internal_function->required_num_args = 0;
+			internal_function->arg_info = NULL;
+			internal_function->arg_offsets = NULL;
 		}
 		if (ptr->flags & ZEND_ACC_ABSTRACT) {
 			if (scope) {
@@ -2863,6 +2864,7 @@ get_function_via_handler:
 				fcc->function_handler->internal_function.module = (ce_org->type == ZEND_INTERNAL_CLASS) ? ce_org->info.internal.module : NULL;
 				fcc->function_handler->internal_function.handler = zend_std_call_user_call;
 				fcc->function_handler->internal_function.arg_info = NULL;
+				fcc->function_handler->internal_function.arg_offsets = NULL;
 				fcc->function_handler->internal_function.num_args = 0;
 				fcc->function_handler->internal_function.scope = ce_org;
 				fcc->function_handler->internal_function.fn_flags = ZEND_ACC_CALL_VIA_HANDLER;
@@ -4025,6 +4027,26 @@ ZEND_API const char* zend_resolve_method_name(zend_class_entry *ce, zend_functio
 		zend_hash_move_forward_ex(function_table, &iterator);
 	}
 	return f->common.function_name;
+}
+/* }}} */
+
+ZEND_API int zend_get_arg_offset(zend_uint *arg_num_target, zend_function *fn, char *name, int name_len TSRMLS_DC) /* {{{ */
+{
+	HashTable *arg_offsets = fn->common.arg_offsets;
+	if (arg_offsets == NULL) {
+		zend_arg_info *arg_info = fn->common.arg_info;
+		zend_uint i, num_args = fn->common.num_args;
+
+		ALLOC_HASHTABLE(arg_offsets);
+		zend_hash_init(arg_offsets, num_args, NULL, NULL, 0);
+		for (i = 0; i < num_args; ++i) {
+			zend_hash_update(arg_offsets, arg_info[i].name, arg_info[i].name_len + 1, &i, sizeof(zend_uint), NULL);
+		}
+
+		fn->common.arg_offsets = arg_offsets;
+	}
+
+	return zend_hash_find(arg_offsets, name, name_len+1, (void **) &arg_num_target);
 }
 /* }}} */
 
