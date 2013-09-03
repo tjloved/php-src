@@ -1707,10 +1707,9 @@ inline void **zend_handle_named_arg(zend_uint *arg_num_target, call_slot *call, 
 {
 	void **target;
 
-	if (zend_get_arg_offset(arg_num_target, call->fbc, name, name_len TSRMLS_CC) == FAILURE) {
+	if (zend_get_arg_num(arg_num_target, call->fbc, name, name_len TSRMLS_CC) == FAILURE) {
 		zend_error(E_ERROR, "TODO:NAMED");
 	}
-	(*arg_num_target)++;
 
 	/* If the argument number is set it means we have to initialize the stack */
 	if (orig_arg_num) {
@@ -1726,6 +1725,24 @@ inline void **zend_handle_named_arg(zend_uint *arg_num_target, call_slot *call, 
 		zend_error(E_ERROR, "Parameter $%s already passed", name);
 	}
 	return target;
+}
+/* }}} */
+
+zend_always_inline zend_bool zend_is_by_ref_func_arg_fetch(zend_op *opline, call_slot *call TSRMLS_DC) /* {{{ */
+{
+	zend_op *send_op = opline + 1; /* next op must be a SEND */
+	zend_uint arg_num;
+
+	if (send_op->op2_type == IS_CONST) {
+		if (zend_get_arg_num(&arg_num, call->fbc, Z_STRVAL_P(send_op->op2.zv), Z_STRLEN_P(send_op->op2.zv) TSRMLS_CC) == SUCCESS) {
+			return ARG_SHOULD_BE_SENT_BY_REF(call->fbc, arg_num);
+		} else {
+			return 0; /* TODO:NAMED */
+		}
+	} else {
+ 		arg_num = (opline->extended_value & ZEND_FETCH_ARG_MASK) + call->num_additional_args;
+		return ARG_SHOULD_BE_SENT_BY_REF(call->fbc, arg_num);
+	}
 }
 /* }}} */
 

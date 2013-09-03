@@ -525,7 +525,7 @@ ZEND_API void zend_rebuild_symbol_table(TSRMLS_D);
 
 ZEND_API const char* zend_find_alias_name(zend_class_entry *ce, const char *name, zend_uint len);
 ZEND_API const char* zend_resolve_method_name(zend_class_entry *ce, zend_function *f);
-ZEND_API int zend_get_arg_offset(zend_uint *arg_num_target, zend_function *fn, char *name, int name_len TSRMLS_DC);
+ZEND_API int zend_get_arg_num(zend_uint *arg_num_target, zend_function *fn, char *name, int name_len TSRMLS_DC);
 
 #define add_method(arg, key, method)	add_assoc_function((arg), (key), (method))
 
