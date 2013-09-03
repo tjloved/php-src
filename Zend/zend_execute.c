@@ -1708,7 +1708,8 @@ inline void **zend_handle_named_arg(zend_uint *arg_num_target, call_slot *call, 
 	void **target;
 
 	if (zend_get_arg_num(arg_num_target, call->fbc, name, name_len TSRMLS_CC) == FAILURE) {
-		zend_error(E_ERROR, "TODO:NAMED");
+		/* TODO:NAMED variadic */
+		zend_error(E_ERROR, "Unknown parameter $%s", name);
 	}
 
 	/* If the argument number is set it means we have to initialize the stack */

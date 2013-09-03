@@ -564,9 +564,14 @@ function_call_parameter:
 	|	variable				{ zend_do_pass_param(&$1, ZEND_SEND_VAR, NULL TSRMLS_CC); }
 	|	'&' w_variable 			{ zend_do_pass_param(&$2, ZEND_SEND_REF, NULL TSRMLS_CC); }
 	|	T_ELLIPSIS expr			{ zend_do_unpack_params(&$2 TSRMLS_CC); }
-	|	T_STRING T_DOUBLE_ARROW expr_without_variable	{ zend_do_pass_param(&$3, ZEND_SEND_VAL, &$1 TSRMLS_CC); }
-	|	T_STRING T_DOUBLE_ARROW variable				{ zend_do_pass_param(&$3, ZEND_SEND_VAR, &$1 TSRMLS_CC); }
-	|	T_STRING T_DOUBLE_ARROW '&' w_variable 			{ zend_do_pass_param(&$4, ZEND_SEND_REF, &$1 TSRMLS_CC); }
+	|	named_arg T_DOUBLE_ARROW expr_without_variable	{ zend_do_pass_param(&$3, ZEND_SEND_VAL, &$1 TSRMLS_CC); }
+	|	named_arg T_DOUBLE_ARROW variable				{ zend_do_pass_param(&$3, ZEND_SEND_VAR, &$1 TSRMLS_CC); }
+	|	named_arg T_DOUBLE_ARROW '&' w_variable 		{ zend_do_pass_param(&$4, ZEND_SEND_REF, &$1 TSRMLS_CC); }
+;
+
+named_arg:
+		T_STRING					{ $$ = $1; }
+	|	T_CONSTANT_ENCAPSED_STRING	{ $$ = $1; }
 ;
 
 global_var_list:
