@@ -766,6 +766,7 @@ static int zend_parse_va_args(int num_args, const char *type_spec, va_list *va, 
 	zval ****varargs = NULL;
 	int *n_varargs = NULL;
 	int disallow_default = flags & ZEND_PARSE_PARAMS_NODEFAULT;
+	zval zv, *zv_ptr = &zv;
 
 	for (spec_walk = type_spec; *spec_walk; spec_walk++) {
 		c = *spec_walk;
@@ -923,9 +924,9 @@ static int zend_parse_va_args(int num_args, const char *type_spec, va_list *va, 
 		arg = (zval **) (zend_vm_stack_top(TSRMLS_C) - 1 - (arg_count-i));
 
 		parse_failed = 0;
-		if(*arg == NULL) {
+		if (*arg == NULL) {
 			/* we have skipped arg */
-			if(i < min_num_args || disallow_default || type_spec[1] == '/') {
+			if (i < min_num_args || disallow_default || type_spec[1] == '/') {
 				/* this is one of the required args or skipping is prohibited or we'd need to write there */
 				if (!quiet) {
 					zend_function *active_function = EG(current_execute_data)->function_state.function;
@@ -938,17 +939,12 @@ static int zend_parse_va_args(int num_args, const char *type_spec, va_list *va, 
 				}
 				parse_failed = 1;
 			} else {
-				if(type_spec[1] == '!') {
-					/* for !, create a null */
-					zval tmp = {0};
-					zval *ptmp = &tmp;
-					ZVAL_NULL(ptmp);
-					arg = &ptmp;
-				} else {
-				/* optional arg - just skip it */
-				continue;
+				/* act as if NULL zval was passed */
+				INIT_PZVAL(zv_ptr);
+				ZVAL_NULL(zv_ptr);
+				arg = &zv_ptr;
+				/* TODO:NAMED this likely doesn't make sense */
 			}
-		}
 		}
 
 		if (parse_failed || zend_parse_arg(i+1, arg, va, &type_spec, quiet TSRMLS_CC) == FAILURE) {

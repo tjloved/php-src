@@ -414,9 +414,9 @@ static int ZEND_FASTCALL zend_leave_helper_SPEC(ZEND_OPCODE_HANDLER_ARGS)
 		LOAD_REGS();
 		LOAD_OPLINE();
 		if (UNEXPECTED(opline->opcode == ZEND_INCLUDE_OR_EVAL)) {
-
 			EX(function_state).function = (zend_function *) EX(op_array);
 			EX(function_state).arguments = NULL;
+			EX(function_state).additional_named_args = NULL;
 
 			EG(opline_ptr) = &EX(opline);
 			EG(active_op_array) = EX(op_array);
@@ -441,6 +441,12 @@ static int ZEND_FASTCALL zend_leave_helper_SPEC(ZEND_OPCODE_HANDLER_ARGS)
 
 			EX(function_state).function = (zend_function *) EX(op_array);
 			EX(function_state).arguments = NULL;
+
+			if (EX(function_state).additional_named_args) {
+				zend_hash_destroy(EX(function_state).additional_named_args);
+				FREE_HASHTABLE(EX(function_state).additional_named_args);
+				EX(function_state).additional_named_args = NULL;
+			}
 
 			if (EG(This)) {
 				if (UNEXPECTED(EG(exception) != NULL) && EX(call)->is_ctor_call) {
@@ -526,18 +532,8 @@ static int ZEND_FASTCALL zend_do_fcall_common_helper_SPEC(ZEND_OPCODE_HANDLER_AR
 		EG(called_scope) = EX(call)->called_scope;
 	}
 
-	if (EX(call)->num_additional_args < 0) {
-		/* Due to use of named args there are trailing NULL args */
-		zend_uint i = 0;
-		while (*(EG(argument_stack)->top-1) == NULL) {
-			EG(argument_stack)->top--;
-			i++;
-		}
-		num_args = opline->extended_value - EX(call)->num_additional_args - i;
-	} else {
-		num_args = opline->extended_value + EX(call)->num_additional_args;
-	}
-
+	num_args = opline->extended_value + EX(call)->num_additional_args;
+	EX(function_state).additional_named_args = EX(call)->additional_named_args;
 	EX(function_state).arguments = zend_vm_stack_top(TSRMLS_C);
 	zend_vm_stack_push((void*)(zend_uintptr_t) num_args TSRMLS_CC);
 	LOAD_OPLINE();
@@ -634,6 +630,12 @@ static int ZEND_FASTCALL zend_do_fcall_common_helper_SPEC(ZEND_OPCODE_HANDLER_AR
 
 	EX(function_state).function = (zend_function *) EX(op_array);
 	EX(function_state).arguments = NULL;
+
+	if (EX(function_state).additional_named_args) {
+		zend_hash_destroy(EX(function_state).additional_named_args);
+		FREE_HASHTABLE(EX(function_state).additional_named_args);
+		EX(function_state).additional_named_args = NULL;
+	}
 
 	if (should_change_scope) {
 		if (EG(This)) {
@@ -901,6 +903,13 @@ static int ZEND_FASTCALL  ZEND_RECV_VARIADIC_SPEC_HANDLER(ZEND_OPCODE_HANDLER_AR
 		zend_verify_arg_type((zend_function *) EG(active_op_array), arg_num, *param, opline->extended_value TSRMLS_CC);
 		zend_hash_next_index_insert(Z_ARRVAL_P(params), param, sizeof(zval *), NULL);
 		Z_ADDREF_PP(param);
+	}
+
+	if (EX(prev_execute_data)->function_state.additional_named_args != NULL) {
+		zend_hash_copy(
+			Z_ARRVAL_P(params), EX(prev_execute_data)->function_state.additional_named_args,
+			(copy_ctor_func_t) zval_add_ref, NULL, sizeof(zval *)
+		);
 	}
 
 	CHECK_EXCEPTION();
@@ -15920,7 +15929,7 @@ static int ZEND_FASTCALL zend_send_by_ref_helper_SPEC_VAR_CONST(void **target, Z
 		ZEND_VM_NEXT_OPCODE();
 	}
 
-	/* Can this conditional be true? */
+	/* TODO: Can this conditional be true? */
 	if (opline->extended_value == ZEND_DO_FCALL_BY_NAME &&
 	    EX(function_state).function->type == ZEND_INTERNAL_FUNCTION) {
 		int arg_num = opline->result.num + EX(call)->num_additional_args;
@@ -22202,7 +22211,7 @@ static int ZEND_FASTCALL zend_send_by_ref_helper_SPEC_VAR_UNUSED(void **target, 
 		ZEND_VM_NEXT_OPCODE();
 	}
 
-	/* Can this conditional be true? */
+	/* TODO: Can this conditional be true? */
 	if (opline->extended_value == ZEND_DO_FCALL_BY_NAME &&
 	    EX(function_state).function->type == ZEND_INTERNAL_FUNCTION) {
 		int arg_num = opline->result.num + EX(call)->num_additional_args;
@@ -33530,7 +33539,7 @@ static int ZEND_FASTCALL zend_send_by_ref_helper_SPEC_CV_CONST(void **target, ZE
 		ZEND_VM_NEXT_OPCODE();
 	}
 
-	/* Can this conditional be true? */
+	/* TODO: Can this conditional be true? */
 	if (opline->extended_value == ZEND_DO_FCALL_BY_NAME &&
 	    EX(function_state).function->type == ZEND_INTERNAL_FUNCTION) {
 		int arg_num = opline->result.num + EX(call)->num_additional_args;
@@ -39303,7 +39312,7 @@ static int ZEND_FASTCALL zend_send_by_ref_helper_SPEC_CV_UNUSED(void **target, Z
 		ZEND_VM_NEXT_OPCODE();
 	}
 
-	/* Can this conditional be true? */
+	/* TODO: Can this conditional be true? */
 	if (opline->extended_value == ZEND_DO_FCALL_BY_NAME &&
 	    EX(function_state).function->type == ZEND_INTERNAL_FUNCTION) {
 		int arg_num = opline->result.num + EX(call)->num_additional_args;

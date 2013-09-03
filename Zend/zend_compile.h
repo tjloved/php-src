@@ -359,6 +359,7 @@ typedef union _zend_function {
 typedef struct _zend_function_state {
 	zend_function *function;
 	void **arguments;
+	HashTable *additional_named_args;
 } zend_function_state;
 
 
@@ -381,8 +382,8 @@ typedef struct _call_slot {
 	zend_function     *fbc;
 	zval              *object;
 	zend_class_entry  *called_scope;
-	void             **stack_base;
-	int                num_additional_args;
+	HashTable         *additional_named_args;
+	zend_uint          num_additional_args;
 	zend_bool          is_ctor_call;
 	zend_bool          is_ctor_result_used;
 } call_slot;

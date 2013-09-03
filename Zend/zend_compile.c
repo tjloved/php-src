@@ -2562,12 +2562,12 @@ void zend_do_end_function_call(znode *function_name, znode *result, int is_metho
 	opline->result.var = get_temporary_variable(CG(active_op_array));
 	opline->result_type = IS_VAR;
 	GET_NODE(result, opline->result);
-	opline->extended_value = fcall->arg_num - fcall->named_arg_num;
+	opline->extended_value = fcall->arg_num;
 
 	if (CG(context).used_stack + 1 > CG(active_op_array)->used_stack) {
 		CG(active_op_array)->used_stack = CG(context).used_stack + 1;
 	}
-	CG(context).used_stack -= fcall->arg_num - fcall->named_arg_num;
+	CG(context).used_stack -= fcall->arg_num;
 
 	zend_stack_del_top(&CG(function_call_stack));
 }
@@ -2601,7 +2601,6 @@ void zend_do_pass_param(znode *param, zend_uchar op, znode *named_arg TSRMLS_DC)
 
 	zend_stack_top(&CG(function_call_stack), (void **) &fcall);
 	function_ptr = fcall->fbc;
-	fcall->arg_num++;
 
 	if (named_arg != NULL) {
 		if (fcall->named_arg_num == 0 && function_ptr) {
@@ -2612,6 +2611,8 @@ void zend_do_pass_param(znode *param, zend_uchar op, znode *named_arg TSRMLS_DC)
 		function_ptr = NULL;
 	} else if (fcall->named_arg_num > 0) {
 		zend_error(E_COMPILE_ERROR, "Cannot pass positional arguments after named arguments");
+	} else {
+		fcall->arg_num++;
 	}
 
 	if (original_op == ZEND_SEND_REF) {
@@ -2708,14 +2709,7 @@ void zend_do_pass_param(znode *param, zend_uchar op, znode *named_arg TSRMLS_DC)
 		opline->result.num = fcall->arg_num;
 	} else {
 		SET_NODE(opline->op2, named_arg);
-
-		/* The first named argument gets an argument number to initialize the stack */
-		if (fcall->named_arg_num > 0) {
-			opline->result.num = 0;
-		} else {
-			opline->result.num = fcall->arg_num;
-		}
-
+		opline->result.num = fcall->arg_num;
 		fcall->named_arg_num++;
 	}
 

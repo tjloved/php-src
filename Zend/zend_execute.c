@@ -1642,6 +1642,15 @@ static zend_always_inline zend_execute_data *i_create_execute_data_from_op_array
 				Z_ADDREF_P(arg_dst[i]);
 			}
 		}
+
+		if (EG(current_execute_data)->function_state.additional_named_args) {
+			ALLOC_HASHTABLE(EX(prev_execute_data)->function_state.additional_named_args);
+			zend_hash_copy(
+				EX(prev_execute_data)->function_state.additional_named_args,
+				EG(current_execute_data)->function_state.additional_named_args,
+				(copy_ctor_func_t) zval_add_ref, NULL, sizeof(zval *)
+			);
+		}
 	} else {
 		execute_data = zend_vm_stack_alloc(total_size TSRMLS_CC);
 		execute_data = (zend_execute_data*)((char*)execute_data + Ts_size);
@@ -1686,6 +1695,7 @@ static zend_always_inline zend_execute_data *i_create_execute_data_from_op_array
 
 	EX(function_state).function = (zend_function *) op_array;
 	EX(function_state).arguments = NULL;
+	EX(function_state).additional_named_args = NULL;
 
 	return execute_data;
 }
@@ -1700,31 +1710,57 @@ zend_execute_data *zend_create_execute_data_from_op_array(zend_op_array *op_arra
 zend_always_inline void zend_init_call_slot(call_slot *call TSRMLS_DC) /* {{{ */
 {
 	call->num_additional_args = 0;
+	call->additional_named_args = NULL;
 }
 /* }}} */
 
 inline void **zend_handle_named_arg(zend_uint *arg_num_target, call_slot *call, char *name, int name_len, zend_uint orig_arg_num TSRMLS_DC) /* {{{ */
 {
 	void **target;
+	zend_uint arg_num;
+	int relative_arg_num;
 
 	if (zend_get_arg_num(arg_num_target, call->fbc, name, name_len TSRMLS_CC) == FAILURE) {
-		/* TODO:NAMED variadic */
-		zend_error(E_ERROR, "Unknown parameter $%s", name);
+		if (call->fbc->common.fn_flags & ZEND_ACC_VARIADIC) {
+			if (!call->additional_named_args) {
+				ALLOC_HASHTABLE(call->additional_named_args);
+				zend_hash_init(call->additional_named_args, 0, NULL, ZVAL_PTR_DTOR, 0);
+			}
+
+			if (zend_hash_find(call->additional_named_args, name, name_len+1, (void **) &target) == SUCCESS) {
+				zval_ptr_dtor((zval **) target);
+				zend_error(E_WARNING, "Overwriting already passed parameter $%s", name);
+			} else {
+				void *dummy = NULL;
+				zend_hash_update(call->additional_named_args, name, name_len+1, &dummy, sizeof(zval *), (void **) &target);
+			}
+
+			*arg_num_target = call->fbc->common.num_args;
+			return target;
+		} else {
+			zend_error_noreturn(E_ERROR, "Unknown named argument $%s", name);
+		}
 	}
 
-	/* If the argument number is set it means we have to initialize the stack */
-	if (orig_arg_num) {
-		zend_uint num_init_args = call->fbc->common.num_args - orig_arg_num + 1;
-		ZEND_VM_STACK_GROW_IF_NEEDED(num_init_args);
-		memset(EG(argument_stack)->top, 0, num_init_args * sizeof(void *));
-		EG(argument_stack)->top += num_init_args;
-		call->num_additional_args = -num_init_args;
+	arg_num = *arg_num_target;
+	relative_arg_num = arg_num - orig_arg_num - call->num_additional_args - 1;
+
+	target = EG(argument_stack)->top + relative_arg_num;
+	if (relative_arg_num < 0) {
+		if (*target != NULL) {
+			zval_ptr_dtor((zval **) target);
+			zend_error(E_WARNING, "Overwriting already passed parameter $%s", name);
+		}
+	} else if (relative_arg_num > 0) {
+		ZEND_VM_STACK_GROW_IF_NEEDED(relative_arg_num);
+		memset(EG(argument_stack)->top, 0, relative_arg_num * sizeof(void *));
+		EG(argument_stack)->top += relative_arg_num + 1;
+		call->num_additional_args += relative_arg_num + 1;
+	} else {
+		EG(argument_stack)->top++;
+		call->num_additional_args++;
 	}
 
-	target = EG(argument_stack)->top - call->fbc->common.num_args + *arg_num_target - 1;
-	if (*target != NULL) {
-		zend_error(E_ERROR, "Parameter $%s already passed", name);
-	}
 	return target;
 }
 /* }}} */

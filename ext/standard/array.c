@@ -2056,14 +2056,15 @@ PHP_FUNCTION(array_splice)
 			length = 0,
 			repl_num = 0;		/* Number of replacement elements */
 	int		num_in;				/* Number of elements in the input array */
+	zend_bool length_null;
 
-	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "al|lz/", &array, &offset, &length, &repl_array) == FAILURE) {
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "al|l!z/", &array, &offset, &length, &length_null, &repl_array) == FAILURE) {
 		return;
 	}
 
 	num_in = zend_hash_num_elements(Z_ARRVAL_P(array));
 
-	if (ZEND_NUM_ARGS() < 3) {
+	if (length_null) {
 		length = num_in;
 	}
 
