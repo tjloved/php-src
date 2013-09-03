@@ -332,6 +332,15 @@ static zend_always_inline zval** zend_vm_stack_get_arg_ex(zend_execute_data *ex,
 	return (zval **) arg;
 }
 
+static zend_always_inline zval** zend_vm_stack_get_args(zend_execute_data *ex)
+{
+	void **p = ex->function_state.arguments;
+	int arg_count = (int)(zend_uintptr_t) *p;
+
+	return (zval**)p - arg_count;
+}
+
+
 static zend_always_inline int zend_vm_stack_get_args_count(TSRMLS_D)
 {
 	return zend_vm_stack_get_args_count_ex(EG(current_execute_data)->prev_execute_data);

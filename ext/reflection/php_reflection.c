@@ -3797,18 +3797,14 @@ ZEND_METHOD(reflection_class, getMethods)
 {
 	reflection_object *intern;
 	zend_class_entry *ce;
-	long filter = 0;
+	/* If no parameters given, default to "return all" */
+	long filter = ZEND_ACC_PPP_MASK | ZEND_ACC_ABSTRACT | ZEND_ACC_FINAL | ZEND_ACC_STATIC;
 	int argc = ZEND_NUM_ARGS();
 
 	METHOD_NOTSTATIC(reflection_class_ptr);
-	if (argc) {
 		if (zend_parse_parameters(argc TSRMLS_CC, "|l", &filter) == FAILURE) {
 			return;
 		}
-	} else {
-		/* No parameters given, default to "return all" */
-		filter = ZEND_ACC_PPP_MASK | ZEND_ACC_ABSTRACT | ZEND_ACC_FINAL | ZEND_ACC_STATIC;
-	}
 
 	GET_REFLECTION_OBJECT_PTR(ce);
 
@@ -3987,18 +3983,14 @@ ZEND_METHOD(reflection_class, getProperties)
 {
 	reflection_object *intern;
 	zend_class_entry *ce;
-	long filter = 0;
+	/* If no parameters given, default to "return all" */
+	long filter = ZEND_ACC_PPP_MASK | ZEND_ACC_STATIC;
 	int argc = ZEND_NUM_ARGS();
 
 	METHOD_NOTSTATIC(reflection_class_ptr);
-	if (argc) {
 		if (zend_parse_parameters(argc TSRMLS_CC, "|l", &filter) == FAILURE) {
 			return;
 		}
-	} else {
-		/* No parameters given, default to "return all" */
-		filter = ZEND_ACC_PPP_MASK | ZEND_ACC_STATIC;
-	}
 
 	GET_REFLECTION_OBJECT_PTR(ce);
 
@@ -4319,7 +4311,7 @@ ZEND_METHOD(reflection_class, newInstanceArgs)
 	reflection_object *intern;
 	zend_class_entry *ce, *old_scope;
 	int argc = 0;
-	HashTable *args;
+	HashTable *args = NULL;
 	zend_function *constructor;
 
 
@@ -4329,8 +4321,7 @@ ZEND_METHOD(reflection_class, newInstanceArgs)
 	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "|h", &args) == FAILURE) {
 		return;
 	}
-
-	if (ZEND_NUM_ARGS() > 0) {
+	if (args != NULL) {
 		argc = args->nNumOfElements;
 	}
 
@@ -4392,7 +4383,9 @@ ZEND_METHOD(reflection_class, newInstanceArgs)
 		if (params) {
 			efree(params);
 		}
-	} else if (argc) {
+	} else if (args == NULL || !argc) {
+		object_init_ex(return_value, ce);
+	} else {
 		zend_throw_exception_ex(reflection_exception_ptr, 0 TSRMLS_CC, "Class %s does not have a constructor, so you cannot pass any constructor arguments", ce->name);
 	}
 }

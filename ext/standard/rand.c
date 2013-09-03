@@ -232,7 +232,7 @@ PHP_FUNCTION(srand)
 {
 	long seed = 0;
 
-	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "|l", &seed) == FAILURE)
+	if (zend_parse_parameters_ex(ZEND_PARSE_PARAMS_NODEFAULT, ZEND_NUM_ARGS() TSRMLS_CC, "|l", &seed) == FAILURE)
 		return;
 
 	if (ZEND_NUM_ARGS() == 0)
@@ -248,7 +248,7 @@ PHP_FUNCTION(mt_srand)
 {
 	long seed = 0;
 
-	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "|l", &seed) == FAILURE) 
+	if (zend_parse_parameters_ex(ZEND_PARSE_PARAMS_NODEFAULT, ZEND_NUM_ARGS() TSRMLS_CC, "|l", &seed) == FAILURE)
 		return;
 
 	if (ZEND_NUM_ARGS() == 0)

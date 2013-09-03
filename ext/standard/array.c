@@ -1493,10 +1493,10 @@ PHP_FUNCTION(compact)
 	if (ZEND_NUM_ARGS() == 1 && Z_TYPE_PP(args[0]) == IS_ARRAY) {
 		array_init_size(return_value, zend_hash_num_elements(Z_ARRVAL_PP(args[0])));
 	} else {
-		array_init_size(return_value, ZEND_NUM_ARGS());
+		array_init_size(return_value, num_args);
 	}
 
-	for (i=0; i<ZEND_NUM_ARGS(); i++) {
+	for (i=0; i<num_args; i++) {
 		php_compact_var(EG(active_symbol_table), return_value, *args[i] TSRMLS_CC);
 	}
 
@@ -2067,7 +2067,7 @@ PHP_FUNCTION(array_splice)
 		length = num_in;
 	}
 
-	if (ZEND_NUM_ARGS() == 4) {
+	if (repl_array != NULL) {
 		/* Make sure the last argument, if passed, is an array */
 		convert_to_array(repl_array);
 
@@ -2116,7 +2116,7 @@ PHP_FUNCTION(array_splice)
 	zend_hash_destroy(&old_hash);
 
 	/* Clean up */
-	if (ZEND_NUM_ARGS() == 4) {
+	if (repl_array != NULL) {
 		efree(repl);
 	}
 }
@@ -2147,7 +2147,7 @@ PHP_FUNCTION(array_slice)
 	num_in = zend_hash_num_elements(Z_ARRVAL_P(input));
 
 	/* We want all entries from offset to the end if length is not passed or is null */
-	if (ZEND_NUM_ARGS() < 3 || Z_TYPE_PP(z_length) == IS_NULL) {
+	if (z_length == NULL || Z_TYPE_PP(z_length) == IS_NULL) {
 		length = num_in;
 	} else {
 		convert_to_long_ex(z_length);
@@ -2938,24 +2938,22 @@ static void php_array_intersect_key(INTERNAL_FUNCTION_PARAMETERS, int data_compa
 {
 	Bucket *p;
 	int argc, i;
-	zval ***args;
+	zval ***args = NULL;
 	int (*intersect_data_compare_func)(zval **, zval ** TSRMLS_DC) = NULL;
 	zend_bool ok;
 	zval **data;
-	int req_args;
 	char *param_spec;
+	int req_args = 2;
 
 	/* Get the argument count */
-	argc = ZEND_NUM_ARGS();
 	if (data_compare_type == INTERSECT_COMP_DATA_USER) {
 		/* INTERSECT_COMP_DATA_USER - array_uintersect_assoc() */
-		req_args = 3;
 		param_spec = "+f";
+		req_args = 3;
 		intersect_data_compare_func = zval_user_compare;
 	} else {
 		/* 	INTERSECT_COMP_DATA_NONE - array_intersect_key()
 			INTERSECT_COMP_DATA_INTERNAL - array_intersect_assoc() */
-		req_args = 2;
 		param_spec = "+";
 				
 		if (data_compare_type == INTERSECT_COMP_DATA_INTERNAL) {
@@ -2963,12 +2961,17 @@ static void php_array_intersect_key(INTERNAL_FUNCTION_PARAMETERS, int data_compa
 		}
 	}
 	
-	if (argc < req_args) {
-		php_error_docref(NULL TSRMLS_CC, E_WARNING, "at least %d parameters are required, %d given", req_args, argc);
+	if (ZEND_NUM_ARGS() < req_args) {
+		php_error_docref(NULL TSRMLS_CC, E_WARNING, "at least %d parameters are required, %d given", req_args, ZEND_NUM_ARGS());
 		return;
 	}
 
 	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, param_spec, &args, &argc, &BG(user_compare_fci), &BG(user_compare_fci_cache)) == FAILURE) {
+		return;
+	}
+
+	if (argc < 2) {
+		php_error_docref(NULL TSRMLS_CC, E_WARNING, "at least %d parameters are required, %d given", req_args, argc+req_args-2);
 		return;
 	}
 
@@ -3114,6 +3117,11 @@ static void php_array_intersect(INTERNAL_FUNCTION_PARAMETERS, int behavior, int 
 		}
 
 		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, param_spec, &args, &arr_argc, &fci1, &fci1_cache, &fci2, &fci2_cache) == FAILURE) {
+			return;
+		}
+
+		if (arr_argc < 2) {
+			php_error_docref(NULL TSRMLS_CC, E_WARNING, "at least %d parameters are required, %d given", req_args, arr_argc+req_args-2);
 			return;
 		}
 
@@ -3365,29 +3373,34 @@ static void php_array_diff_key(INTERNAL_FUNCTION_PARAMETERS, int data_compare_ty
 	int (*diff_data_compare_func)(zval **, zval ** TSRMLS_DC) = NULL;
 	zend_bool ok;
 	zval **data;
+	int req_args = 2;
+	char *param_spec;
 
 	/* Get the argument count */
 	argc = ZEND_NUM_ARGS();
 	if (data_compare_type == DIFF_COMP_DATA_USER) {
-		if (argc < 3) {
-			php_error_docref(NULL TSRMLS_CC, E_WARNING, "at least 3 parameters are required, %d given", ZEND_NUM_ARGS());
-			return;
-		}
-		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "+f", &args, &argc, &BG(user_compare_fci), &BG(user_compare_fci_cache)) == FAILURE) {
-			return;
-		}
+		req_args = 3;
+		param_spec = "+f";
 		diff_data_compare_func = zval_user_compare;
 	} else {
-		if (argc < 2) {
-			php_error_docref(NULL TSRMLS_CC, E_WARNING, "at least 2 parameters are required, %d given", ZEND_NUM_ARGS());
-			return;
-		}
-		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "+", &args, &argc) == FAILURE) {
-			return;
-		}
+		param_spec = "+";
 		if (data_compare_type == DIFF_COMP_DATA_INTERNAL) {
 			diff_data_compare_func = zval_compare;
 		}
+	}
+
+	if (argc < req_args) {
+		php_error_docref(NULL TSRMLS_CC, E_WARNING, "at least %d parameters are required, %d given", req_args, ZEND_NUM_ARGS());
+			return;
+		}
+
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, param_spec, &args, &argc, &BG(user_compare_fci), &BG(user_compare_fci_cache)) == FAILURE) {
+		return;
+		}
+
+	if (argc < 2) {
+		php_error_docref(NULL TSRMLS_CC, E_WARNING, "at least %d parameters are required, %d given", req_args, argc+req_args-2);
+		return;
 	}
 
 	for (i = 0; i < argc; i++) {
@@ -3531,6 +3544,11 @@ static void php_array_diff(INTERNAL_FUNCTION_PARAMETERS, int behavior, int data_
 		}
 
 		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, param_spec, &args, &arr_argc, &fci1, &fci1_cache, &fci2, &fci2_cache) == FAILURE) {
+			return;
+		}
+
+		if (arr_argc < 2) {
+			php_error_docref(NULL TSRMLS_CC, E_WARNING, "at least %d parameters are required, %d given", req_args, arr_argc+req_args-2);
 			return;
 		}
 
@@ -4003,12 +4021,11 @@ PHP_FUNCTION(array_rand)
 
 	num_avail = zend_hash_num_elements(Z_ARRVAL_P(input));
 
-	if (ZEND_NUM_ARGS() > 1) {
 		if (num_req <= 0 || num_req > num_avail) {
 			php_error_docref(NULL TSRMLS_CC, E_WARNING, "Second argument has to be between 1 and the number of elements in the array");
 			return;
 		}
-	}
+
 
 	/* Make the return value an array only if we need to pass back more than one result. */
 	if (num_req > 1) {
@@ -4138,7 +4155,7 @@ PHP_FUNCTION(array_reduce)
 		return;
 	}
 
-	if (ZEND_NUM_ARGS() > 2) {
+	if (initial != NULL) {
 		ALLOC_ZVAL(result);
 		MAKE_COPY_ZVAL(&initial, result);
 	} else {
@@ -4212,7 +4229,7 @@ PHP_FUNCTION(array_filter)
 		return;
 	}
 
-	if (ZEND_NUM_ARGS() > 1) {
+	if (fci.size > 0) {
 		have_callback = 1;
 		fci.no_separation = 0;
 		fci.retval_ptr_ptr = &retval;
@@ -4427,7 +4444,7 @@ PHP_FUNCTION(array_key_exists)
    Split array into chunks */
 PHP_FUNCTION(array_chunk)
 {
-	int argc = ZEND_NUM_ARGS(), key_type, num_in;
+	int key_type, num_in;
 	long size, current = 0;
 	char *str_key;
 	uint str_key_len;
@@ -4438,7 +4455,7 @@ PHP_FUNCTION(array_chunk)
 	zval **entry;
 	HashPosition pos;
 
-	if (zend_parse_parameters(argc TSRMLS_CC, "al|b", &input, &size, &preserve_keys) == FAILURE) {
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "al|b", &input, &size, &preserve_keys) == FAILURE) {
 		return;
 	}
 	/* Do bounds checking for size parameter. */
