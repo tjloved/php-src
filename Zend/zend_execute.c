@@ -1711,14 +1711,29 @@ zend_always_inline void zend_init_call_slot(call_slot *call TSRMLS_DC) /* {{{ */
 {
 	call->num_additional_args = 0;
 	call->additional_named_args = NULL;
+	call->uses_named_args = 0;
 }
 /* }}} */
 
-inline void **zend_handle_named_arg(zend_uint *arg_num_target, call_slot *call, char *name, int name_len, zend_uint orig_arg_num TSRMLS_DC) /* {{{ */
+zend_always_inline void zend_check_for_overwritten_parameter(zend_function *fbc, zend_uint arg_num, void **target) /* {{{ */
+{
+	if (*target != NULL) {
+		zval_ptr_dtor((zval **) target);
+		zend_error(
+			E_WARNING, "Overwriting already passed parameter %d ($%s)",
+			arg_num, fbc->common.arg_info[arg_num - 1].name
+		);
+	}
+}
+/* }}} */
+
+void **zend_handle_named_arg(zend_uint *arg_num_target, call_slot *call, char *name, int name_len, zend_uint orig_arg_num TSRMLS_DC) /* {{{ */
 {
 	void **target;
 	zend_uint arg_num;
 	int relative_arg_num;
+
+	call->uses_named_args = 1;
 
 	if (zend_get_arg_num(arg_num_target, call->fbc, name, name_len TSRMLS_CC) == FAILURE) {
 		if (call->fbc->common.fn_flags & ZEND_ACC_VARIADIC) {
@@ -1747,10 +1762,7 @@ inline void **zend_handle_named_arg(zend_uint *arg_num_target, call_slot *call, 
 
 	target = EG(argument_stack)->top + relative_arg_num;
 	if (relative_arg_num < 0) {
-		if (*target != NULL) {
-			zval_ptr_dtor((zval **) target);
-			zend_error(E_WARNING, "Overwriting already passed parameter $%s", name);
-		}
+		zend_check_for_overwritten_parameter(call->fbc, arg_num, target);
 	} else if (relative_arg_num > 0) {
 		ZEND_VM_STACK_GROW_IF_NEEDED(relative_arg_num);
 		memset(EG(argument_stack)->top, 0, relative_arg_num * sizeof(void *));

@@ -719,7 +719,7 @@ static int ZEND_FASTCALL  ZEND_SEND_UNPACK_SPEC_HANDLER(ZEND_OPCODE_HANDLER_ARGS
 	USE_OPLINE
 	zend_free_op free_op1;
 	zval *args;
-	int arg_num;
+	zend_uint arg_num;
 	SAVE_OPLINE();
 
 	args = get_zval_ptr(opline->op1_type, &opline->op1, execute_data, &free_op1, BP_VAR_R);
@@ -731,14 +731,34 @@ static int ZEND_FASTCALL  ZEND_SEND_UNPACK_SPEC_HANDLER(ZEND_OPCODE_HANDLER_ARGS
 			HashPosition pos;
 			zval **arg_ptr, *arg;
 
-			long num_args = zend_hash_num_elements(ht);
-			ZEND_VM_STACK_GROW_IF_NEEDED(num_args);
-			EX(call)->num_additional_args += num_args;
+			ZEND_VM_STACK_GROW_IF_NEEDED(zend_hash_num_elements(ht));
 
 			for (zend_hash_internal_pointer_reset_ex(ht, &pos);
 			     zend_hash_get_current_data_ex(ht, (void **) &arg_ptr, &pos) == SUCCESS;
-				 zend_hash_move_forward_ex(ht, &pos), ++arg_num
+				 zend_hash_move_forward_ex(ht, &pos)
 			) {
+				char *name;
+				zend_uint name_len;
+				zend_ulong index;
+				void **target;
+
+				switch (zend_hash_get_current_key_ex(ht, &name, &name_len, &index, 0, &pos)) {
+					case HASH_KEY_IS_LONG:
+						if (EX(call)->uses_named_args) {
+							zend_error(E_WARNING, "Cannot pass positional arguments after named arguments. Aborting argument unpacking");
+							FREE_OP(free_op1);
+							CHECK_EXCEPTION();
+							ZEND_VM_NEXT_OPCODE();
+						}
+						arg_num++;
+						target = EG(argument_stack)->top++;
+						EX(call)->num_additional_args++;
+						break;
+					case HASH_KEY_IS_STRING:
+						target = zend_handle_named_arg(&arg_num, EX(call), name, name_len-1, opline->op2.num TSRMLS_CC);
+						break;
+				}
+
 				if (ARG_SHOULD_BE_SENT_BY_REF(EX(call)->fbc, arg_num)) {
 					SEPARATE_ZVAL_TO_MAKE_IS_REF(arg_ptr);
 					arg = *arg_ptr;
@@ -751,14 +771,13 @@ static int ZEND_FASTCALL  ZEND_SEND_UNPACK_SPEC_HANDLER(ZEND_OPCODE_HANDLER_ARGS
 					Z_ADDREF_P(arg);
 				}
 
-				zend_vm_stack_push(arg TSRMLS_CC);
+				*target = arg;
 			}
 			break;
 		}
 		case IS_OBJECT: {
 			zend_class_entry *ce = Z_OBJCE_P(args);
 			zend_object_iterator *iter;
-			long num_args = 0;
 
 			if (!ce || !ce->get_iterator) {
 				zend_error(E_WARNING, "Only arrays and Traversables can be unpacked");
@@ -783,8 +802,9 @@ static int ZEND_FASTCALL  ZEND_SEND_UNPACK_SPEC_HANDLER(ZEND_OPCODE_HANDLER_ARGS
 				}
 			}
 
-			for (; iter->funcs->valid(iter TSRMLS_CC) == SUCCESS; ++arg_num, ++num_args) {
-				zval **arg_ptr, *arg;
+			while (iter->funcs->valid(iter TSRMLS_CC) == SUCCESS) {
+				zval **arg_ptr, *arg, key;
+				void **target;
 
 				if (UNEXPECTED(EG(exception) != NULL)) {
 					goto unpack_iter_dtor;
@@ -793,6 +813,35 @@ static int ZEND_FASTCALL  ZEND_SEND_UNPACK_SPEC_HANDLER(ZEND_OPCODE_HANDLER_ARGS
 				iter->funcs->get_current_data(iter, &arg_ptr TSRMLS_CC);
 				if (UNEXPECTED(EG(exception) != NULL)) {
 					goto unpack_iter_dtor;
+				}
+
+				if (iter->funcs->get_current_key) {
+					iter->funcs->get_current_key(iter, &key TSRMLS_CC);
+					if (UNEXPECTED(EG(exception) != NULL)) {
+						goto unpack_iter_dtor;
+					}
+				} else {
+					Z_TYPE(key) = IS_LONG;
+				}
+
+				switch (Z_TYPE(key)) {
+					default:
+						zval_dtor(&key);
+						/* break missing intentionally */
+					case IS_LONG:
+						if (EX(call)->uses_named_args) {
+							zend_error(E_WARNING, "Cannot pass positional arguments after named arguments. Aborting argument unpacking");
+							goto unpack_iter_dtor;
+						}
+
+						arg_num++;
+						target = EG(argument_stack)->top++;
+						EX(call)->num_additional_args++;
+						break;
+					case IS_STRING:
+						target = zend_handle_named_arg(&arg_num, EX(call), Z_STRVAL(key), Z_STRLEN(key), opline->op2.num TSRMLS_CC);
+						zval_dtor(&key);
+						break;
 				}
 
 				if (ARG_MUST_BE_SENT_BY_REF(EX(call)->fbc, arg_num)) {
@@ -814,15 +863,13 @@ static int ZEND_FASTCALL  ZEND_SEND_UNPACK_SPEC_HANDLER(ZEND_OPCODE_HANDLER_ARGS
 				}
 
 				ZEND_VM_STACK_GROW_IF_NEEDED(1);
-				zend_vm_stack_push(arg TSRMLS_CC);
+				*target = arg;
 
 				iter->funcs->move_forward(iter TSRMLS_CC);
 				if (UNEXPECTED(EG(exception) != NULL)) {
 					goto unpack_iter_dtor;
 				}
 			}
-
-			EX(call)->num_additional_args += num_args;
 
 unpack_iter_dtor:
 			iter->funcs->dtor(iter TSRMLS_CC);

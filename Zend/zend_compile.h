@@ -386,6 +386,7 @@ typedef struct _call_slot {
 	zend_uint          num_additional_args;
 	zend_bool          is_ctor_call;
 	zend_bool          is_ctor_result_used;
+	zend_bool          uses_named_args;
 } call_slot;
 
 struct _zend_execute_data {

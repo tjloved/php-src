@@ -109,11 +109,12 @@ typedef struct _zend_function_call_entry {
 	zend_function *fbc;
 	zend_uint arg_num;
 	zend_uint named_arg_num;
+	zend_bool uses_delayed_fcall;
 } zend_function_call_entry;
 
 static void zend_push_function_call_entry(zend_function *fbc TSRMLS_DC) /* {{{ */
 {
-	zend_function_call_entry fcall = { fbc, 0, 0 };
+	zend_function_call_entry fcall = { fbc, 0, 0, 0 };
 	zend_stack_push(&CG(function_call_stack), &fcall, sizeof(zend_function_call_entry));
 }
 /* }}} */
@@ -2550,10 +2551,9 @@ void zend_do_end_function_call(znode *function_name, znode *result, int is_metho
 			SET_UNUSED(opline->op2);
 			opline->op2.num = --CG(context).nested_calls;
 
-			/* This would normally be a ZEND_DO_FCALL, but was force to
-			 * ZEND_DO_FCALL_BY_NAME due to a ... argument. In this case we need to
-			 * free the function_name */
-			if (!is_method && !is_dynamic_fcall && function_name->op_type==IS_CONST) {
+			/* This would normally be a ZEND_DO_FCALL, but was forced to
+			 * ZEND_DO_FCALL_BY_NAME for argument unpacking or named args. */
+			if (fcall->uses_delayed_fcall) {
 				zval_dtor(&function_name->u.constant);
 			}
 		}
@@ -2587,6 +2587,7 @@ void zend_do_delayed_begin_function_call(zend_function_call_entry *fcall TSRMLS_
 	GET_CACHE_SLOT(opline->op2.constant);
 
 	++CG(context).nested_calls;
+	fcall->uses_delayed_fcall = 1;
 }
 /* }}} */
 
@@ -2603,7 +2604,7 @@ void zend_do_pass_param(znode *param, zend_uchar op, znode *named_arg TSRMLS_DC)
 	function_ptr = fcall->fbc;
 
 	if (named_arg != NULL) {
-		if (fcall->named_arg_num == 0 && function_ptr) {
+		if (function_ptr && !fcall->uses_delayed_fcall) {
 			zend_do_delayed_begin_function_call(fcall TSRMLS_CC);
 		}
 
@@ -2729,7 +2730,9 @@ void zend_do_unpack_params(znode *params TSRMLS_DC) /* {{{ */
 		/* If argument unpacking is used argument numbers and sending modes can no longer be
 		 * computed at compile time, thus we need access to EX(call). In order to have it we
 		 * retroactively emit a ZEND_INIT_FCALL_BY_NAME opcode. */
-		zend_do_delayed_begin_function_call(fcall TSRMLS_CC);
+		if (!fcall->uses_delayed_fcall) {
+			zend_do_delayed_begin_function_call(fcall TSRMLS_CC);
+		}
 		fcall->fbc = NULL;
 	}
 
