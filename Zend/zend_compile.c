@@ -2596,43 +2596,51 @@ void zend_do_pass_param(znode *param, zend_uchar op, znode *named_arg TSRMLS_DC)
 	zend_op *opline;
 	int original_op = op;
 	zend_function_call_entry *fcall;
-	zend_function *function_ptr;
+	zend_uint arg_num;
 	int send_by_reference = 0;
 	int send_function = 0;
 
 	zend_stack_top(&CG(function_call_stack), (void **) &fcall);
-	function_ptr = fcall->fbc;
 
 	if (named_arg != NULL) {
-		if (function_ptr && !fcall->uses_delayed_fcall) {
-			zend_do_delayed_begin_function_call(fcall TSRMLS_CC);
-		}
+		zend_ulong hash_value = zend_inline_hash_func(Z_STRVAL(named_arg->u.constant), Z_STRLEN(named_arg->u.constant)+1);
 
-		/* For now no compile-time resolution of named args */
-		function_ptr = NULL;
+		if (fcall->fbc) {
+			if (!fcall->uses_delayed_fcall) {
+				zend_do_delayed_begin_function_call(fcall TSRMLS_CC);
+			}
+
+			if (zend_get_arg_num(&arg_num, fcall->fbc, Z_STRVAL(named_arg->u.constant), Z_STRLEN(named_arg->u.constant), hash_value TSRMLS_CC) == FAILURE) {
+				if (fcall->fbc->common.fn_flags & ZEND_ACC_VARIADIC) {
+					arg_num = fcall->fbc->common.num_args;
+				} else {
+					zend_error_noreturn(E_COMPILE_ERROR, "Unknown named argument $%s", Z_STRVAL(named_arg->u.constant));
+				}
+			}
+		}
 	} else if (fcall->named_arg_num > 0) {
-		zend_error(E_COMPILE_ERROR, "Cannot pass positional arguments after named arguments");
+		zend_error_noreturn(E_COMPILE_ERROR, "Cannot pass positional arguments after named arguments");
 	} else {
-		fcall->arg_num++;
+		arg_num = ++fcall->arg_num;
 	}
 
 	if (original_op == ZEND_SEND_REF) {
-		if (function_ptr &&
-		    function_ptr->common.function_name &&
-		    function_ptr->common.type == ZEND_USER_FUNCTION &&
-		    !ARG_SHOULD_BE_SENT_BY_REF(function_ptr, fcall->arg_num)) {
+		if (fcall->fbc &&
+		    fcall->fbc->common.function_name &&
+		    fcall->fbc->common.type == ZEND_USER_FUNCTION &&
+		    !ARG_SHOULD_BE_SENT_BY_REF(fcall->fbc, arg_num)) {
 			zend_error(E_COMPILE_ERROR,
 						"Call-time pass-by-reference has been removed; "
 						"If you would like to pass argument by reference, modify the declaration of %s().",
-						function_ptr->common.function_name);
+						fcall->fbc->common.function_name);
 		} else {
 			zend_error(E_COMPILE_ERROR, "Call-time pass-by-reference has been removed");
 		}
 		return;
 	}
 
-	if (function_ptr) {
-		if (ARG_MAY_BE_SENT_BY_REF(function_ptr, fcall->arg_num)) {
+	if (fcall->fbc) {
+		if (ARG_MAY_BE_SENT_BY_REF(fcall->fbc, arg_num)) {
 			if (op == ZEND_SEND_VAR && param->op_type & (IS_VAR|IS_CV)) {
 				send_by_reference = ZEND_ARG_SEND_BY_REF;
 				if (zend_is_function_or_method_call(param)) {
@@ -2643,7 +2651,7 @@ void zend_do_pass_param(znode *param, zend_uchar op, znode *named_arg TSRMLS_DC)
 			} else {
 				op = ZEND_SEND_VAL;
 			}
-		} else if (ARG_SHOULD_BE_SENT_BY_REF(function_ptr, fcall->arg_num)) {
+		} else if (ARG_SHOULD_BE_SENT_BY_REF(fcall->fbc, arg_num)) {
 			send_by_reference = ZEND_ARG_SEND_BY_REF;
 		}
 	}
@@ -2675,7 +2683,7 @@ void zend_do_pass_param(znode *param, zend_uchar op, znode *named_arg TSRMLS_DC)
 				zend_do_end_variable_parse(param, BP_VAR_R, 0 TSRMLS_CC);
 				break;
 			case ZEND_SEND_VAR:
-				if (function_ptr) {
+				if (fcall->fbc) {
 					zend_do_end_variable_parse(param, BP_VAR_R, 0 TSRMLS_CC);
 				} else {
 					zend_do_end_variable_parse(param, BP_VAR_FUNC_ARG, fcall->arg_num TSRMLS_CC);
@@ -2690,13 +2698,13 @@ void zend_do_pass_param(znode *param, zend_uchar op, znode *named_arg TSRMLS_DC)
 	opline = get_next_op(CG(active_op_array) TSRMLS_CC);
 
 	if (op == ZEND_SEND_VAR_NO_REF) {
-		if (function_ptr) {
+		if (fcall->fbc) {
 			opline->extended_value = ZEND_ARG_COMPILE_TIME_BOUND | send_by_reference | send_function;
 		} else {
 			opline->extended_value = send_function;
 		}
 	} else {
-		if (function_ptr) {
+		if (fcall->fbc) {
 			opline->extended_value = ZEND_DO_FCALL;
 		} else {
 			opline->extended_value = ZEND_DO_FCALL_BY_NAME;

@@ -735,7 +735,7 @@ static int ZEND_FASTCALL  ZEND_SEND_UNPACK_SPEC_HANDLER(ZEND_OPCODE_HANDLER_ARGS
 
 			for (zend_hash_internal_pointer_reset_ex(ht, &pos);
 			     zend_hash_get_current_data_ex(ht, (void **) &arg_ptr, &pos) == SUCCESS;
-				 zend_hash_move_forward_ex(ht, &pos)
+				 zend_hash_move_forward_ex(ht, &pos), arg_num++
 			) {
 				char *name;
 				zend_uint name_len;
@@ -750,7 +750,6 @@ static int ZEND_FASTCALL  ZEND_SEND_UNPACK_SPEC_HANDLER(ZEND_OPCODE_HANDLER_ARGS
 							CHECK_EXCEPTION();
 							ZEND_VM_NEXT_OPCODE();
 						}
-						arg_num++;
 						target = EG(argument_stack)->top++;
 						EX(call)->num_additional_args++;
 						break;
@@ -804,7 +803,7 @@ static int ZEND_FASTCALL  ZEND_SEND_UNPACK_SPEC_HANDLER(ZEND_OPCODE_HANDLER_ARGS
 				}
 			}
 
-			while (iter->funcs->valid(iter TSRMLS_CC) == SUCCESS) {
+			for (; iter->funcs->valid(iter TSRMLS_CC) == SUCCESS; arg_num++) {
 				zval **arg_ptr, *arg, key;
 				void **target;
 
@@ -836,7 +835,6 @@ static int ZEND_FASTCALL  ZEND_SEND_UNPACK_SPEC_HANDLER(ZEND_OPCODE_HANDLER_ARGS
 							goto unpack_iter_dtor;
 						}
 
-						arg_num++;
 						target = EG(argument_stack)->top++;
 						EX(call)->num_additional_args++;
 						break;
@@ -15980,15 +15978,6 @@ static int ZEND_FASTCALL zend_send_by_ref_helper_SPEC_VAR_CONST(void **target, Z
 		ZEND_VM_NEXT_OPCODE();
 	}
 
-	/* TODO: Can this conditional be true? */
-	if (opline->extended_value == ZEND_DO_FCALL_BY_NAME &&
-	    EX(function_state).function->type == ZEND_INTERNAL_FUNCTION) {
-		int arg_num = opline->result.num + EX(call)->num_additional_args;
-	    if (!ARG_SHOULD_BE_SENT_BY_REF(EX(call)->fbc, arg_num)) {
-			return zend_send_by_var_helper_SPEC_VAR_CONST(target, ZEND_OPCODE_HANDLER_ARGS_PASSTHRU);
-		}
-	}
-
 	SEPARATE_ZVAL_TO_MAKE_IS_REF(varptr_ptr);
 	varptr = *varptr_ptr;
 	Z_ADDREF_P(varptr);
@@ -16001,7 +15990,26 @@ static int ZEND_FASTCALL zend_send_by_ref_helper_SPEC_VAR_CONST(void **target, Z
 
 static int ZEND_FASTCALL  ZEND_SEND_REF_SPEC_VAR_CONST_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
 {
-	void **target = EG(argument_stack)->top++;
+	USE_OPLINE;
+	void **target;
+
+	if (IS_CONST == IS_CONST) {
+		zend_uint arg_num;
+		target = zend_handle_named_arg(&arg_num, EX(call), Z_STRVAL_P(opline->op2.zv), Z_STRLEN_P(opline->op2.zv), Z_HASH_P(opline->op2.zv), opline->result.num TSRMLS_CC);
+
+	} else {
+		target = EG(argument_stack)->top++;
+	}
+
+	/* TODO: Can this conditional be true? */
+	/*if (opline->extended_value == ZEND_DO_FCALL_BY_NAME &&
+	    EX(function_state).function->type == ZEND_INTERNAL_FUNCTION) {
+		int arg_num = opline->result.num + EX(call)->num_additional_args;
+	    if (!ARG_SHOULD_BE_SENT_BY_REF(EX(call)->fbc, arg_num)) {
+			return zend_send_by_var_helper_SPEC_VAR_CONST(target, ZEND_OPCODE_HANDLER_ARGS_PASSTHRU);
+		}
+	}*/
+
 	return zend_send_by_ref_helper_SPEC_VAR_CONST(target, ZEND_OPCODE_HANDLER_ARGS_PASSTHRU);
 }
 
@@ -22262,15 +22270,6 @@ static int ZEND_FASTCALL zend_send_by_ref_helper_SPEC_VAR_UNUSED(void **target, 
 		ZEND_VM_NEXT_OPCODE();
 	}
 
-	/* TODO: Can this conditional be true? */
-	if (opline->extended_value == ZEND_DO_FCALL_BY_NAME &&
-	    EX(function_state).function->type == ZEND_INTERNAL_FUNCTION) {
-		int arg_num = opline->result.num + EX(call)->num_additional_args;
-	    if (!ARG_SHOULD_BE_SENT_BY_REF(EX(call)->fbc, arg_num)) {
-			return zend_send_by_var_helper_SPEC_VAR_UNUSED(target, ZEND_OPCODE_HANDLER_ARGS_PASSTHRU);
-		}
-	}
-
 	SEPARATE_ZVAL_TO_MAKE_IS_REF(varptr_ptr);
 	varptr = *varptr_ptr;
 	Z_ADDREF_P(varptr);
@@ -22283,7 +22282,26 @@ static int ZEND_FASTCALL zend_send_by_ref_helper_SPEC_VAR_UNUSED(void **target, 
 
 static int ZEND_FASTCALL  ZEND_SEND_REF_SPEC_VAR_UNUSED_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
 {
-	void **target = EG(argument_stack)->top++;
+	USE_OPLINE;
+	void **target;
+
+	if (IS_UNUSED == IS_CONST) {
+		zend_uint arg_num;
+		target = zend_handle_named_arg(&arg_num, EX(call), Z_STRVAL_P(opline->op2.zv), Z_STRLEN_P(opline->op2.zv), Z_HASH_P(opline->op2.zv), opline->result.num TSRMLS_CC);
+
+	} else {
+		target = EG(argument_stack)->top++;
+	}
+
+	/* TODO: Can this conditional be true? */
+	/*if (opline->extended_value == ZEND_DO_FCALL_BY_NAME &&
+	    EX(function_state).function->type == ZEND_INTERNAL_FUNCTION) {
+		int arg_num = opline->result.num + EX(call)->num_additional_args;
+	    if (!ARG_SHOULD_BE_SENT_BY_REF(EX(call)->fbc, arg_num)) {
+			return zend_send_by_var_helper_SPEC_VAR_UNUSED(target, ZEND_OPCODE_HANDLER_ARGS_PASSTHRU);
+		}
+	}*/
+
 	return zend_send_by_ref_helper_SPEC_VAR_UNUSED(target, ZEND_OPCODE_HANDLER_ARGS_PASSTHRU);
 }
 
@@ -33590,15 +33608,6 @@ static int ZEND_FASTCALL zend_send_by_ref_helper_SPEC_CV_CONST(void **target, ZE
 		ZEND_VM_NEXT_OPCODE();
 	}
 
-	/* TODO: Can this conditional be true? */
-	if (opline->extended_value == ZEND_DO_FCALL_BY_NAME &&
-	    EX(function_state).function->type == ZEND_INTERNAL_FUNCTION) {
-		int arg_num = opline->result.num + EX(call)->num_additional_args;
-	    if (!ARG_SHOULD_BE_SENT_BY_REF(EX(call)->fbc, arg_num)) {
-			return zend_send_by_var_helper_SPEC_CV_CONST(target, ZEND_OPCODE_HANDLER_ARGS_PASSTHRU);
-		}
-	}
-
 	SEPARATE_ZVAL_TO_MAKE_IS_REF(varptr_ptr);
 	varptr = *varptr_ptr;
 	Z_ADDREF_P(varptr);
@@ -33610,7 +33619,26 @@ static int ZEND_FASTCALL zend_send_by_ref_helper_SPEC_CV_CONST(void **target, ZE
 
 static int ZEND_FASTCALL  ZEND_SEND_REF_SPEC_CV_CONST_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
 {
-	void **target = EG(argument_stack)->top++;
+	USE_OPLINE;
+	void **target;
+
+	if (IS_CONST == IS_CONST) {
+		zend_uint arg_num;
+		target = zend_handle_named_arg(&arg_num, EX(call), Z_STRVAL_P(opline->op2.zv), Z_STRLEN_P(opline->op2.zv), Z_HASH_P(opline->op2.zv), opline->result.num TSRMLS_CC);
+
+	} else {
+		target = EG(argument_stack)->top++;
+	}
+
+	/* TODO: Can this conditional be true? */
+	/*if (opline->extended_value == ZEND_DO_FCALL_BY_NAME &&
+	    EX(function_state).function->type == ZEND_INTERNAL_FUNCTION) {
+		int arg_num = opline->result.num + EX(call)->num_additional_args;
+	    if (!ARG_SHOULD_BE_SENT_BY_REF(EX(call)->fbc, arg_num)) {
+			return zend_send_by_var_helper_SPEC_CV_CONST(target, ZEND_OPCODE_HANDLER_ARGS_PASSTHRU);
+		}
+	}*/
+
 	return zend_send_by_ref_helper_SPEC_CV_CONST(target, ZEND_OPCODE_HANDLER_ARGS_PASSTHRU);
 }
 
@@ -39363,15 +39391,6 @@ static int ZEND_FASTCALL zend_send_by_ref_helper_SPEC_CV_UNUSED(void **target, Z
 		ZEND_VM_NEXT_OPCODE();
 	}
 
-	/* TODO: Can this conditional be true? */
-	if (opline->extended_value == ZEND_DO_FCALL_BY_NAME &&
-	    EX(function_state).function->type == ZEND_INTERNAL_FUNCTION) {
-		int arg_num = opline->result.num + EX(call)->num_additional_args;
-	    if (!ARG_SHOULD_BE_SENT_BY_REF(EX(call)->fbc, arg_num)) {
-			return zend_send_by_var_helper_SPEC_CV_UNUSED(target, ZEND_OPCODE_HANDLER_ARGS_PASSTHRU);
-		}
-	}
-
 	SEPARATE_ZVAL_TO_MAKE_IS_REF(varptr_ptr);
 	varptr = *varptr_ptr;
 	Z_ADDREF_P(varptr);
@@ -39383,7 +39402,26 @@ static int ZEND_FASTCALL zend_send_by_ref_helper_SPEC_CV_UNUSED(void **target, Z
 
 static int ZEND_FASTCALL  ZEND_SEND_REF_SPEC_CV_UNUSED_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
 {
-	void **target = EG(argument_stack)->top++;
+	USE_OPLINE;
+	void **target;
+
+	if (IS_UNUSED == IS_CONST) {
+		zend_uint arg_num;
+		target = zend_handle_named_arg(&arg_num, EX(call), Z_STRVAL_P(opline->op2.zv), Z_STRLEN_P(opline->op2.zv), Z_HASH_P(opline->op2.zv), opline->result.num TSRMLS_CC);
+
+	} else {
+		target = EG(argument_stack)->top++;
+	}
+
+	/* TODO: Can this conditional be true? */
+	/*if (opline->extended_value == ZEND_DO_FCALL_BY_NAME &&
+	    EX(function_state).function->type == ZEND_INTERNAL_FUNCTION) {
+		int arg_num = opline->result.num + EX(call)->num_additional_args;
+	    if (!ARG_SHOULD_BE_SENT_BY_REF(EX(call)->fbc, arg_num)) {
+			return zend_send_by_var_helper_SPEC_CV_UNUSED(target, ZEND_OPCODE_HANDLER_ARGS_PASSTHRU);
+		}
+	}*/
+
 	return zend_send_by_ref_helper_SPEC_CV_UNUSED(target, ZEND_OPCODE_HANDLER_ARGS_PASSTHRU);
 }
 

@@ -3242,15 +3242,6 @@ ZEND_VM_HELPER_EX(zend_send_by_ref_helper, VAR|CV, CONST|UNUSED, void **target)
 		ZEND_VM_NEXT_OPCODE();
 	}
 
-	/* TODO: Can this conditional be true? */
-	if (opline->extended_value == ZEND_DO_FCALL_BY_NAME &&
-	    EX(function_state).function->type == ZEND_INTERNAL_FUNCTION) { 
-		int arg_num = opline->result.num + EX(call)->num_additional_args;
-	    if (!ARG_SHOULD_BE_SENT_BY_REF(EX(call)->fbc, arg_num)) {
-			ZEND_VM_DISPATCH_TO_HELPER_EX(zend_send_by_var_helper, target, target);
-		}
-	}
-
 	SEPARATE_ZVAL_TO_MAKE_IS_REF(varptr_ptr);
 	varptr = *varptr_ptr;
 	Z_ADDREF_P(varptr);
@@ -3263,7 +3254,26 @@ ZEND_VM_HELPER_EX(zend_send_by_ref_helper, VAR|CV, CONST|UNUSED, void **target)
 
 ZEND_VM_HANDLER(67, ZEND_SEND_REF, VAR|CV, CONST|UNUSED)
 {
-	void **target = EG(argument_stack)->top++;
+	USE_OPLINE;
+	void **target;
+
+	if (OP2_TYPE == IS_CONST) {
+		zend_uint arg_num;
+		target = zend_handle_named_arg(&arg_num, EX(call), Z_STRVAL_P(opline->op2.zv), Z_STRLEN_P(opline->op2.zv), Z_HASH_P(opline->op2.zv), opline->result.num TSRMLS_CC);
+
+	} else {
+		target = EG(argument_stack)->top++;
+	}
+
+	/* TODO: Can this conditional be true? */
+	/*if (opline->extended_value == ZEND_DO_FCALL_BY_NAME &&
+	    EX(function_state).function->type == ZEND_INTERNAL_FUNCTION) { 
+		int arg_num = opline->result.num + EX(call)->num_additional_args;
+	    if (!ARG_SHOULD_BE_SENT_BY_REF(EX(call)->fbc, arg_num)) {
+			ZEND_VM_DISPATCH_TO_HELPER_EX(zend_send_by_var_helper, target, target);
+		}
+	}*/
+
 	ZEND_VM_DISPATCH_TO_HELPER_EX(zend_send_by_ref_helper, target, target);
 }
 
@@ -3313,7 +3323,7 @@ ZEND_VM_HANDLER(165, ZEND_SEND_UNPACK, ANY, ANY)
 
 			for (zend_hash_internal_pointer_reset_ex(ht, &pos);
 			     zend_hash_get_current_data_ex(ht, (void **) &arg_ptr, &pos) == SUCCESS;
-				 zend_hash_move_forward_ex(ht, &pos)
+				 zend_hash_move_forward_ex(ht, &pos), arg_num++
 			) {
 				char *name;
 				zend_uint name_len;
@@ -3328,7 +3338,6 @@ ZEND_VM_HANDLER(165, ZEND_SEND_UNPACK, ANY, ANY)
 							CHECK_EXCEPTION();
 							ZEND_VM_NEXT_OPCODE();
 						}
-						arg_num++;
 						target = EG(argument_stack)->top++;
 						EX(call)->num_additional_args++;
 						break;
@@ -3382,7 +3391,7 @@ ZEND_VM_HANDLER(165, ZEND_SEND_UNPACK, ANY, ANY)
 				}
 			}
 
-			while (iter->funcs->valid(iter TSRMLS_CC) == SUCCESS) {
+			for (; iter->funcs->valid(iter TSRMLS_CC) == SUCCESS; arg_num++) {
 				zval **arg_ptr, *arg, key;
 				void **target;
 
@@ -3414,7 +3423,6 @@ ZEND_VM_HANDLER(165, ZEND_SEND_UNPACK, ANY, ANY)
 							ZEND_VM_C_GOTO(unpack_iter_dtor);
 						}
 
-						arg_num++;
 						target = EG(argument_stack)->top++;
 						EX(call)->num_additional_args++;
 						break;
