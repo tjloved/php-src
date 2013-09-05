@@ -1727,7 +1727,7 @@ zend_always_inline void zend_check_for_overwritten_parameter(zend_function *fbc,
 }
 /* }}} */
 
-void **zend_handle_named_arg(zend_uint *arg_num_target, call_slot *call, char *name, int name_len, zend_uint orig_arg_num TSRMLS_DC) /* {{{ */
+void **zend_handle_named_arg(zend_uint *arg_num_target, call_slot *call, char *name, int name_len, zend_ulong hash_value, zend_uint orig_arg_num TSRMLS_DC) /* {{{ */
 {
 	void **target;
 	zend_uint arg_num;
@@ -1735,19 +1735,19 @@ void **zend_handle_named_arg(zend_uint *arg_num_target, call_slot *call, char *n
 
 	call->uses_named_args = 1;
 
-	if (zend_get_arg_num(arg_num_target, call->fbc, name, name_len TSRMLS_CC) == FAILURE) {
+	if (zend_get_arg_num(arg_num_target, call->fbc, name, name_len, hash_value TSRMLS_CC) == FAILURE) {
 		if (call->fbc->common.fn_flags & ZEND_ACC_VARIADIC) {
 			if (!call->additional_named_args) {
 				ALLOC_HASHTABLE(call->additional_named_args);
 				zend_hash_init(call->additional_named_args, 0, NULL, ZVAL_PTR_DTOR, 0);
 			}
 
-			if (zend_hash_find(call->additional_named_args, name, name_len+1, (void **) &target) == SUCCESS) {
+			if (zend_hash_quick_find(call->additional_named_args, name, name_len+1, hash_value, (void **) &target) == SUCCESS) {
 				zval_ptr_dtor((zval **) target);
 				zend_error(E_WARNING, "Overwriting already passed parameter $%s", name);
 			} else {
 				void *dummy = NULL;
-				zend_hash_update(call->additional_named_args, name, name_len+1, &dummy, sizeof(zval *), (void **) &target);
+				zend_hash_quick_update(call->additional_named_args, name, name_len+1, hash_value, &dummy, sizeof(zval *), (void **) &target);
 			}
 
 			*arg_num_target = call->fbc->common.num_args;
@@ -1783,10 +1783,12 @@ zend_always_inline zend_bool zend_is_by_ref_func_arg_fetch(zend_op *opline, call
 	zend_uint arg_num;
 
 	if (send_op->op2_type == IS_CONST) {
-		if (zend_get_arg_num(&arg_num, call->fbc, Z_STRVAL_P(send_op->op2.zv), Z_STRLEN_P(send_op->op2.zv) TSRMLS_CC) == SUCCESS) {
+		if (zend_get_arg_num(&arg_num, call->fbc, Z_STRVAL_P(send_op->op2.zv), Z_STRLEN_P(send_op->op2.zv), Z_HASH_P(send_op->op2.zv) TSRMLS_CC) == SUCCESS) {
 			return ARG_SHOULD_BE_SENT_BY_REF(call->fbc, arg_num);
+		} else if (call->fbc->common.fn_flags & ZEND_ACC_VARIADIC) {
+			return ARG_SHOULD_BE_SENT_BY_REF(call->fbc, call->fbc->common.num_args);
 		} else {
-			return 0; /* TODO:NAMED */
+			return 0;
 		}
 	} else {
  		arg_num = (opline->extended_value & ZEND_FETCH_ARG_MASK) + call->num_additional_args;

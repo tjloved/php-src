@@ -3091,7 +3091,7 @@ ZEND_VM_HANDLER(65, ZEND_SEND_VAL, CONST|TMP, CONST|UNUSED)
 	SAVE_OPLINE();
 	if (OP2_TYPE == IS_CONST) {
 		zend_uint arg_num;
-		target = zend_handle_named_arg(&arg_num, EX(call), Z_STRVAL_P(opline->op2.zv), Z_STRLEN_P(opline->op2.zv), opline->result.num TSRMLS_CC);
+		target = zend_handle_named_arg(&arg_num, EX(call), Z_STRVAL_P(opline->op2.zv), Z_STRLEN_P(opline->op2.zv), Z_HASH_P(opline->op2.zv), opline->result.num TSRMLS_CC);
 
 		if (ARG_MUST_BE_SENT_BY_REF(EX(call)->fbc, arg_num)) {
 			zend_error(E_ERROR, "Cannot pass parameter $%s by reference", Z_STRVAL_P(opline->op2.zv));
@@ -3172,7 +3172,7 @@ ZEND_VM_HANDLER(106, ZEND_SEND_VAR_NO_REF, VAR|CV, CONST|UNUSED)
 	compile_time_bound = opline->extended_value & ZEND_ARG_COMPILE_TIME_BOUND;
 
 	if (OP2_TYPE == IS_CONST) {
-		target = zend_handle_named_arg(&arg_num, EX(call), Z_STRVAL_P(opline->op2.zv), Z_STRLEN_P(opline->op2.zv), opline->result.num TSRMLS_CC);
+		target = zend_handle_named_arg(&arg_num, EX(call), Z_STRVAL_P(opline->op2.zv), Z_STRLEN_P(opline->op2.zv), Z_HASH_P(opline->op2.zv), opline->result.num TSRMLS_CC);
 	} else {
 		if (!compile_time_bound) {
 			arg_num = opline->result.num + EX(call)->num_additional_args;
@@ -3274,7 +3274,7 @@ ZEND_VM_HANDLER(66, ZEND_SEND_VAR, VAR|CV, CONST|UNUSED)
 	zend_uint arg_num;
 
 	if (OP2_TYPE == IS_CONST) {
-		target = zend_handle_named_arg(&arg_num, EX(call), Z_STRVAL_P(opline->op2.zv), Z_STRLEN_P(opline->op2.zv), opline->result.num TSRMLS_CC);
+		target = zend_handle_named_arg(&arg_num, EX(call), Z_STRVAL_P(opline->op2.zv), Z_STRLEN_P(opline->op2.zv), Z_HASH_P(opline->op2.zv), opline->result.num TSRMLS_CC);
 		if (ARG_SHOULD_BE_SENT_BY_REF(EX(call)->fbc, arg_num)) {
 			ZEND_VM_DISPATCH_TO_HELPER_EX(zend_send_by_ref_helper, target, target);
 		}
@@ -3332,9 +3332,11 @@ ZEND_VM_HANDLER(165, ZEND_SEND_UNPACK, ANY, ANY)
 						target = EG(argument_stack)->top++;
 						EX(call)->num_additional_args++;
 						break;
-					case HASH_KEY_IS_STRING:
-						target = zend_handle_named_arg(&arg_num, EX(call), name, name_len-1, opline->op2.num TSRMLS_CC);
+					case HASH_KEY_IS_STRING: {
+						zend_ulong hash_value = zend_inline_hash_func(name, name_len);
+						target = zend_handle_named_arg(&arg_num, EX(call), name, name_len-1, hash_value, opline->op2.num TSRMLS_CC);
 						break;
+					}
 				}
 
 				if (ARG_SHOULD_BE_SENT_BY_REF(EX(call)->fbc, arg_num)) {
@@ -3416,10 +3418,12 @@ ZEND_VM_HANDLER(165, ZEND_SEND_UNPACK, ANY, ANY)
 						target = EG(argument_stack)->top++;
 						EX(call)->num_additional_args++;
 						break;
-					case IS_STRING:
-						target = zend_handle_named_arg(&arg_num, EX(call), Z_STRVAL(key), Z_STRLEN(key), opline->op2.num TSRMLS_CC);
+					case IS_STRING: {
+						zend_ulong hash_value = zend_inline_hash_func(Z_STRVAL(key), Z_STRLEN(key)+1);
+						target = zend_handle_named_arg(&arg_num, EX(call), Z_STRVAL(key), Z_STRLEN(key), hash_value, opline->op2.num TSRMLS_CC);
 						zval_dtor(&key);
 						break;
+					}
 				}
 
 				if (ARG_MUST_BE_SENT_BY_REF(EX(call)->fbc, arg_num)) {

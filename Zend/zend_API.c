@@ -4107,7 +4107,7 @@ ZEND_API const char* zend_resolve_method_name(zend_class_entry *ce, zend_functio
 }
 /* }}} */
 
-ZEND_API int zend_get_arg_num(zend_uint *arg_num_target, zend_function *fn, char *name, int name_len TSRMLS_DC) /* {{{ */
+ZEND_API int zend_get_arg_num(zend_uint *arg_num_target, zend_function *fn, char *name, int name_len, zend_ulong hash_value TSRMLS_DC) /* {{{ */
 {
 	HashTable *arg_offsets = fn->common.arg_offsets;
 	if (arg_offsets == NULL) {

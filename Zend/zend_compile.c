@@ -2705,12 +2705,12 @@ void zend_do_pass_param(znode *param, zend_uchar op, znode *named_arg TSRMLS_DC)
 
 	opline->opcode = op;
 	SET_NODE(opline->op1, param);
+	opline->result.num = fcall->arg_num;
 	if (named_arg == NULL) {
 		SET_UNUSED(opline->op2);
-		opline->result.num = fcall->arg_num;
 	} else {
 		SET_NODE(opline->op2, named_arg);
-		opline->result.num = fcall->arg_num;
+		CALCULATE_LITERAL_HASH(opline->op2.constant);
 		fcall->named_arg_num++;
 	}
 
