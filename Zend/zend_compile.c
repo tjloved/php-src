@@ -1308,7 +1308,7 @@ void zend_do_begin_variable_parse(TSRMLS_D) /* {{{ */
 }
 /* }}} */
 
-void zend_do_end_variable_parse(znode *variable, int type, int arg_offset TSRMLS_DC) /* {{{ */
+void zend_do_end_variable_parse_ex(znode *variable, int type, int arg_offset, zend_bool is_named_arg TSRMLS_DC) /* {{{ */
 {
 	zend_llist *fetch_list_ptr;
 	zend_llist_element *le;
@@ -1385,6 +1385,9 @@ void zend_do_end_variable_parse(znode *variable, int type, int arg_offset TSRMLS
 				case BP_VAR_FUNC_ARG:
 					opline->opcode += 9; /* 3+3+3 */
 					opline->extended_value |= arg_offset;
+					if (is_named_arg) {
+						opline->extended_value |= ZEND_FETCH_NAMED;
+					}
 					break;
 				case BP_VAR_UNSET:
 					if (opline->opcode == ZEND_FETCH_DIM_W && opline->op2_type == IS_UNUSED) {
@@ -1401,6 +1404,12 @@ void zend_do_end_variable_parse(znode *variable, int type, int arg_offset TSRMLS
 	}
 	zend_llist_destroy(fetch_list_ptr);
 	zend_stack_del_top(&CG(bp_stack));
+}
+/* }}} */
+
+void zend_do_end_variable_parse(znode *variable, int type, int arg_num TSRMLS_DC) /* {{{ */
+{
+	zend_do_end_variable_parse_ex(variable, type, arg_num, 0 TSRMLS_CC);
 }
 /* }}} */
 
@@ -2686,7 +2695,9 @@ void zend_do_pass_param(znode *param, zend_uchar op, znode *named_arg TSRMLS_DC)
 				if (fcall->fbc) {
 					zend_do_end_variable_parse(param, BP_VAR_R, 0 TSRMLS_CC);
 				} else {
-					zend_do_end_variable_parse(param, BP_VAR_FUNC_ARG, fcall->arg_num TSRMLS_CC);
+					zend_do_end_variable_parse_ex(
+						param, BP_VAR_FUNC_ARG, fcall->arg_num, named_arg != NULL TSRMLS_CC
+					);
 				}
 				break;
 			case ZEND_SEND_REF:

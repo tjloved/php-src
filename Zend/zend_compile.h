@@ -496,6 +496,7 @@ void zend_do_pre_incdec(znode *result, const znode *op1, zend_uchar op TSRMLS_DC
 void zend_do_post_incdec(znode *result, const znode *op1, zend_uchar op TSRMLS_DC);
 
 void zend_do_begin_variable_parse(TSRMLS_D);
+void zend_do_end_variable_parse_ex(znode *variable, int type, int arg_offset, zend_bool is_named_arg TSRMLS_DC);
 void zend_do_end_variable_parse(znode *variable, int type, int arg_offset TSRMLS_DC);
 
 void zend_check_writable_variable(const znode *variable);
@@ -800,6 +801,7 @@ int zend_add_literal(zend_op_array *op_array, const zval *zv TSRMLS_DC);
 #define ZEND_FETCH_STANDARD		    0x00000000
 #define ZEND_FETCH_ADD_LOCK		    0x08000000
 #define ZEND_FETCH_MAKE_REF		    0x04000000
+#define ZEND_FETCH_NAMED			0x00400000
 
 #define ZEND_ISSET				    0x02000000
 #define ZEND_ISEMPTY			    0x01000000

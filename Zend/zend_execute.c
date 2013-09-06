@@ -1779,10 +1779,15 @@ void **zend_handle_named_arg(zend_uint *arg_num_target, call_slot *call, char *n
 
 zend_always_inline zend_bool zend_is_by_ref_func_arg_fetch(zend_op *opline, call_slot *call TSRMLS_DC) /* {{{ */
 {
-	zend_op *send_op = opline + 1; /* next op must be a SEND */
 	zend_uint arg_num;
 
-	if (send_op->op2_type == IS_CONST) {
+	if (opline->extended_value & ZEND_FETCH_NAMED) {
+		/* This is likely not the right way to do it... */
+		zend_op *send_op = opline + 1;
+		while (send_op->opcode != ZEND_SEND_VAR) {
+			send_op++;
+		}
+
 		if (zend_get_arg_num(&arg_num, call->fbc, Z_STRVAL_P(send_op->op2.zv), Z_STRLEN_P(send_op->op2.zv), Z_HASH_P(send_op->op2.zv) TSRMLS_CC) == SUCCESS) {
 			return ARG_SHOULD_BE_SENT_BY_REF(call->fbc, arg_num);
 		} else if (call->fbc->common.fn_flags & ZEND_ACC_VARIADIC) {
