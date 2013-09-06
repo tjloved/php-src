@@ -406,9 +406,7 @@ ZEND_FUNCTION(func_num_args)
    Get the $arg_num'th argument that was passed to the function */
 ZEND_FUNCTION(func_get_arg)
 {
-	void **p;
-	int arg_count;
-	zval *arg;
+	zval **arg;
 	long requested_offset;
 	zend_execute_data *ex = EG(current_execute_data)->prev_execute_data;
 
@@ -426,18 +424,13 @@ ZEND_FUNCTION(func_get_arg)
 		RETURN_FALSE;
 	}
 
-	p = ex->function_state.arguments;
-	arg_count = (int)(zend_uintptr_t) *p;		/* this is the amount of arguments passed to func_get_arg(); */
-
-	if (requested_offset >= arg_count) {
+	arg = zend_vm_stack_get_arg(requested_offset + 1 TSRMLS_CC);
+	if (arg == NULL) {
 		zend_error(E_WARNING, "func_get_arg():  Argument %ld not passed to function", requested_offset);
 		RETURN_FALSE;
 	}
 
-	arg = *(p-(arg_count-requested_offset));
-	*return_value = *arg;
-	zval_copy_ctor(return_value);
-	INIT_PZVAL(return_value);
+	RETURN_ZVAL(*arg, 1, 0);
 }
 /* }}} */
 
@@ -460,14 +453,17 @@ ZEND_FUNCTION(func_get_args)
 	arg_count = (int)(zend_uintptr_t) *p;		/* this is the amount of arguments passed to func_get_args(); */
 
 	array_init_size(return_value, arg_count);
-	for (i=0; i<arg_count; i++) {
-		zval *element;
+	for (i = 0; i < arg_count; i++) {
+		zval *arg = *(p - (arg_count - i));
+		zval *arg_copy;
 
-		ALLOC_ZVAL(element);
-		*element = **((zval **) (p-(arg_count-i)));
-		zval_copy_ctor(element);
-		INIT_PZVAL(element);
-		zend_hash_next_index_insert(return_value->value.ht, &element, sizeof(zval *), NULL);
+		if (arg == NULL) {
+			continue;
+		}
+
+		ALLOC_ZVAL(arg_copy);
+		MAKE_COPY_ZVAL(&arg, arg_copy);
+		zend_hash_index_update(return_value->value.ht, i, &arg_copy, sizeof(zval *), NULL);
 	}
 }
 /* }}} */
