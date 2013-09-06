@@ -328,6 +328,112 @@ static int parse_arg_object_to_string(zval **arg, char **p, int *pl, int type TS
 }
 /* }}} */
 
+static void zend_parse_arg_skip(va_list *va, const char **spec TSRMLS_DC) /* {{{ */
+{
+	/* Just a first idea of how argument skipping should work. In this implementation I'm not
+	 * touching values at all, unless check_null is specified, in which case I do the appropriate
+	 * logic. This likely is not the optimal approach, because code may rely on values being set
+	 * if later values are set. */
+	const char *spec_walk = *spec;
+	char c = *spec_walk++;
+	zend_bool check_null = 0;
+
+	if (*spec_walk == '!') {
+		check_null = 1;
+		spec_walk++;
+	}
+
+	switch (c) {
+		case 'l':
+		case 'L': {
+			va_arg(*va, long *);
+			if (check_null) {
+				zend_bool *p = va_arg(*va, zend_bool *);
+				*p = 1;
+			}
+			break;
+		}
+		case 'd': {
+			va_arg(*va, double *);
+			if (check_null) {
+				zend_bool *p = va_arg(*va, zend_bool *);
+				*p = 1;
+			}
+			break;
+		}
+		case 'p':
+		case 's': {
+			char **p = va_arg(*va, char **);
+			int *pl = va_arg(*va, int *);
+			if (check_null) {
+				*p = NULL;
+				*pl = 0;
+			}
+			break;
+		}
+		case 'b': {
+			va_arg(*va, zend_bool *);
+			if (check_null) {
+				zend_bool *p = va_arg(*va, zend_bool *);
+				*p = 1;
+			}
+			break;
+		}
+		case 'r':
+		case 'A':
+		case 'a':
+		case 'o':
+		case 'z': {
+			zval **p = va_arg(*va, zval **);
+			if (check_null) {
+				*p = NULL;
+			}
+			break;
+		}
+		case 'H':
+		case 'h': {
+			HashTable **p = va_arg(*va, HashTable **);
+			if (check_null) {
+				*p = NULL;
+			}
+			break;
+		}
+		case 'O': {
+			zval **p = va_arg(*va, zval **);
+			va_arg(*va, zend_class_entry *);
+			if (check_null) {
+				*p = NULL;
+			}
+			break;
+		}
+		case 'C': {
+			zend_class_entry **p = va_arg(*va, zend_class_entry **);
+			if (check_null) {
+				*p = NULL;
+			}
+			break;
+		}
+		case 'f': {
+			zend_fcall_info *fci = va_arg(*va, zend_fcall_info *);
+			zend_fcall_info_cache *fcc = va_arg(*va, zend_fcall_info_cache *);
+			if (check_null) {
+				fci->size = 0;
+				fcc->initialized = 0;
+			}
+			break;
+		}
+		case 'Z': {
+			zval ***p = va_arg(*va, zval ***);
+			if (check_null) {
+				*p = NULL;
+			}
+			break;
+		}
+	}
+
+	*spec = spec_walk;
+}
+
 static const char *zend_parse_arg_impl(int arg_num, zval **arg, va_list *va, const char **spec, char **error, int *severity TSRMLS_DC) /* {{{ */
 {
 	const char *spec_walk = *spec;
@@ -766,7 +872,6 @@ static int zend_parse_va_args(int num_args, const char *type_spec, va_list *va, 
 	zval ****varargs = NULL;
 	int *n_varargs = NULL;
 	int disallow_default = flags & ZEND_PARSE_PARAMS_NODEFAULT;
-	zval zv, *zv_ptr = &zv;
 
 	for (spec_walk = type_spec; *spec_walk; spec_walk++) {
 		c = *spec_walk;
@@ -939,11 +1044,9 @@ static int zend_parse_va_args(int num_args, const char *type_spec, va_list *va, 
 				}
 				parse_failed = 1;
 			} else {
-				/* act as if NULL zval was passed */
-				INIT_PZVAL(zv_ptr);
-				ZVAL_NULL(zv_ptr);
-				arg = &zv_ptr;
-				/* TODO:NAMED this likely doesn't make sense */
+				i++;
+				zend_parse_arg_skip(va, &type_spec TSRMLS_CC);
+				continue;
 			}
 		}
 
