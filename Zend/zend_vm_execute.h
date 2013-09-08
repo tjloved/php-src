@@ -2343,12 +2343,12 @@ static int ZEND_FASTCALL  ZEND_RETURN_SPEC_CONST_HANDLER(ZEND_OPCODE_HANDLER_ARG
 	retval_ptr = opline->op1.zv;
 
 	if (EG(active_op_array)->return_type != IS_NULL) {
-		if (EG(active_op_array)->return_type != Z_TYPE(*retval_ptr)) {
+		if (EG(active_op_array)->return_type != Z_TYPE_P(retval_ptr)) {
 			zend_error(
 				E_NOTICE,
 				"Return type mismatch. Expected %d got %d for function %s() defined in file %s line %d",
 				EG(active_op_array)->return_type,
-				Z_TYPE(*retval_ptr),
+				Z_TYPE_P(retval_ptr),
 				EG(active_op_array)->function_name,
 				EG(active_op_array)->filename,
 				EG(active_op_array)->line_start
@@ -7685,12 +7685,12 @@ static int ZEND_FASTCALL  ZEND_RETURN_SPEC_TMP_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
 	retval_ptr = _get_zval_ptr_tmp(opline->op1.var, execute_data, &free_op1 TSRMLS_CC);
 
 	if (EG(active_op_array)->return_type != IS_NULL) {
-		if (EG(active_op_array)->return_type != Z_TYPE(*retval_ptr)) {
+		if (EG(active_op_array)->return_type != Z_TYPE_P(retval_ptr)) {
 			zend_error(
 				E_NOTICE,
 				"Return type mismatch. Expected %d got %d for function %s() defined in file %s line %d",
 				EG(active_op_array)->return_type,
-				Z_TYPE(*retval_ptr),
+				Z_TYPE_P(retval_ptr),
 				EG(active_op_array)->function_name,
 				EG(active_op_array)->filename,
 				EG(active_op_array)->line_start
@@ -12928,12 +12928,12 @@ static int ZEND_FASTCALL  ZEND_RETURN_SPEC_VAR_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
 	retval_ptr = _get_zval_ptr_var(opline->op1.var, execute_data, &free_op1 TSRMLS_CC);
 
 	if (EG(active_op_array)->return_type != IS_NULL) {
-		if (EG(active_op_array)->return_type != Z_TYPE(*retval_ptr)) {
+		if (EG(active_op_array)->return_type != Z_TYPE_P(retval_ptr)) {
 			zend_error(
 				E_NOTICE,
 				"Return type mismatch. Expected %d got %d for function %s() defined in file %s line %d",
 				EG(active_op_array)->return_type,
-				Z_TYPE(*retval_ptr),
+				Z_TYPE_P(retval_ptr),
 				EG(active_op_array)->function_name,
 				EG(active_op_array)->filename,
 				EG(active_op_array)->line_start
@@ -30601,12 +30601,12 @@ static int ZEND_FASTCALL  ZEND_RETURN_SPEC_CV_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
 	retval_ptr = _get_zval_ptr_cv_BP_VAR_R(execute_data, opline->op1.var TSRMLS_CC);
 
 	if (EG(active_op_array)->return_type != IS_NULL) {
-		if (EG(active_op_array)->return_type != Z_TYPE(*retval_ptr)) {
+		if (EG(active_op_array)->return_type != Z_TYPE_P(retval_ptr)) {
 			zend_error(
 				E_NOTICE,
 				"Return type mismatch. Expected %d got %d for function %s() defined in file %s line %d",
 				EG(active_op_array)->return_type,
-				Z_TYPE(*retval_ptr),
+				Z_TYPE_P(retval_ptr),
 				EG(active_op_array)->function_name,
 				EG(active_op_array)->filename,
 				EG(active_op_array)->line_start
