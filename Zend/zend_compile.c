@@ -108,7 +108,7 @@ ZEND_API zend_executor_globals executor_globals;
 typedef struct _zend_function_call_entry {
 	zend_function *fbc;
 	zend_uint arg_num;
-	zend_uint named_arg_num;
+	zend_bool uses_named_args;
 	zend_bool uses_delayed_fcall;
 } zend_function_call_entry;
 
@@ -2547,7 +2547,7 @@ void zend_do_end_function_call(znode *function_name, znode *result, int is_metho
 		opline = &CG(active_op_array)->opcodes[Z_LVAL(function_name->u.constant)];
 	} else {
 		opline = get_next_op(CG(active_op_array) TSRMLS_CC);
-		if (fcall->fbc && fcall->named_arg_num == 0) {
+		if (fcall->fbc && !fcall->uses_delayed_fcall) {
 			opline->opcode = ZEND_DO_FCALL;
 			SET_NODE(opline->op1, function_name);
 			SET_UNUSED(opline->op2);
@@ -2614,6 +2614,7 @@ void zend_do_pass_param(znode *param, zend_uchar op, znode *named_arg TSRMLS_DC)
 	if (named_arg != NULL) {
 		zend_ulong hash_value = zend_inline_hash_func(Z_STRVAL(named_arg->u.constant), Z_STRLEN(named_arg->u.constant)+1);
 
+		fcall->uses_named_args = 1;
 		if (fcall->fbc) {
 			if (!fcall->uses_delayed_fcall) {
 				zend_do_delayed_begin_function_call(fcall TSRMLS_CC);
@@ -2627,7 +2628,7 @@ void zend_do_pass_param(znode *param, zend_uchar op, znode *named_arg TSRMLS_DC)
 				}
 			}
 		}
-	} else if (fcall->named_arg_num > 0) {
+	} else if (fcall->uses_named_args) {
 		zend_error_noreturn(E_COMPILE_ERROR, "Cannot pass positional arguments after named arguments");
 	} else {
 		arg_num = ++fcall->arg_num;
@@ -2730,7 +2731,6 @@ void zend_do_pass_param(znode *param, zend_uchar op, znode *named_arg TSRMLS_DC)
 	} else {
 		SET_NODE(opline->op2, named_arg);
 		CALCULATE_LITERAL_HASH(opline->op2.constant);
-		fcall->named_arg_num++;
 	}
 
 	if (++CG(context).used_stack > CG(active_op_array)->used_stack) {

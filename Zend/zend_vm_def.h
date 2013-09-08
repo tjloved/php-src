@@ -3174,10 +3174,6 @@ ZEND_VM_HANDLER(106, ZEND_SEND_VAR_NO_REF, VAR|CV, CONST|UNUSED)
 	if (OP2_TYPE == IS_CONST) {
 		target = zend_handle_named_arg(&arg_num, EX(call), Z_STRVAL_P(opline->op2.zv), Z_STRLEN_P(opline->op2.zv), Z_HASH_P(opline->op2.zv), opline->result.num TSRMLS_CC);
 	} else {
-		if (!compile_time_bound) {
-			arg_num = opline->result.num + EX(call)->num_additional_args;
-		}
-
 		target = EG(argument_stack)->top++;
 	}
 
@@ -3186,6 +3182,9 @@ ZEND_VM_HANDLER(106, ZEND_SEND_VAR_NO_REF, VAR|CV, CONST|UNUSED)
 			ZEND_VM_DISPATCH_TO_HELPER_EX(zend_send_by_var_helper, target, target);
 		}
 	} else {
+		if (OP2_TYPE != IS_CONST) {
+			arg_num = opline->result.num + EX(call)->num_additional_args;
+		}
 		if (!ARG_SHOULD_BE_SENT_BY_REF(EX(call)->fbc, arg_num)) {
 			ZEND_VM_DISPATCH_TO_HELPER_EX(zend_send_by_var_helper, target, target);
 		}
@@ -3260,19 +3259,9 @@ ZEND_VM_HANDLER(67, ZEND_SEND_REF, VAR|CV, CONST|UNUSED)
 	if (OP2_TYPE == IS_CONST) {
 		zend_uint arg_num;
 		target = zend_handle_named_arg(&arg_num, EX(call), Z_STRVAL_P(opline->op2.zv), Z_STRLEN_P(opline->op2.zv), Z_HASH_P(opline->op2.zv), opline->result.num TSRMLS_CC);
-
 	} else {
 		target = EG(argument_stack)->top++;
 	}
-
-	/* TODO: Can this conditional be true? */
-	/*if (opline->extended_value == ZEND_DO_FCALL_BY_NAME &&
-	    EX(function_state).function->type == ZEND_INTERNAL_FUNCTION) { 
-		int arg_num = opline->result.num + EX(call)->num_additional_args;
-	    if (!ARG_SHOULD_BE_SENT_BY_REF(EX(call)->fbc, arg_num)) {
-			ZEND_VM_DISPATCH_TO_HELPER_EX(zend_send_by_var_helper, target, target);
-		}
-	}*/
 
 	ZEND_VM_DISPATCH_TO_HELPER_EX(zend_send_by_ref_helper, target, target);
 }
