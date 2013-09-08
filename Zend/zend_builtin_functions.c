@@ -386,6 +386,48 @@ ZEND_FUNCTION(gc_disable)
 }
 /* }}} */
 
+static zval *zend_get_arg_default_value_ex(zend_op_array *op_array, zend_uint arg_num, zend_op **start_op_ptr TSRMLS_DC) /* {{{ */
+{
+	zend_op *op = *start_op_ptr;
+	zend_op *end_op = op_array->opcodes + op_array->last;
+	zval *retval = NULL;
+
+	for (; op < end_op; ++op) {
+		if ((op->opcode != ZEND_RECV && op->opcode != ZEND_RECV_INIT) || op->op1.num != arg_num) {
+			continue;
+		}
+
+		if (op->opcode == ZEND_RECV_INIT) {
+			MAKE_STD_ZVAL(retval);
+			ZVAL_COPY_VALUE(retval, op->op2.zv);
+
+			if ((Z_TYPE_P(retval) & IS_CONSTANT_TYPE_MASK) == IS_CONSTANT
+			    || Z_TYPE_P(retval) == IS_CONSTANT_ARRAY
+			) {
+				zval_update_constant_no_inline_change(&retval, op_array->scope TSRMLS_CC);
+			} else {
+				zval_copy_ctor(retval);
+			}
+		}
+		break;
+	}
+
+	*start_op_ptr = op;
+	return retval;
+}
+/* }}} */
+
+static zval *zend_get_arg_default_value(zend_function *fn, zend_uint arg_num TSRMLS_DC) /* {{{ */
+{
+	if (fn->type == ZEND_USER_FUNCTION) {
+		zend_op *start_op = fn->op_array.opcodes;
+		return zend_get_arg_default_value_ex(&fn->op_array, arg_num, &start_op TSRMLS_CC);
+	}
+
+	return NULL;
+}
+/* }}} */
+
 /* {{{ proto int func_num_args(void)
    Get the number of arguments that were passed to the function */
 ZEND_FUNCTION(func_num_args)
@@ -409,6 +451,7 @@ ZEND_FUNCTION(func_get_arg)
 	zval **arg;
 	long requested_offset;
 	zend_execute_data *ex = EG(current_execute_data)->prev_execute_data;
+	zend_uint arg_count;
 
 	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "l", &requested_offset) == FAILURE) {
 		return;
@@ -424,13 +467,21 @@ ZEND_FUNCTION(func_get_arg)
 		RETURN_FALSE;
 	}
 
-	arg = zend_vm_stack_get_arg(requested_offset + 1 TSRMLS_CC);
-	if (arg == NULL) {
+	arg_count = zend_vm_stack_get_args_count(TSRMLS_C);
+	if (requested_offset >= arg_count) {
 		zend_error(E_WARNING, "func_get_arg():  Argument %ld not passed to function", requested_offset);
 		RETURN_FALSE;
 	}
 
-	RETURN_ZVAL(*arg, 1, 0);
+	arg = zend_vm_stack_get_arg(requested_offset + 1 TSRMLS_CC);
+	if (arg != NULL) {
+		RETURN_ZVAL(*arg, 1, 0);
+	} else {
+		zval *retval = zend_get_arg_default_value(ex->function_state.function, requested_offset + 1 TSRMLS_CC);
+		if (retval != NULL) {
+			RETURN_ZVAL(retval, 0, 1);
+		}
+	}
 }
 /* }}} */
 
@@ -440,30 +491,41 @@ ZEND_FUNCTION(func_get_arg)
 ZEND_FUNCTION(func_get_args)
 {
 	void **p;
-	int arg_count;
-	int i;
+	zend_uint arg_count, i;
 	zend_execute_data *ex = EG(current_execute_data)->prev_execute_data;
+	zend_op_array *op_array = NULL;
+	zend_op *start_op;
 
 	if (!ex || !ex->function_state.arguments) {
 		zend_error(E_WARNING, "func_get_args():  Called from the global scope - no function context");
 		RETURN_FALSE;
 	}
 
+	if (ex->function_state.function->type == ZEND_USER_FUNCTION) {
+		op_array = &ex->function_state.function->op_array;
+		start_op = op_array->opcodes;
+	}
+
 	p = ex->function_state.arguments;
-	arg_count = (int)(zend_uintptr_t) *p;		/* this is the amount of arguments passed to func_get_args(); */
+	arg_count = (int)(zend_uintptr_t) *p;
 
 	array_init_size(return_value, arg_count);
 	for (i = 0; i < arg_count; i++) {
-		zval *arg = *(p - (arg_count - i));
-		zval *arg_copy;
+		zval *stack_arg = *(p - (arg_count - i));
+		zval *arg = NULL;
 
-		if (arg == NULL) {
-			continue;
+		if (stack_arg != NULL) {
+			ALLOC_ZVAL(arg);
+			MAKE_COPY_ZVAL(&stack_arg, arg);
+		} else if (op_array) {
+			arg = zend_get_arg_default_value_ex(op_array, i + 1, &start_op TSRMLS_CC);
 		}
 
-		ALLOC_ZVAL(arg_copy);
-		MAKE_COPY_ZVAL(&arg, arg_copy);
-		zend_hash_index_update(return_value->value.ht, i, &arg_copy, sizeof(zval *), NULL);
+		if (arg == NULL) {
+			ALLOC_INIT_ZVAL(arg);
+		}
+
+		zend_hash_next_index_insert(return_value->value.ht, &arg, sizeof(zval *), NULL);
 	}
 }
 /* }}} */
