@@ -1727,37 +1727,41 @@ zend_always_inline void zend_check_for_overwritten_parameter(zend_function *fbc,
 }
 /* }}} */
 
-void **zend_handle_named_arg(zend_uint *arg_num_target, call_slot *call, char *name, int name_len, zend_ulong hash_value, zend_uint orig_arg_num TSRMLS_DC) /* {{{ */
+void **zend_handle_named_arg(zend_uint *arg_num_target, call_slot *call, char *name, int name_len, const zend_literal *key, zend_uint orig_arg_num TSRMLS_DC) /* {{{ */
 {
 	void **target;
 	zend_uint arg_num;
 	int relative_arg_num;
 
 	call->uses_named_args = 1;
+	if (!key || !(arg_num = (zend_uint) (zend_uintptr_t) CACHED_POLYMORPHIC_PTR(key->cache_slot, call->fbc))) {
+		zend_ulong hash_value = key ? key->hash_value : zend_inline_hash_func(name, name_len+1);
+		if (zend_get_arg_num(&arg_num, call->fbc, name, name_len, hash_value TSRMLS_CC) == FAILURE) {
+			if (call->fbc->common.fn_flags & ZEND_ACC_VARIADIC) {
+				if (!call->additional_named_args) {
+					ALLOC_HASHTABLE(call->additional_named_args);
+					zend_hash_init(call->additional_named_args, 0, NULL, ZVAL_PTR_DTOR, 0);
+				}
 
-	if (zend_get_arg_num(arg_num_target, call->fbc, name, name_len, hash_value TSRMLS_CC) == FAILURE) {
-		if (call->fbc->common.fn_flags & ZEND_ACC_VARIADIC) {
-			if (!call->additional_named_args) {
-				ALLOC_HASHTABLE(call->additional_named_args);
-				zend_hash_init(call->additional_named_args, 0, NULL, ZVAL_PTR_DTOR, 0);
-			}
+				if (zend_hash_quick_find(call->additional_named_args, name, name_len+1, hash_value, (void **) &target) == SUCCESS) {
+					zval_ptr_dtor((zval **) target);
+					zend_error(E_WARNING, "Overwriting already passed parameter $%s", name);
+				} else {
+					void *dummy = NULL;
+					zend_hash_quick_update(call->additional_named_args, name, name_len+1, hash_value, &dummy, sizeof(zval *), (void **) &target);
+				}
 
-			if (zend_hash_quick_find(call->additional_named_args, name, name_len+1, hash_value, (void **) &target) == SUCCESS) {
-				zval_ptr_dtor((zval **) target);
-				zend_error(E_WARNING, "Overwriting already passed parameter $%s", name);
+				*arg_num_target = call->fbc->common.num_args;
+				return target;
 			} else {
-				void *dummy = NULL;
-				zend_hash_quick_update(call->additional_named_args, name, name_len+1, hash_value, &dummy, sizeof(zval *), (void **) &target);
+				zend_error_noreturn(E_ERROR, "Unknown named argument $%s", name);
 			}
-
-			*arg_num_target = call->fbc->common.num_args;
-			return target;
-		} else {
-			zend_error_noreturn(E_ERROR, "Unknown named argument $%s", name);
+		} else if (key) {
+			CACHE_POLYMORPHIC_PTR(key->cache_slot, call->fbc, (void *) (zend_uintptr_t) arg_num);
 		}
 	}
 
-	arg_num = *arg_num_target;
+	*arg_num_target = arg_num;
 	relative_arg_num = arg_num - orig_arg_num - call->num_additional_args - 1;
 
 	target = EG(argument_stack)->top + relative_arg_num;

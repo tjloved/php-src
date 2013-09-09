@@ -2731,6 +2731,7 @@ void zend_do_pass_param(znode *param, zend_uchar op, znode *named_arg TSRMLS_DC)
 	} else {
 		SET_NODE(opline->op2, named_arg);
 		CALCULATE_LITERAL_HASH(opline->op2.constant);
+		GET_POLYMORPHIC_CACHE_SLOT(opline->op2.constant);
 	}
 
 	if (++CG(context).used_stack > CG(active_op_array)->used_stack) {
