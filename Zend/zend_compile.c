@@ -1939,6 +1939,13 @@ void zend_do_receive_arg(zend_uchar op, znode *varname, const znode *offset, con
 
 void zend_do_add_function_return_type(znode *class_type TSRMLS_DC) /* {{{ */
 {
+	zval *return_type = &CG(active_op_array)->return_type;
+
+	if (class_type->op_type == IS_UNUSED || Z_TYPE(class_type->u.constant) == IS_NULL) {
+		ZVAL_NULL(return_type);
+		return;
+	}
+
 	if (class_type->op_type == IS_CONST &&
 		Z_TYPE(class_type->u.constant) == IS_STRING &&
 		Z_STRLEN(class_type->u.constant) == 0) {
@@ -1948,13 +1955,7 @@ void zend_do_add_function_return_type(znode *class_type TSRMLS_DC) /* {{{ */
 		return;
 	}
 
-	CG(active_op_array)->return_type = IS_NULL;
-
-    if (class_type->op_type == IS_UNUSED || Z_TYPE(class_type->u.constant) == IS_NULL) {
-		return;
-	}
-
-	CG(active_op_array)->return_type = Z_TYPE(class_type->u.constant);
+	Z_TYPE_P(return_type) = Z_TYPE(class_type->u.constant);
 }
 /* }}} */
 
