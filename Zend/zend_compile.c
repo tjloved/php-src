@@ -1946,8 +1946,7 @@ void zend_do_add_function_return_type(znode *class_type TSRMLS_DC) /* {{{ */
 		return;
 	}
 
-	if (class_type->op_type == IS_CONST &&
-		Z_TYPE(class_type->u.constant) == IS_STRING &&
+	if (Z_TYPE(class_type->u.constant) == IS_STRING &&
 		Z_STRLEN(class_type->u.constant) == 0) {
 		/* Usage of namespace as class name not in namespace */
 		zval_dtor(&class_type->u.constant);

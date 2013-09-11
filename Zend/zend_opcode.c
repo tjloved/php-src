@@ -104,6 +104,8 @@ void init_op_array(zend_op_array *op_array, zend_uchar type, int initial_ops_siz
 	op_array->run_time_cache = NULL;
 	op_array->last_cache_slot = 0;
 
+	ZVAL_NULL(&op_array->return_type);
+
 	memset(op_array->reserved, 0, ZEND_MAX_RESERVED_RESOURCES * sizeof(void*));
 
 	zend_llist_apply_with_argument(&zend_extensions, (llist_apply_with_arg_func_t) zend_extension_op_array_ctor_handler, op_array TSRMLS_CC);
@@ -410,6 +412,7 @@ ZEND_API void destroy_op_array(zend_op_array *op_array TSRMLS_DC)
 		}
 		efree(op_array->arg_info);
 	}
+	zval_dtor(&op_array->return_type);
 }
 
 void init_op(zend_op *op TSRMLS_DC)

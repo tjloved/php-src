@@ -378,7 +378,7 @@ is_reference:
 
 unticked_function_declaration_statement:
 		function is_reference T_STRING { zend_do_begin_function_declaration(&$1, &$3, 0, $2.op_type, NULL TSRMLS_CC); }
-		'(' parameter_list ')' optional_return_type { zend_do_add_function_return_type(&$4); }
+		'(' parameter_list ')' optional_return_type { zend_do_add_function_return_type(&$8 TSRMLS_CC); }
 		'{' inner_statement_list '}' { zend_do_end_function_declaration(&$1 TSRMLS_CC); }
 ;
 
@@ -599,7 +599,7 @@ class_statement:
 	|	class_constant_declaration ';'
 	|	trait_use_statement
 	|	method_modifiers function is_reference T_STRING { zend_do_begin_function_declaration(&$2, &$4, 1, $3.op_type, &$1 TSRMLS_CC); }
-		'(' parameter_list ')' optional_return_type { zend_do_add_function_return_type(&$4); }
+		'(' parameter_list ')' optional_return_type { zend_do_add_function_return_type(&$9 TSRMLS_CC); }
 		method_body { zend_do_abstract_method(&$6, &$1, &$11 TSRMLS_CC); zend_do_end_function_declaration(&$2 TSRMLS_CC); }
 ;
 
@@ -818,10 +818,10 @@ expr_without_variable:
 	|	T_PRINT expr  { zend_do_print(&$$, &$2 TSRMLS_CC); }
 	|	T_YIELD { zend_do_yield(&$$, NULL, NULL, 0 TSRMLS_CC); }
 	|	function is_reference { zend_do_begin_lambda_function_declaration(&$$, &$1, $2.op_type, 0 TSRMLS_CC); }
-		'(' parameter_list ')' lexical_vars optional_return_type { zend_do_add_function_return_type(&$5); }
+		'(' parameter_list ')' lexical_vars optional_return_type { zend_do_add_function_return_type(&$8 TSRMLS_CC); }
 		'{' inner_statement_list '}' { zend_do_end_function_declaration(&$1 TSRMLS_CC); $$ = $3; }
 	|	T_STATIC function is_reference { zend_do_begin_lambda_function_declaration(&$$, &$2, $3.op_type, 1 TSRMLS_CC); }
-		'(' parameter_list ')' lexical_vars optional_return_type { zend_do_add_function_return_type(&$5); }
+		'(' parameter_list ')' lexical_vars optional_return_type { zend_do_add_function_return_type(&$9 TSRMLS_CC); }
 		'{' inner_statement_list '}' { zend_do_end_function_declaration(&$2 TSRMLS_CC); $$ = $4; }
 ;
 

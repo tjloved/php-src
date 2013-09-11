@@ -667,6 +667,46 @@ static inline int zend_verify_arg_type(zend_function *zf, zend_uint arg_num, zva
 	return 1;
 }
 
+static void zend_verify_return_type_error(zend_op_array *op_array, const char *need_msg, const char *given_msg TSRMLS_DC) /* {{{ */
+{
+	zend_error(
+		E_NOTICE, "Return value of %s%s%s() must %s, %s given",
+		op_array->function_name, op_array->scope ? "::" : "",
+		op_array->scope ? op_array->scope->name : "",
+		need_msg, given_msg
+	);
+}
+/* }}} */
+
+static inline void zend_verify_return_type(zend_op_array *op_array, zval *value TSRMLS_DC) /* {{{ */
+{
+	if (Z_TYPE_P(value) == IS_NULL) {
+		/* Always allow null as return value */
+		return;
+	}
+
+	switch (Z_TYPE(op_array->return_type)) {
+		case IS_NULL:
+			/* no typehint */
+			return;
+		case IS_ARRAY:
+			if (Z_TYPE_P(value) != IS_ARRAY) {
+				zend_verify_return_type_error(
+					op_array, "be of type array", zend_zval_type_name(value) TSRMLS_CC
+				);
+			}
+			return;
+		case IS_CALLABLE:
+			if (!zend_is_callable(value, IS_CALLABLE_CHECK_SILENT, NULL TSRMLS_CC)) {
+				zend_verify_return_type_error(
+					op_array, "be callable", zend_zval_type_name(value) TSRMLS_CC
+				);
+			}
+			return;
+	}
+}
+/* }}} */
+
 static inline void zend_assign_to_object(zval **retval, zval **object_ptr, zval *property_name, int value_type, znode_op *value_op, const zend_execute_data *execute_data, int opcode, const zend_literal *key TSRMLS_DC)
 {
 	zval *object = *object_ptr;

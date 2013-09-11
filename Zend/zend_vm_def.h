@@ -2843,19 +2843,7 @@ ZEND_VM_HANDLER(62, ZEND_RETURN, CONST|TMP|VAR|CV, ANY)
 	SAVE_OPLINE();
 	retval_ptr = GET_OP1_ZVAL_PTR(BP_VAR_R);
 
-	if (EG(active_op_array)->return_type != IS_NULL) {
-		if (EG(active_op_array)->return_type != Z_TYPE_P(retval_ptr)) {
-			zend_error(
-				E_NOTICE,
-				"Return type mismatch. Expected %d got %d for function %s() defined in file %s line %d",
-				EG(active_op_array)->return_type,
-				Z_TYPE_P(retval_ptr),
-				EG(active_op_array)->function_name,
-				EG(active_op_array)->filename,
-				EG(active_op_array)->line_start
-			);
-		}
-	}
+	zend_verify_return_type(EG(active_op_array), retval_ptr TSRMLS_CC);
 
 	if (!EG(return_value_ptr_ptr)) {
 		FREE_OP1();
