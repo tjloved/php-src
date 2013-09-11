@@ -667,13 +667,26 @@ static inline int zend_verify_arg_type(zend_function *zf, zend_uint arg_num, zva
 	return 1;
 }
 
-static void zend_verify_return_type_error(zend_op_array *op_array, const char *need_msg, const char *given_msg TSRMLS_DC) /* {{{ */
+char *zend_verify_return_type_class_kind(const zend_op_array *op_array, const char **class_name, zend_class_entry **pce TSRMLS_DC) /* {{{ */
+{
+	*pce = zend_fetch_class(op_array->return_type.class_name, op_array->return_type.class_name_len, (ZEND_FETCH_CLASS_AUTO | ZEND_FETCH_CLASS_NO_AUTOLOAD) TSRMLS_CC);
+
+	*class_name = (*pce) ? (*pce)->name : op_array->return_type.class_name;
+	if (*pce && (*pce)->ce_flags & ZEND_ACC_INTERFACE) {
+		return "implement interface ";
+	} else {
+		return "be an instance of ";
+	}
+}
+/* }}} */
+
+static void zend_verify_return_type_error(const zend_op_array *op_array, const char *need_msg, const char *need_kind, const char *given_msg, const char *given_kind TSRMLS_DC) /* {{{ */
 {
 	zend_error(
-		E_NOTICE, "Return value of %s%s%s() must %s, %s given",
+		E_NOTICE, "Return value of %s%s%s() must %s%s, %s%s given",
 		op_array->function_name, op_array->scope ? "::" : "",
 		op_array->scope ? op_array->scope->name : "",
-		need_msg, given_msg
+		need_msg, need_kind, given_msg, given_kind
 	);
 }
 /* }}} */
@@ -689,20 +702,36 @@ static inline void zend_verify_return_type(zend_op_array *op_array, zval *value 
 		case IS_ARRAY:
 			if (Z_TYPE_P(value) != IS_ARRAY) {
 				zend_verify_return_type_error(
-					op_array, "be of type array", zend_zval_type_name(value) TSRMLS_CC
+					op_array, "be of type array", "", zend_zval_type_name(value), "" TSRMLS_CC
 				);
 			}
 			return;
 		case IS_CALLABLE:
 			if (!zend_is_callable(value, IS_CALLABLE_CHECK_SILENT, NULL TSRMLS_CC)) {
 				zend_verify_return_type_error(
-					op_array, "be callable", zend_zval_type_name(value) TSRMLS_CC
+					op_array, "be callable", "", zend_zval_type_name(value), "" TSRMLS_CC
 				);
 			}
 			return;
-		case IS_OBJECT:
-			/* TODO */
+		case IS_OBJECT: {
+			const char *class_name;
+			zend_class_entry *ce;
+			char *need_msg = zend_verify_return_type_class_kind(
+				op_array, &class_name, &ce TSRMLS_CC
+			);
+
+			if (Z_TYPE_P(value) != IS_OBJECT) {
+				zend_verify_return_type_error(
+					op_array, need_msg, class_name, zend_zval_type_name(value), "" TSRMLS_CC
+				);
+			} else if (!ce || !instanceof_function(Z_OBJCE_P(value), ce TSRMLS_CC)) {
+				zend_verify_return_type_error(
+					op_array, need_msg, class_name,
+					"instance of ", Z_OBJCE_P(value)->name TSRMLS_CC
+				);
+			}
 			return;
+		}
 		default:
 			/* no typehint */
 			return;

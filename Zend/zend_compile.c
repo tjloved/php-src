@@ -1959,7 +1959,17 @@ void zend_do_add_function_return_type(znode *return_type TSRMLS_DC) /* {{{ */
 			break;
 		default:
 			CG(active_op_array)->return_type.type = IS_OBJECT;
-			/* TODO */
+
+			if (ZEND_FETCH_CLASS_DEFAULT == zend_get_class_fetch_type(Z_STRVAL(return_type->u.constant), Z_STRLEN(return_type->u.constant))) {
+				zend_resolve_class_name(return_type, 0, 0 TSRMLS_CC);
+			}
+
+			CG(active_op_array)->return_type.class_name = (char*) zend_new_interned_string(
+				Z_STRVAL(return_type->u.constant), Z_STRLEN(return_type->u.constant) + 1,
+				1 TSRMLS_CC
+			);
+			CG(active_op_array)->return_type.class_name_len = Z_STRLEN(return_type->u.constant);
+			break;
 	}
 }
 /* }}} */
