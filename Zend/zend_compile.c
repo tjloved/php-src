@@ -1937,7 +1937,7 @@ void zend_do_receive_arg(zend_uchar op, znode *varname, const znode *offset, con
 }
 /* }}} */
 
-void zend_do_add_function_return_type(znode *class_type) /* {{{ */
+void zend_do_add_function_return_type(znode *class_type TSRMLS_DC) /* {{{ */
 {
 	if (class_type->op_type == IS_CONST &&
 		Z_TYPE(class_type->u.constant) == IS_STRING &&
