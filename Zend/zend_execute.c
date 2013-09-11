@@ -685,10 +685,7 @@ static inline void zend_verify_return_type(zend_op_array *op_array, zval *value 
 		return;
 	}
 
-	switch (Z_TYPE(op_array->return_type)) {
-		case IS_NULL:
-			/* no typehint */
-			return;
+	switch (op_array->return_type.type) {
 		case IS_ARRAY:
 			if (Z_TYPE_P(value) != IS_ARRAY) {
 				zend_verify_return_type_error(
@@ -702,6 +699,12 @@ static inline void zend_verify_return_type(zend_op_array *op_array, zval *value 
 					op_array, "be callable", zend_zval_type_name(value) TSRMLS_CC
 				);
 			}
+			return;
+		case IS_OBJECT:
+			/* TODO */
+			return;
+		default:
+			/* no typehint */
 			return;
 	}
 }

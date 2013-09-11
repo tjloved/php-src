@@ -1,5 +1,7 @@
 --TEST--
 Return typing test
+--INI--
+error_reporting=E_ALL
 --FILE--
 <?php
 

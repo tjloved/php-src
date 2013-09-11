@@ -308,7 +308,11 @@ struct _zend_op_array {
 	void **run_time_cache;
 	int  last_cache_slot;
 
-	zval return_type;
+	struct {
+		zend_uchar type;
+		const char *class_name;
+		zend_uint  class_name_len;
+	} return_type;
 
 	void *reserved[ZEND_MAX_RESERVED_RESOURCES];
 };
