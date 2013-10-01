@@ -11,4 +11,7 @@ class derived implements base {
 }
 ?>
 --EXPECTF--
-Fatal error: derived cannot implement base - it is not an interface in %s on line %d
+Fatal error: Uncaught exception 'EngineException' with message 'derived cannot implement base - it is not an interface' in %s:%d
+Stack trace:
+#0 {main}
+  thrown in %s on line %d

@@ -12,4 +12,7 @@ interface bar extends foo {
 echo "Done\n";
 ?>
 --EXPECTF--	
-Fatal error: bar cannot implement foo - it is not an interface in %s on line %d
+Fatal error: Uncaught exception 'EngineException' with message 'bar cannot implement foo - it is not an interface' in %s:%d
+Stack trace:
+#0 {main}
+  thrown in %s on line %d

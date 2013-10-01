@@ -273,6 +273,24 @@ $op2_free_op_var_ptr = array(
 $op2_free_op_var_ptr_fast = $op2_free_op_var_ptr;
 $op2_free_op_var_ptr_fast["VAR"] = "zval_ptr_dtor(&free_op2.var)";
 
+$op1_free_unfetched_op = array(
+	"ANY"    => "_free_unfetched_op(opline->op1_type, &opline->op1, execute_data);",
+    "TMP"    => "zval_dtor(&EX_T(opline->op1.var).tmp_var);",
+    "VAR"    => "zval_ptr_dtor(&EX_T(opline->op1.var).var.ptr);",
+    "CONST"  => "",
+    "UNUSED" => "",
+    "CV"     => "",
+);
+
+$op2_free_unfetched_op = array(
+	"ANY"    => "_free_unfetched_op(opline->op2_type, &opline->op2, execute_data);",
+    "TMP"    => "zval_dtor(&EX_T(opline->op2.var).tmp_var);",
+    "VAR"    => "zval_ptr_dtor(&EX_T(opline->op2.var).var.ptr);",
+    "CONST"  => "",
+    "UNUSED" => "",
+    "CV"     => "",
+);
+
 $list    = array(); // list of opcode handlers and helpers in original order
 $opcodes = array(); // opcode handlers by code
 $helpers = array(); // opcode helpers by name
@@ -326,7 +344,8 @@ function gen_code($f, $spec, $kind, $export, $code, $op1, $op2, $name) {
 		$op1_free_op_var_ptr, $op2_free_op_var_ptr, $prefix, 
 		$op1_get_zval_ptr_ptr_fast, $op2_get_zval_ptr_ptr_fast,
 		$op1_get_obj_zval_ptr_ptr_fast, $op2_get_obj_zval_ptr_ptr_fast,
-		$op1_free_op_var_ptr_fast, $op2_free_op_var_ptr_fast;
+        $op1_free_op_var_ptr_fast, $op2_free_op_var_ptr_fast,
+        $op1_free_unfetched_op, $op2_free_unfetched_op;
 
 	// Specializing
 	$code = preg_replace(
@@ -357,6 +376,8 @@ function gen_code($f, $spec, $kind, $export, $code, $op1, $op2, $name) {
 			"/GET_OP2_OBJ_ZVAL_PTR_PTR_FAST\(([^)]*)\)/",
 			"/FREE_OP1_VAR_PTR_FAST\(\)/",
 			"/FREE_OP2_VAR_PTR_FAST\(\)/",
+			"/FREE_UNFETCHED_OP1\(\)/",
+			"/FREE_UNFETCHED_OP2\(\)/",
 			"/^#ifdef\s+ZEND_VM_SPEC\s*\n/m",
 			"/^#ifndef\s+ZEND_VM_SPEC\s*\n/m",
 			"/\!defined\(ZEND_VM_SPEC\)/m",
@@ -395,6 +416,8 @@ function gen_code($f, $spec, $kind, $export, $code, $op1, $op2, $name) {
 			$op2_get_obj_zval_ptr_ptr_fast[$op2],
 			$op1_free_op_var_ptr_fast[$op1],
 			$op2_free_op_var_ptr_fast[$op2],
+            $op1_free_unfetched_op[$op1],
+            $op2_free_unfetched_op[$op2],
 			($op1!="ANY"||$op2!="ANY")?"#if 1\n":"#if 0\n",
 			($op1!="ANY"||$op2!="ANY")?"#if 0\n":"#if 1\n",
 			($op1!="ANY"||$op2!="ANY")?"0":"1",

@@ -23,4 +23,8 @@ test();
 int(9)
 int(81)
 
-Fatal error: Cannot pass parameter 1 by reference in %s on line %d
+Fatal error: Uncaught exception 'EngineException' with message 'Cannot pass parameter 1 by reference' in %s:%d
+Stack trace:
+#0 %s(%d): test()
+#1 {main}
+  thrown in %s on line %d

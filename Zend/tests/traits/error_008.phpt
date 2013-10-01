@@ -9,4 +9,7 @@ class foo implements abc { }
 
 ?>
 --EXPECTF--
-Fatal error: foo cannot implement abc - it is not an interface in %s on line %d
+Fatal error: Uncaught exception 'EngineException' with message 'foo cannot implement abc - it is not an interface' in %s:%d
+Stack trace:
+#0 {main}
+  thrown in %s on line %d

@@ -5,5 +5,7 @@ Bug #42818 ($foo = clone(array()); leaks memory)
 $foo = clone(array());
 ?>
 --EXPECTF--
-Fatal error: __clone method called on non-object in %sbug42818.php on line 2
-
+Fatal error: Uncaught exception 'EngineException' with message '__clone method called on non-object' in %s:%d
+Stack trace:
+#0 {main}
+  thrown in %s on line %d

@@ -17,4 +17,8 @@ Fatal error: Uncaught exception 'Exception' with message 'error!' in %sbug51394.
 Stack trace:
 #0 %sbug51394.php(%d): eh(8, 'Undefined varia%s', '%s', %d, Array)
 #1 {main}
+
+Next exception 'EngineException' with message 'Function name must be a string' in %s:%d
+Stack trace:
+#0 {main}
   thrown in %sbug51394.php on line %d

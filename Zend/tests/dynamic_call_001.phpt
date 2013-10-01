@@ -14,4 +14,7 @@ $a::$a();
 
 ?>
 --EXPECTF--
-Fatal error: Non-static method foo::foo() cannot be called statically in %s on line %d
+Fatal error: Uncaught exception 'EngineException' with message 'Non-static method foo::foo() cannot be called statically' in %s:%d
+Stack trace:
+#0 {main}
+  thrown in %s on line %d

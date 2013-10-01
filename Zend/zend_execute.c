@@ -519,6 +519,21 @@ static inline zval *_get_obj_zval_ptr(int op_type, znode_op *op, const zend_exec
 	return get_zval_ptr(op_type, op, execute_data, should_free, type);
 }
 
+static zend_always_inline void _free_unfetched_op(int op_type, znode_op *op, const zend_execute_data *execute_data TSRMLS_DC)
+{
+	switch (op_type) {
+		case IS_TMP_VAR:
+			zval_dtor(&EX_T(op->var).tmp_var);
+			break;
+		case IS_VAR:
+			zval_ptr_dtor(&EX_T(op->var).var.ptr);
+			break;
+		default:
+			/* IS_CV, IS_CONST and IS_UNUSED don't need to be freed */
+			break;
+	}
+}
+
 static void zend_assign_to_variable_reference(zval **variable_ptr_ptr, zval **value_ptr_ptr TSRMLS_DC)
 {
 	zval *variable_ptr = *variable_ptr_ptr;
