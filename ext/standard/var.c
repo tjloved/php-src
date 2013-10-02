@@ -107,7 +107,7 @@ PHPAPI void php_var_dump(zval **struc, int level TSRMLS_DC) /* {{{ */
 		php_printf("%sint(%ld)\n", COMMON, Z_LVAL_PP(struc));
 		break;
 	case IS_DOUBLE:
-		php_printf("%sfloat(%.*G)\n", COMMON, (int) EG(precision), Z_DVAL_PP(struc));
+		php_printf("%sfloat(%.*H)\n", COMMON, (int) EG(precision), Z_DVAL_PP(struc));
 		break;
 	case IS_STRING:
 		php_printf("%sstring(%d) \"", COMMON, Z_STRLEN_PP(struc));
@@ -262,7 +262,7 @@ PHPAPI void php_debug_zval_dump(zval **struc, int level TSRMLS_DC) /* {{{ */
 		php_printf("%slong(%ld) refcount(%u)\n", COMMON, Z_LVAL_PP(struc), Z_REFCOUNT_PP(struc));
 		break;
 	case IS_DOUBLE:
-		php_printf("%sdouble(%.*G) refcount(%u)\n", COMMON, (int) EG(precision), Z_DVAL_PP(struc), Z_REFCOUNT_PP(struc));
+		php_printf("%sdouble(%.*H) refcount(%u)\n", COMMON, (int) EG(precision), Z_DVAL_PP(struc), Z_REFCOUNT_PP(struc));
 		break;
 	case IS_STRING:
 		php_printf("%sstring(%d) \"", COMMON, Z_STRLEN_PP(struc));

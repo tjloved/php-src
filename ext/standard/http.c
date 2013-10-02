@@ -181,7 +181,7 @@ PHPAPI int php_url_encode_hash_ex(HashTable *ht, smart_str *formstr,
 					ekey_len = spprintf(&ekey, 0, "%ld", Z_LVAL_PP(zdata));
 					break;
 				case IS_DOUBLE:
-					ekey_len = spprintf(&ekey, 0, "%.*G", (int) EG(precision), Z_DVAL_PP(zdata));
+					ekey_len = spprintf(&ekey, 0, "%.*H", (int) EG(precision), Z_DVAL_PP(zdata));
 					break;
 				default:
 					/* fall back on convert to string */

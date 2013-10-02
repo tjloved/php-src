@@ -112,9 +112,9 @@ mysqlnd_build_trace_args(zval **arg TSRMLS_DC, int num_args, va_list args, zend_
 			int l_tmp;
 
 			s_tmp = emalloc(MAX_LENGTH_OF_DOUBLE + EG(precision) + 1);
-			l_tmp = zend_sprintf(s_tmp, "%.*G", (int) EG(precision), dval);  /* SAFE */
+			l_tmp = zend_sprintf(s_tmp, "%.*H", (int) EG(precision), dval);  /* SAFE */
 			TRACE_APPEND_STRL(s_tmp, l_tmp);
-			/* %G already handles removing trailing zeros from the fractional part, yay */
+			/* %H already handles removing trailing zeros from the fractional part, yay */
 			efree(s_tmp);
 			TRACE_APPEND_STR(", ");
 			break;

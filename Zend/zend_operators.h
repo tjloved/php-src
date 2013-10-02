@@ -375,7 +375,7 @@ ZEND_API void zend_compare_objects(zval *result, zval *o1, zval *o2 TSRMLS_DC);
 ZEND_API int zend_atoi(const char *str, int str_len);
 ZEND_API long zend_atol(const char *str, int str_len);
 
-ZEND_API void zend_locale_sprintf_double(zval *op ZEND_FILE_LINE_DC);
+ZEND_API void zend_sprintf_double(zval *op ZEND_FILE_LINE_DC);
 END_EXTERN_C()
 
 #define convert_to_ex_master(ppzv, lower_type, upper_type)	\

@@ -1163,7 +1163,7 @@ PHPAPI void php_implode(zval *delim, zval *arr, zval *return_value TSRMLS_DC)
 
 			case IS_DOUBLE: {
 				char *stmp;
-				str_len = spprintf(&stmp, 0, "%.*G", (int) EG(precision), Z_DVAL_PP(tmp));
+				str_len = spprintf(&stmp, 0, "%.*H", (int) EG(precision), Z_DVAL_PP(tmp));
 				smart_str_appendl(&implstr, stmp, str_len);
 				efree(stmp);
 			}
