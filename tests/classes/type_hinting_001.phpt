@@ -34,5 +34,8 @@ $a->b($b);
 
 ?>
 --EXPECTF--
-
-Catchable fatal error: Argument 1 passed to FooBar::a() must implement interface Foo, instance of Blort given, called in %s on line 27 and defined in %s on line 12
+Fatal error: Uncaught exception 'EngineException' with message 'Argument 1 passed to FooBar::a() must implement interface Foo, instance of Blort given, called in %s on line %d and defined' in %s:%d
+Stack trace:
+#0 %s(%d): FooBar->a(Object(Blort))
+#1 {main}
+  thrown in %s on line %d

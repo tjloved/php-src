@@ -2,36 +2,18 @@
 Catchable fatal error [2]
 --FILE--
 <?php
-	class Foo {
-	}
 
-	function blah (Foo $a)
-	{
-	}
+function func(Foo $a) { }
 
-	function error()
-	{
-		$a = func_get_args();
-		var_dump($a);
-	}
+try {
+	func(42);
+} catch (EngineException $e) {
+    echo $e->getMessage(), "\n";
+}
 
-	set_error_handler('error');
+echo "ALIVE!\n";
 
-	blah (new StdClass);
-	echo "ALIVE!\n";
 ?>
 --EXPECTF--
-array(5) {
-  [0]=>
-  int(4096)
-  [1]=>
-  string(%d) "Argument 1 passed to blah() must be an instance of Foo, instance of stdClass given, called in %scatchable_error_002.php on line %d and defined"
-  [2]=>
-  string(%d) "%scatchable_error_002.php"
-  [3]=>
-  int(5)
-  [4]=>
-  array(0) {
-  }
-}
+Argument 1 passed to func() must be an instance of Foo, integer given, called in %s on line %d and defined
 ALIVE!

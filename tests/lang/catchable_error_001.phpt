@@ -19,4 +19,8 @@ Catchable fatal error [1]
 	echo "ALIVE!\n";
 ?>
 --EXPECTF--
-Catchable fatal error: Argument 1 passed to blah() must be an instance of Foo, instance of stdClass given, called in %scatchable_error_001.php on line 15 and defined in %scatchable_error_001.php on line 5
+Fatal error: Uncaught exception 'EngineException' with message 'Argument 1 passed to blah() must be an instance of Foo, instance of stdClass given, called in %s on line %d and defined' in %s:%d
+Stack trace:
+#0 %s(%d): blah(Object(stdClass))
+#1 {main}
+  thrown in %s on line %d

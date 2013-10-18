@@ -541,7 +541,9 @@ static int ZEND_FASTCALL zend_do_fcall_common_helper_SPEC(ZEND_OPCODE_HANDLER_AR
 			ulong arg_count = opline->extended_value;
 
 			while (arg_count>0) {
-				zend_verify_arg_type(fbc, ++i, *(p-arg_count), 0 TSRMLS_CC);
+				if (!zend_verify_arg_type(fbc, ++i, *(p-arg_count), 0 TSRMLS_CC)) {
+					break;
+				}
 				arg_count--;
 			}
 		}
@@ -733,11 +735,8 @@ static int ZEND_FASTCALL  ZEND_RECV_SPEC_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
 				zend_error(E_WARNING, "Missing argument %u for %s%s%s()", opline->op1.num, class_name, space, get_active_function_name(TSRMLS_C));
 			}
 		}
-	} else {
-		zval **var_ptr;
-
-		zend_verify_arg_type((zend_function *) EG(active_op_array), arg_num, *param, opline->extended_value TSRMLS_CC);
-		var_ptr = _get_zval_ptr_ptr_cv_BP_VAR_W(execute_data, opline->result.var TSRMLS_CC);
+	} else if (zend_verify_arg_type((zend_function *) EG(active_op_array), arg_num, *param, opline->extended_value TSRMLS_CC)) {
+		zval **var_ptr = _get_zval_ptr_ptr_cv_BP_VAR_W(execute_data, opline->result.var TSRMLS_CC);
 		Z_DELREF_PP(var_ptr);
 		*var_ptr = *param;
 		Z_ADDREF_PP(var_ptr);
@@ -769,7 +768,10 @@ static int ZEND_FASTCALL  ZEND_RECV_VARIADIC_SPEC_HANDLER(ZEND_OPCODE_HANDLER_AR
 
 	for (; arg_num <= arg_count; ++arg_num) {
 		zval **param = zend_vm_stack_get_arg(arg_num TSRMLS_CC);
-		zend_verify_arg_type((zend_function *) EG(active_op_array), arg_num, *param, opline->extended_value TSRMLS_CC);
+		if (!zend_verify_arg_type((zend_function *) EG(active_op_array), arg_num, *param, opline->extended_value TSRMLS_CC)) {
+			break;
+		}
+
 		zend_hash_next_index_insert(Z_ARRVAL_P(params), param, sizeof(zval *), NULL);
 		Z_ADDREF_PP(param);
 	}
@@ -14690,10 +14692,6 @@ static int ZEND_FASTCALL zend_binary_assign_op_helper_SPEC_VAR_CONST(int (*binar
 					value = get_zval_ptr((opline+1)->op1_type, &(opline+1)->op1, execute_data, &free_op_data1, BP_VAR_R);
 					var_ptr = _get_zval_ptr_ptr_var((opline+1)->op2.var, execute_data, &free_op_data2 TSRMLS_CC);
 
-					/* TODO: Find out if this check is necessary
-					if (UNEXPECTED(var_ptr == NULL)) {
-						zend_error_noreturn(E_ERROR, "Cannot use assign-op operators with overloaded objects nor string offsets");
-					}*/
 				}
 			}
 			break;
@@ -17296,10 +17294,6 @@ static int ZEND_FASTCALL zend_binary_assign_op_helper_SPEC_VAR_TMP(int (*binary_
 					value = get_zval_ptr((opline+1)->op1_type, &(opline+1)->op1, execute_data, &free_op_data1, BP_VAR_R);
 					var_ptr = _get_zval_ptr_ptr_var((opline+1)->op2.var, execute_data, &free_op_data2 TSRMLS_CC);
 
-					/* TODO: Find out if this check is necessary
-					if (UNEXPECTED(var_ptr == NULL)) {
-						zend_error_noreturn(E_ERROR, "Cannot use assign-op operators with overloaded objects nor string offsets");
-					}*/
 				}
 			}
 			break;
@@ -19470,10 +19464,6 @@ static int ZEND_FASTCALL zend_binary_assign_op_helper_SPEC_VAR_VAR(int (*binary_
 					value = get_zval_ptr((opline+1)->op1_type, &(opline+1)->op1, execute_data, &free_op_data1, BP_VAR_R);
 					var_ptr = _get_zval_ptr_ptr_var((opline+1)->op2.var, execute_data, &free_op_data2 TSRMLS_CC);
 
-					/* TODO: Find out if this check is necessary
-					if (UNEXPECTED(var_ptr == NULL)) {
-						zend_error_noreturn(E_ERROR, "Cannot use assign-op operators with overloaded objects nor string offsets");
-					}*/
 				}
 			}
 			break;
@@ -21764,10 +21754,6 @@ static int ZEND_FASTCALL zend_binary_assign_op_helper_SPEC_VAR_UNUSED(int (*bina
 					value = get_zval_ptr((opline+1)->op1_type, &(opline+1)->op1, execute_data, &free_op_data1, BP_VAR_R);
 					var_ptr = _get_zval_ptr_ptr_var((opline+1)->op2.var, execute_data, &free_op_data2 TSRMLS_CC);
 
-					/* TODO: Find out if this check is necessary
-					if (UNEXPECTED(var_ptr == NULL)) {
-						zend_error_noreturn(E_ERROR, "Cannot use assign-op operators with overloaded objects nor string offsets");
-					}*/
 				}
 			}
 			break;
@@ -23247,10 +23233,6 @@ static int ZEND_FASTCALL zend_binary_assign_op_helper_SPEC_VAR_CV(int (*binary_o
 					value = get_zval_ptr((opline+1)->op1_type, &(opline+1)->op1, execute_data, &free_op_data1, BP_VAR_R);
 					var_ptr = _get_zval_ptr_ptr_var((opline+1)->op2.var, execute_data, &free_op_data2 TSRMLS_CC);
 
-					/* TODO: Find out if this check is necessary
-					if (UNEXPECTED(var_ptr == NULL)) {
-						zend_error_noreturn(E_ERROR, "Cannot use assign-op operators with overloaded objects nor string offsets");
-					}*/
 				}
 			}
 			break;
@@ -25299,10 +25281,6 @@ static int ZEND_FASTCALL zend_binary_assign_op_helper_SPEC_UNUSED_CONST(int (*bi
 					value = get_zval_ptr((opline+1)->op1_type, &(opline+1)->op1, execute_data, &free_op_data1, BP_VAR_R);
 					var_ptr = _get_zval_ptr_ptr_var((opline+1)->op2.var, execute_data, &free_op_data2 TSRMLS_CC);
 
-					/* TODO: Find out if this check is necessary
-					if (UNEXPECTED(var_ptr == NULL)) {
-						zend_error_noreturn(E_ERROR, "Cannot use assign-op operators with overloaded objects nor string offsets");
-					}*/
 				}
 			}
 			break;
@@ -26773,10 +26751,6 @@ static int ZEND_FASTCALL zend_binary_assign_op_helper_SPEC_UNUSED_TMP(int (*bina
 					value = get_zval_ptr((opline+1)->op1_type, &(opline+1)->op1, execute_data, &free_op_data1, BP_VAR_R);
 					var_ptr = _get_zval_ptr_ptr_var((opline+1)->op2.var, execute_data, &free_op_data2 TSRMLS_CC);
 
-					/* TODO: Find out if this check is necessary
-					if (UNEXPECTED(var_ptr == NULL)) {
-						zend_error_noreturn(E_ERROR, "Cannot use assign-op operators with overloaded objects nor string offsets");
-					}*/
 				}
 			}
 			break;
@@ -28145,10 +28119,6 @@ static int ZEND_FASTCALL zend_binary_assign_op_helper_SPEC_UNUSED_VAR(int (*bina
 					value = get_zval_ptr((opline+1)->op1_type, &(opline+1)->op1, execute_data, &free_op_data1, BP_VAR_R);
 					var_ptr = _get_zval_ptr_ptr_var((opline+1)->op2.var, execute_data, &free_op_data2 TSRMLS_CC);
 
-					/* TODO: Find out if this check is necessary
-					if (UNEXPECTED(var_ptr == NULL)) {
-						zend_error_noreturn(E_ERROR, "Cannot use assign-op operators with overloaded objects nor string offsets");
-					}*/
 				}
 			}
 			break;
@@ -29518,10 +29488,6 @@ static int ZEND_FASTCALL zend_binary_assign_op_helper_SPEC_UNUSED_UNUSED(int (*b
 					value = get_zval_ptr((opline+1)->op1_type, &(opline+1)->op1, execute_data, &free_op_data1, BP_VAR_R);
 					var_ptr = _get_zval_ptr_ptr_var((opline+1)->op2.var, execute_data, &free_op_data2 TSRMLS_CC);
 
-					/* TODO: Find out if this check is necessary
-					if (UNEXPECTED(var_ptr == NULL)) {
-						zend_error_noreturn(E_ERROR, "Cannot use assign-op operators with overloaded objects nor string offsets");
-					}*/
 				}
 			}
 			break;
@@ -29965,10 +29931,6 @@ static int ZEND_FASTCALL zend_binary_assign_op_helper_SPEC_UNUSED_CV(int (*binar
 					value = get_zval_ptr((opline+1)->op1_type, &(opline+1)->op1, execute_data, &free_op_data1, BP_VAR_R);
 					var_ptr = _get_zval_ptr_ptr_var((opline+1)->op2.var, execute_data, &free_op_data2 TSRMLS_CC);
 
-					/* TODO: Find out if this check is necessary
-					if (UNEXPECTED(var_ptr == NULL)) {
-						zend_error_noreturn(E_ERROR, "Cannot use assign-op operators with overloaded objects nor string offsets");
-					}*/
 				}
 			}
 			break;
@@ -32868,10 +32830,6 @@ static int ZEND_FASTCALL zend_binary_assign_op_helper_SPEC_CV_CONST(int (*binary
 					value = get_zval_ptr((opline+1)->op1_type, &(opline+1)->op1, execute_data, &free_op_data1, BP_VAR_R);
 					var_ptr = _get_zval_ptr_ptr_var((opline+1)->op2.var, execute_data, &free_op_data2 TSRMLS_CC);
 
-					/* TODO: Find out if this check is necessary
-					if (UNEXPECTED(var_ptr == NULL)) {
-						zend_error_noreturn(E_ERROR, "Cannot use assign-op operators with overloaded objects nor string offsets");
-					}*/
 				}
 			}
 			break;
@@ -35221,10 +35179,6 @@ static int ZEND_FASTCALL zend_binary_assign_op_helper_SPEC_CV_TMP(int (*binary_o
 					value = get_zval_ptr((opline+1)->op1_type, &(opline+1)->op1, execute_data, &free_op_data1, BP_VAR_R);
 					var_ptr = _get_zval_ptr_ptr_var((opline+1)->op2.var, execute_data, &free_op_data2 TSRMLS_CC);
 
-					/* TODO: Find out if this check is necessary
-					if (UNEXPECTED(var_ptr == NULL)) {
-						zend_error_noreturn(E_ERROR, "Cannot use assign-op operators with overloaded objects nor string offsets");
-					}*/
 				}
 			}
 			break;
@@ -37245,10 +37199,6 @@ static int ZEND_FASTCALL zend_binary_assign_op_helper_SPEC_CV_VAR(int (*binary_o
 					value = get_zval_ptr((opline+1)->op1_type, &(opline+1)->op1, execute_data, &free_op_data1, BP_VAR_R);
 					var_ptr = _get_zval_ptr_ptr_var((opline+1)->op2.var, execute_data, &free_op_data2 TSRMLS_CC);
 
-					/* TODO: Find out if this check is necessary
-					if (UNEXPECTED(var_ptr == NULL)) {
-						zend_error_noreturn(E_ERROR, "Cannot use assign-op operators with overloaded objects nor string offsets");
-					}*/
 				}
 			}
 			break;
@@ -39388,10 +39338,6 @@ static int ZEND_FASTCALL zend_binary_assign_op_helper_SPEC_CV_UNUSED(int (*binar
 					value = get_zval_ptr((opline+1)->op1_type, &(opline+1)->op1, execute_data, &free_op_data1, BP_VAR_R);
 					var_ptr = _get_zval_ptr_ptr_var((opline+1)->op2.var, execute_data, &free_op_data2 TSRMLS_CC);
 
-					/* TODO: Find out if this check is necessary
-					if (UNEXPECTED(var_ptr == NULL)) {
-						zend_error_noreturn(E_ERROR, "Cannot use assign-op operators with overloaded objects nor string offsets");
-					}*/
 				}
 			}
 			break;
@@ -40711,10 +40657,6 @@ static int ZEND_FASTCALL zend_binary_assign_op_helper_SPEC_CV_CV(int (*binary_op
 					value = get_zval_ptr((opline+1)->op1_type, &(opline+1)->op1, execute_data, &free_op_data1, BP_VAR_R);
 					var_ptr = _get_zval_ptr_ptr_var((opline+1)->op2.var, execute_data, &free_op_data2 TSRMLS_CC);
 
-					/* TODO: Find out if this check is necessary
-					if (UNEXPECTED(var_ptr == NULL)) {
-						zend_error_noreturn(E_ERROR, "Cannot use assign-op operators with overloaded objects nor string offsets");
-					}*/
 				}
 			}
 			break;

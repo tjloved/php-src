@@ -26,4 +26,8 @@ FooTest(new Foo());
 --EXPECTF--
 Warning: Missing argument 1 for NormalTest(), called in %sbug33996.php on line %d and defined in %sbug33996.php on line %d
 Hi!
-Catchable fatal error: Argument 1 passed to FooTest() must be an instance of Foo, none given, called in %sbug33996.php on line %d and defined in %sbug33996.php on line %d
+Fatal error: Uncaught exception 'EngineException' with message 'Argument 1 passed to FooTest() must be an instance of Foo, none given, called in %s on line %d and defined' in %s:%d
+Stack trace:
+#0 %s(%d): FooTest()
+#1 {main}
+  thrown in %s on line %d

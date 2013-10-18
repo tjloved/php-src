@@ -22,5 +22,8 @@ $obj = new MyTestClass;
 ?>
 ===DONE===
 --EXPECTF--
-
-Catchable fatal error: Argument 1 passed to MyTestClass::__construct() must be an instance of MyObject, none given, called in %sinterfaces_003.php on line %d
+Fatal error: Uncaught exception 'EngineException' with message 'Argument 1 passed to MyTestClass::__construct() must be an instance of MyObject, none given, called in %s on line %d and defined' in %s:%d
+Stack trace:
+#0 %s(%d): MyTestClass->__construct()
+#1 {main}
+  thrown in %s on line %d
