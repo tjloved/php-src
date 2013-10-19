@@ -133,7 +133,7 @@ ZEND_METHOD(Closure, bind)
 
 static zend_function *zend_closure_get_constructor(zval *object TSRMLS_DC) /* {{{ */
 {
-	zend_error(E_RECOVERABLE_ERROR, "Instantiation of 'Closure' is not allowed");
+	zend_throw_engine_exception("Instantiation of 'Closure' is not allowed" TSRMLS_CC);
 	return NULL;
 }
 /* }}} */
@@ -384,7 +384,7 @@ static HashTable *zend_closure_get_gc(zval *obj, zval ***table, int *n TSRMLS_DC
    Private constructor preventing instantiation */
 ZEND_METHOD(Closure, __construct)
 {
-	zend_error(E_RECOVERABLE_ERROR, "Instantiation of 'Closure' is not allowed");
+	zend_throw_engine_exception("Instantiation of 'Closure' is not allowed" TSRMLS_CC);
 }
 /* }}} */
 

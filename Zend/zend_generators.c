@@ -309,7 +309,8 @@ ZEND_API zval *zend_generator_create_zval(zend_op_array *op_array TSRMLS_DC) /* 
 
 static zend_function *zend_generator_get_constructor(zval *object TSRMLS_DC) /* {{{ */
 {
-	zend_error(E_RECOVERABLE_ERROR, "The \"Generator\" class is reserved for internal use and cannot be manually instantiated");
+	zend_throw_engine_exception("The \"Generator\" class is reserved for internal use and "
+		"cannot be manually instantiated" TSRMLS_CC);
 
 	return NULL;
 }

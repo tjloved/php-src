@@ -806,6 +806,11 @@ static int ZEND_FASTCALL  ZEND_NEW_SPEC_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
 	constructor = Z_OBJ_HT_P(object_zval)->get_constructor(object_zval TSRMLS_CC);
 
 	if (constructor == NULL) {
+		if (UNEXPECTED(EG(exception) != NULL)) {
+			zval_ptr_dtor(&object_zval);
+			HANDLE_EXCEPTION();
+		}
+
 		if (RETURN_VALUE_USED(opline)) {
 			AI_SET_PTR(&EX_T(opline->result.var), object_zval);
 		} else {
