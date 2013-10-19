@@ -226,6 +226,7 @@ char *alloca ();
 #define ZEND_FILE_LINE_ORIG_RELAY_C		__zend_orig_filename, __zend_orig_lineno
 #define ZEND_FILE_LINE_ORIG_RELAY_CC	, ZEND_FILE_LINE_ORIG_RELAY_C
 #define ZEND_ASSERT(c)					assert(c)
+#define ZEND_IMPOSSIBLE(msg)			assert(0 && msg)
 #else
 #define ZEND_FILE_LINE_D
 #define ZEND_FILE_LINE_DC
@@ -240,6 +241,7 @@ char *alloca ();
 #define ZEND_FILE_LINE_ORIG_RELAY_C
 #define ZEND_FILE_LINE_ORIG_RELAY_CC
 #define ZEND_ASSERT(c)
+#define ZEND_IMPOSSIBLE(msg)
 #endif	/* ZEND_DEBUG */
 
 #ifdef ZTS

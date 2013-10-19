@@ -6760,7 +6760,7 @@ static int ZEND_FASTCALL  ZEND_DECLARE_LAMBDA_FUNCTION_SPEC_CONST_UNUSED_HANDLER
 
 	if (UNEXPECTED(zend_hash_quick_find(EG(function_table), Z_STRVAL_P(opline->op1.zv), Z_STRLEN_P(opline->op1.zv), Z_HASH_P(opline->op1.zv), (void *) &op_array) == FAILURE) ||
 	    UNEXPECTED(op_array->type != ZEND_USER_FUNCTION)) {
-		zend_error_noreturn(E_ERROR, "Base lambda function for closure not found");
+		ZEND_IMPOSSIBLE("Base lambda function for closure not found");
 	}
 
 	zend_create_closure(&EX_T(opline->result.var).tmp_var, (zend_function *) op_array, EG(scope), EG(This) TSRMLS_CC);

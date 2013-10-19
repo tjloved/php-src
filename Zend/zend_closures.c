@@ -53,9 +53,7 @@ ZEND_METHOD(Closure, __invoke) /* {{{ */
 
 	arguments = emalloc(sizeof(zval**) * ZEND_NUM_ARGS());
 	if (zend_get_parameters_array_ex(ZEND_NUM_ARGS(), arguments) == FAILURE) {
-		efree(arguments);
-		zend_error(E_RECOVERABLE_ERROR, "Cannot get arguments for calling closure");
-		RETVAL_FALSE;
+		ZEND_IMPOSSIBLE("Cannot get arguments for calling closure");
 	} else if (call_user_function_ex(CG(function_table), NULL, this_ptr, &closure_result_ptr, ZEND_NUM_ARGS(), arguments, 1, NULL TSRMLS_CC) == FAILURE) {
 		RETVAL_FALSE;
 	} else if (closure_result_ptr) {
