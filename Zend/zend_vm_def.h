@@ -2116,7 +2116,7 @@ ZEND_VM_HELPER(zend_do_fcall_common_helper, ANY, ANY)
 		if (EXPECTED(EX(object) != NULL)) {
 			Z_OBJ_HT_P(EX(object))->call_method(fbc->common.function_name, opline->extended_value, EX_T(opline->result.var).var.ptr, &EX_T(opline->result.var).var.ptr, EX(object), RETURN_VALUE_USED(opline) TSRMLS_CC);
 		} else {
-			zend_error_noreturn(E_ERROR, "Cannot call overloaded function for non-object");
+			zend_throw_engine_exception("Cannot call overloaded function for non-object" TSRMLS_CC);
 		}
 
 		if (fbc->type == ZEND_OVERLOADED_FUNCTION_TEMPORARY) {
