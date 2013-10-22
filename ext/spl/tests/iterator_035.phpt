@@ -12,4 +12,7 @@ $a[] = &$tmp;
 echo "Done\n";
 ?>
 --EXPECTF--	
-Fatal error: Cannot assign by reference to overloaded object in %s on line %d
+Fatal error: Uncaught exception 'EngineException' with message 'Cannot assign by reference to overloaded object' in %s:%d
+Stack trace:
+#0 {main}
+  thrown in %s on line %d

@@ -19,5 +19,7 @@ Strict Standards: Non-static method foo::bar() should not be called statically i
 ok
 bool(false)
 
-Fatal error: Non-static method Exception::getMessage() cannot be called statically in %sbug47857.php on line %d
-
+Fatal error: Uncaught exception 'EngineException' with message 'Non-static method Exception::getMessage() cannot be called statically' in %s:%d
+Stack trace:
+#0 {main}
+  thrown in %s on line %d

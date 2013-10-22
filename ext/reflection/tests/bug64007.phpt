@@ -16,4 +16,7 @@ var_dump($generator);
 --EXPECTF--
 string(97) "Class Generator is an internal class that cannot be instantiated without invoking its constructor"
 
-Catchable fatal error: The "Generator" class is reserved for internal use and cannot be manually instantiated in %sbug64007.php on line %d
+Fatal error: Uncaught exception 'EngineException' with message 'The "Generator" class is reserved for internal use and cannot be manually instantiated' in %s:%d
+Stack trace:
+#0 {main}
+  thrown in %s on line %d
