@@ -693,7 +693,7 @@ php_mb_parse_encoding_list(const char *value, size_t value_length, const mbfl_en
 		endp = tmpstr + value_length;
 		n = 1;
 		p1 = tmpstr;
-		while ((p2 = php_memnstr(p1, ",", 1, endp)) != NULL) {
+		while ((p2 = (char *)php_memnstr(p1, ",", 1, endp)) != NULL) {
 			p1 = p2 + 1;
 			n++;
 		}
@@ -706,7 +706,7 @@ php_mb_parse_encoding_list(const char *value, size_t value_length, const mbfl_en
 			bauto = 0;
 			p1 = tmpstr;
 			do {
-				p2 = p = php_memnstr(p1, ",", 1, endp);
+				p2 = p = (char *)php_memnstr(p1, ",", 1, endp);
 				if (p == NULL) {
 					p = endp;
 				}
@@ -2206,7 +2206,7 @@ PHP_FUNCTION(mb_strlen)
 PHP_FUNCTION(mb_strpos)
 {
 	int n, reverse = 0;
-	long offset;
+	long offset = 0;
 	mbfl_string haystack, needle;
 	char *enc_name = NULL;
 	int enc_name_len;
@@ -2368,7 +2368,7 @@ PHP_FUNCTION(mb_strrpos)
 PHP_FUNCTION(mb_stripos)
 {
 	int n;
-	long offset;
+	long offset = 0;
 	mbfl_string haystack, needle;
 	const char *from_encoding = MBSTRG(current_internal_encoding)->mime_name;
 	int from_encoding_len;
@@ -2397,7 +2397,7 @@ PHP_FUNCTION(mb_stripos)
 PHP_FUNCTION(mb_strripos)
 {
 	int n;
-	long offset;
+	long offset = 0;
 	mbfl_string haystack, needle;
 	const char *from_encoding = MBSTRG(current_internal_encoding)->mime_name;
 	int from_encoding_len;
@@ -2694,14 +2694,13 @@ PHP_FUNCTION(mb_substr_count)
    Returns part of a string */
 PHP_FUNCTION(mb_substr)
 {
-	size_t argc = ZEND_NUM_ARGS();
-	char *str, *encoding;
-	long from, len;
+	char *str, *encoding = NULL;
+	long from, len = LONG_MAX;
 	int mblen, str_len, encoding_len;
-	zval **z_len = NULL;
 	mbfl_string string, result, *ret;
+	zend_bool no_len = 1;
 
-	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "sl|Zs", &str, &str_len, &from, &z_len, &encoding, &encoding_len) == FAILURE) {
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "sl|l!s", &str, &str_len, &from, &len, &no_len, &encoding, &encoding_len) == FAILURE) {
 		return;
 	}
 
@@ -2709,7 +2708,7 @@ PHP_FUNCTION(mb_substr)
 	string.no_language = MBSTRG(language);
 	string.no_encoding = MBSTRG(current_internal_encoding)->no_encoding;
 
-	if (argc == 4) {
+	if (encoding != NULL) {
 		string.no_encoding = mbfl_name2no_encoding(encoding);
 		if (string.no_encoding == mbfl_no_encoding_invalid) {
 			php_error_docref(NULL TSRMLS_CC, E_WARNING, "Unknown encoding \"%s\"", encoding);
@@ -2720,11 +2719,8 @@ PHP_FUNCTION(mb_substr)
 	string.val = (unsigned char *)str;
 	string.len = str_len;
 
-	if (argc < 3 || Z_TYPE_PP(z_len) == IS_NULL) {
+	if (no_len || len > str_len) {
 		len = str_len;
-	} else {
-		convert_to_long_ex(z_len);
-		len = Z_LVAL_PP(z_len);
 	}
 
 	/* measures length */
@@ -2771,22 +2767,21 @@ PHP_FUNCTION(mb_substr)
    Returns part of a string */
 PHP_FUNCTION(mb_strcut)
 {
-	size_t argc = ZEND_NUM_ARGS();
-	char *encoding;
-	long from, len;
+	char *encoding = NULL;
+	long from, len = LONG_MAX;
 	int encoding_len;
-	zval **z_len = NULL;
 	mbfl_string string, result, *ret;
+	zend_bool no_len = 1;
 
 	mbfl_string_init(&string);
 	string.no_language = MBSTRG(language);
 	string.no_encoding = MBSTRG(current_internal_encoding)->no_encoding;
 
-	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "sl|Zs", (char **)&string.val, (int **)&string.len, &from, &z_len, &encoding, &encoding_len) == FAILURE) {
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "sl|l!s", (char **)&string.val, (int **)&string.len, &from, &len, &no_len, &encoding, &encoding_len) == FAILURE) {
 		return;
 	}
 
-	if (argc == 4) {
+	if (encoding != NULL) {
 		string.no_encoding = mbfl_name2no_encoding(encoding);
 		if (string.no_encoding == mbfl_no_encoding_invalid) {
 			php_error_docref(NULL TSRMLS_CC, E_WARNING, "Unknown encoding \"%s\"", encoding);
@@ -2794,11 +2789,8 @@ PHP_FUNCTION(mb_strcut)
 		}
 	}
 
-	if (argc < 3 || Z_TYPE_PP(z_len) == IS_NULL) {
+	if (no_len || len > string.len) {
 		len = string.len;
-	} else {
-		convert_to_long_ex(z_len);
-		len = Z_LVAL_PP(z_len);
 	}
 
 	/* if "from" position is negative, count start position from the end
@@ -2873,7 +2865,7 @@ PHP_FUNCTION(mb_strwidth)
    Trim the string in terminal width */
 PHP_FUNCTION(mb_strimwidth)
 {
-	char *str, *trimmarker, *encoding;
+	char *str, *trimmarker = NULL, *encoding = NULL;
 	long from, width;
 	int str_len, trimmarker_len, encoding_len;
 	mbfl_string string, result, marker, *ret;
@@ -2891,7 +2883,7 @@ PHP_FUNCTION(mb_strimwidth)
 	marker.val = NULL;
 	marker.len = 0;
 
-	if (ZEND_NUM_ARGS() == 5) {
+	if (encoding != NULL) {
 		string.no_encoding = marker.no_encoding = mbfl_name2no_encoding(encoding);
 		if (string.no_encoding == mbfl_no_encoding_invalid) {
 			php_error_docref(NULL TSRMLS_CC, E_WARNING, "Unknown encoding \"%s\"", encoding);
@@ -2912,7 +2904,7 @@ PHP_FUNCTION(mb_strimwidth)
 		RETURN_FALSE;
 	}
 
-	if (ZEND_NUM_ARGS() >= 4) {
+	if (trimmarker != NULL) {
 		marker.val = (unsigned char *)trimmarker;
 		marker.len = trimmarker_len;
 	}
@@ -3020,7 +3012,7 @@ PHP_FUNCTION(mb_convert_encoding)
 {
 	char *arg_str, *arg_new;
 	int str_len, new_len;
-	zval *arg_old;
+	zval *arg_old = NULL;
 	int i;
 	size_t size, l, n;
 	char *_from_encodings = NULL, *ret, *s_free = NULL;
@@ -3032,7 +3024,7 @@ PHP_FUNCTION(mb_convert_encoding)
 		return;
 	}
 
-	if (ZEND_NUM_ARGS() == 3) {
+	if (arg_old != NULL) {
 		switch (Z_TYPE_P(arg_old)) {
 		case IS_ARRAY:
 			target_hash = Z_ARRVAL_P(arg_old);
@@ -3166,8 +3158,8 @@ PHP_FUNCTION(mb_detect_encoding)
 {
 	char *str;
 	int str_len;
-	zend_bool strict=0;
-	zval *encoding_list;
+	zend_bool strict = (zend_bool)MBSTRG(strict_detection);
+	zval *encoding_list = NULL;
 
 	mbfl_string string;
 	const mbfl_encoding *ret;
@@ -3181,7 +3173,7 @@ PHP_FUNCTION(mb_detect_encoding)
 	/* make encoding list */
 	list = NULL;
 	size = 0;
-	if (ZEND_NUM_ARGS() >= 2 && !ZVAL_IS_NULL(encoding_list)) {
+	if (encoding_list != NULL && !ZVAL_IS_NULL(encoding_list)) {
 		switch (Z_TYPE_P(encoding_list)) {
 		case IS_ARRAY:
 			if (FAILURE == php_mb_parse_encoding_array(encoding_list, &list, &size, 0 TSRMLS_CC)) {
@@ -3206,10 +3198,6 @@ PHP_FUNCTION(mb_detect_encoding)
 		if (size <= 0) {
 			php_error_docref(NULL TSRMLS_CC, E_WARNING, "Illegal argument");
 		}
-	}
-
-	if (ZEND_NUM_ARGS() < 3) {
-		strict = (zend_bool)MBSTRG(strict_detection);
 	}
 
 	if (size > 0 && list != NULL) {
@@ -3689,17 +3677,16 @@ detect_end:
 static void
 php_mb_numericentity_exec(INTERNAL_FUNCTION_PARAMETERS, int type)
 {
-	char *str, *encoding;
+	char *str, *encoding = NULL;
 	int str_len, encoding_len;
 	zval *zconvmap, **hash_entry;
 	HashTable *target_hash;
-	size_t argc = ZEND_NUM_ARGS();
 	int i, *convmap, *mapelm, mapsize=0;
 	zend_bool is_hex = 0;
 	mbfl_string string, result, *ret;
 	enum mbfl_no_encoding no_encoding;
 
-	if (zend_parse_parameters(argc TSRMLS_CC, "sz|sb", &str, &str_len, &zconvmap, &encoding, &encoding_len, &is_hex) == FAILURE) {
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "sz|sb", &str, &str_len, &zconvmap, &encoding, &encoding_len, &is_hex) == FAILURE) {
 		return;
 	}
 
@@ -3710,7 +3697,7 @@ php_mb_numericentity_exec(INTERNAL_FUNCTION_PARAMETERS, int type)
 	string.len = str_len;
 
 	/* encoding */
-	if ((argc == 3 || argc == 4) && encoding_len > 0) {
+	if (encoding != NULL && encoding_len > 0) {
 		no_encoding = mbfl_name2no_encoding(encoding);
 		if (no_encoding == mbfl_no_encoding_invalid) {
 			php_error_docref(NULL TSRMLS_CC, E_WARNING, "Unknown encoding \"%s\"", encoding);
@@ -3720,11 +3707,9 @@ php_mb_numericentity_exec(INTERNAL_FUNCTION_PARAMETERS, int type)
 		}
 	}
 
-	if (argc == 4) {
 		if (type == 0 && is_hex) {
 			type = 2; /* output in hex format */
 		}
-	}
 
 	/* conversion map */
 	convmap = NULL;

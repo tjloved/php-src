@@ -1375,9 +1375,7 @@ static void preg_replace_impl(INTERNAL_FUNCTION_PARAMETERS, int is_callable_repl
 	SEPARATE_ZVAL(regex);
 	SEPARATE_ZVAL(subject);
 
-	if (ZEND_NUM_ARGS() > 3) {
 		limit_val = limit;
-	}
 		
 	if (Z_TYPE_PP(regex) != IS_ARRAY)
 		convert_to_string_ex(regex);
@@ -1422,7 +1420,7 @@ static void preg_replace_impl(INTERNAL_FUNCTION_PARAMETERS, int is_callable_repl
 			}
 		}
 	}
-	if (ZEND_NUM_ARGS() > 4) {
+	if (zcount) {
 		zval_dtor(*zcount);
 		ZVAL_LONG(*zcount, replace_count);
 	}

@@ -2028,7 +2028,7 @@ PHP_FUNCTION(iconv_substr)
 	int charset_len = 0;
 	char *str;
 	int str_len;
-	long offset, length = 0;
+	long offset, length = LONG_MAX;
 
 	php_iconv_err_t err;
 
@@ -2045,7 +2045,7 @@ PHP_FUNCTION(iconv_substr)
 		RETURN_FALSE;
 	}
 
-	if (ZEND_NUM_ARGS() < 3) {
+	if (length == LONG_MAX) {
 		length = str_len;
 	}
 

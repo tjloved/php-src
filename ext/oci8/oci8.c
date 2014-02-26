@@ -2635,7 +2635,7 @@ void php_oci_fetch_row (INTERNAL_FUNCTION_PARAMETERS, int mode, int expected_arg
 	php_oci_out_column *column;
 	ub4 nrows = 1;
 	int i;
-	long fetch_mode = 0;
+	long fetch_mode = mode;
 
 	if (expected_args > 2) {
 		/* only for ocifetchinto BC */
@@ -2644,9 +2644,6 @@ void php_oci_fetch_row (INTERNAL_FUNCTION_PARAMETERS, int mode, int expected_arg
 			return;
 		}
 
-		if (ZEND_NUM_ARGS() == 2) {
-			fetch_mode = mode;
-		}
 	} else if (expected_args == 2) {
 		/* only for oci_fetch_array() */
 
@@ -2654,9 +2651,6 @@ void php_oci_fetch_row (INTERNAL_FUNCTION_PARAMETERS, int mode, int expected_arg
 			return;
 		}
 
-		if (ZEND_NUM_ARGS() == 1) {
-			fetch_mode = mode;
-		}
 	} else {
 		/* for all oci_fetch_*() */
 
@@ -2664,7 +2658,6 @@ void php_oci_fetch_row (INTERNAL_FUNCTION_PARAMETERS, int mode, int expected_arg
 			return;
 		}
 
-		fetch_mode = mode;
 	}
 
 	if (!(fetch_mode & PHP_OCI_NUM) && !(fetch_mode & PHP_OCI_ASSOC)) {
