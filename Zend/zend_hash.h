@@ -54,7 +54,6 @@ struct _hashtable;
 
 typedef struct bucket {
 	ulong h;						/* Used for numeric indexing */
-	uint nKeyLength;
 	struct bucket *pListNext;
 	struct bucket *pListLast;
 	struct bucket *pNext;
@@ -227,6 +226,7 @@ ZEND_API int zend_hash_num_elements(const HashTable *ht);
 ZEND_API int zend_hash_rehash(HashTable *ht);
 
 #define zend_bucket_data(bucket) ((void *) ((char *) bucket + sizeof(Bucket)))
+#define zend_bucket_key_length(bucket) (*(uint *) (bucket->arKey - ZEND_MM_ALIGNED_SIZE(sizeof(uint))))
 
 /*
  * DJBX33A (Daniel J. Bernstein, Times 33 with Addition)

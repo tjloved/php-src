@@ -153,14 +153,16 @@ static int ini_key_compare(const void *a, const void *b TSRMLS_DC) /* {{{ */
 	f = *((const Bucket **) a);
 	s = *((const Bucket **) b);
 
-	if (f->nKeyLength == 0 && s->nKeyLength == 0) { /* both numeric */
-		return ZEND_NORMALIZE_BOOL(f->nKeyLength - s->nKeyLength);
-	} else if (f->nKeyLength == 0) { /* f is numeric, s is not */
+	if (!f->arKey && !s->arKey) { /* both numeric */
+		return ZEND_NORMALIZE_BOOL(f->h - s->h);
+	} else if (!f->arKey) { /* f is numeric, s is not */
 		return -1;
-	} else if (s->nKeyLength == 0) { /* s is numeric, f is not */
+	} else if (!s->arKey) { /* s is numeric, f is not */
 		return 1;
 	} else { /* both strings */
-		return zend_binary_strcasecmp(f->arKey, f->nKeyLength, s->arKey, s->nKeyLength);
+		return zend_binary_strcasecmp(
+			f->arKey, zend_bucket_key_length(f), s->arKey, zend_bucket_key_length(s)
+		);
 	}
 }
 /* }}} */

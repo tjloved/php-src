@@ -399,6 +399,7 @@ const char *accel_new_interned_string(const char *arKey, int nKeyLength, int fre
 
 #if ZEND_EXTENSION_API_NO <= PHP_5_5_X_API_NO
 # define zend_bucket_data(bucket) (bucket->pData)
+# define zend_bucket_key_length(bucket) (bucket->nKeyLength)
 #endif
 
 #endif /* ZEND_ACCELERATOR_H */

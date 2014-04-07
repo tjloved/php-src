@@ -2271,14 +2271,6 @@ static void add_xml_array_elements(xmlNodePtr xmlParam,
  	}
 }
 
-static inline int array_num_elements(HashTable* ht)
-{
-	if (ht->pListTail && ht->pListTail->nKeyLength == 0) {
-		return ht->pListTail->h-1;
-	}
-	return 0;
-}
-
 static xmlNodePtr to_xml_array(encodeTypePtr type, zval *data, int style, xmlNodePtr parent TSRMLS_DC)
 {
 	sdlTypePtr sdl_type = type->sdl_type;

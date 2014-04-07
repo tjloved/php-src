@@ -154,21 +154,13 @@ static int phar_add_empty(HashTable *ht, char *arKey, uint nKeyLength)  /* {{{ *
  */
 static int phar_compare_dir_name(const void *a, const void *b TSRMLS_DC)  /* {{{ */
 {
-	Bucket *f;
-	Bucket *s;
-	int result;
+	Bucket *f = *(Bucket **) a;
+	Bucket *s = *(Bucket **) b;
+	int result = zend_binary_strcmp(
+		f->arKey, zend_bucket_key_length(f), s->arKey, zend_bucket_key_length(s)
+	);
 
-	f = *((Bucket **) a);
-	s = *((Bucket **) b);
-	result = zend_binary_strcmp(f->arKey, f->nKeyLength, s->arKey, s->nKeyLength);
-
-	if (result < 0) {
-		return -1;
-	} else if (result > 0) {
-		return 1;
-	} else {
-		return 0;
-	}
+	return ZEND_NORMALIZE_BOOL(result);
 }
 /* }}} */
 

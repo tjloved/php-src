@@ -45,7 +45,7 @@ END_EXTERN_C()
 #endif
 
 #define INTERNED_LEN(s) \
-	(((Bucket*)(((char*)(s))-sizeof(Bucket)))->nKeyLength)
+	(*(uint *) (s - ZEND_MM_ALIGNED_SIZE(uint)))
 
 #define INTERNED_HASH(s) \
 	(((Bucket*)(((char*)(s))-sizeof(Bucket)))->h)

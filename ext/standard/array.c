@@ -175,31 +175,28 @@ static void php_set_compare_func(int sort_type TSRMLS_DC) /* {{{ */
 
 static int php_array_key_compare(const void *a, const void *b TSRMLS_DC) /* {{{ */
 {
-	Bucket *f;
-	Bucket *s;
+	Bucket *f = *(Bucket **) a;
+	Bucket *s = *(Bucket **) b;
 	zval result;
 	zval first;
 	zval second;
 
-	f = *((Bucket **) a);
-	s = *((Bucket **) b);
-
-	if (f->nKeyLength == 0) {
+	if (!f->arKey) {
 		Z_TYPE(first) = IS_LONG;
 		Z_LVAL(first) = f->h;
 	} else {
 		Z_TYPE(first) = IS_STRING;
 		Z_STRVAL(first) = (char*)f->arKey;
-		Z_STRLEN(first) = f->nKeyLength - 1;
+		Z_STRLEN(first) = zend_bucket_key_length(f) - 1;
 	}
 
-	if (s->nKeyLength == 0) {
+	if (!s->arKey) {
 		Z_TYPE(second) = IS_LONG;
 		Z_LVAL(second) = s->h;
 	} else {
 		Z_TYPE(second) = IS_STRING;
 		Z_STRVAL(second) = (char*)s->arKey;
-		Z_STRLEN(second) = s->nKeyLength - 1;
+		Z_STRLEN(second) = zend_bucket_key_length(s) - 1;
 	}
 
 	if (ARRAYG(compare_func)(&result, &first, &second TSRMLS_CC) == FAILURE) {
@@ -703,8 +700,8 @@ PHP_FUNCTION(uasort)
 
 static int php_array_user_key_compare(const void *a, const void *b TSRMLS_DC) /* {{{ */
 {
-	Bucket *f;
-	Bucket *s;
+	Bucket *f = *(Bucket **) a;
+	Bucket *s = *(Bucket **) b;
 	zval *key1, *key2;
 	zval **args[2];
 	zval *retval_ptr = NULL;
@@ -715,23 +712,20 @@ static int php_array_user_key_compare(const void *a, const void *b TSRMLS_DC) /*
 	args[0] = &key1;
 	args[1] = &key2;
 
-	f = *((Bucket **) a);
-	s = *((Bucket **) b);
-
-	if (f->nKeyLength == 0) {
+	if (!f->arKey) {
 		Z_LVAL_P(key1) = f->h;
 		Z_TYPE_P(key1) = IS_LONG;
 	} else {
-		Z_STRVAL_P(key1) = estrndup(f->arKey, f->nKeyLength - 1);
-		Z_STRLEN_P(key1) = f->nKeyLength - 1;
+		Z_STRVAL_P(key1) = estrndup(f->arKey, zend_bucket_key_length(f) - 1);
+		Z_STRLEN_P(key1) = zend_bucket_key_length(f) - 1;
 		Z_TYPE_P(key1) = IS_STRING;
 	}
-	if (s->nKeyLength == 0) {
+	if (!s->arKey) {
 		Z_LVAL_P(key2) = s->h;
 		Z_TYPE_P(key2) = IS_LONG;
 	} else {
-		Z_STRVAL_P(key2) = estrndup(s->arKey, s->nKeyLength - 1);
-		Z_STRLEN_P(key2) = s->nKeyLength - 1;
+		Z_STRVAL_P(key2) = estrndup(s->arKey, zend_bucket_key_length(s) - 1);
+		Z_STRLEN_P(key2) = zend_bucket_key_length(s) - 1;
 		Z_TYPE_P(key2) = IS_STRING;
 	}
 
@@ -1769,7 +1763,7 @@ static void php_array_data_shuffle(zval *array TSRMLS_DC) /* {{{ */
 	temp = hash->pListHead;
 	j = 0;
 	while (temp != NULL) {
-		temp->nKeyLength = 0;
+		temp->arKey = NULL;
 		temp->h = j++;
 		temp = temp->pListNext;
 	}
@@ -1839,10 +1833,10 @@ PHPAPI HashTable* php_splice(HashTable *in_hash, int offset, int length, zval **
 		Z_ADDREF_P(entry);
 
 		/* Update output hash depending on key type */
-		if (p->nKeyLength == 0) {
+		if (!p->arKey) {
 			zend_hash_next_index_insert(out_hash, &entry, sizeof(zval *), NULL);
 		} else {
-			zend_hash_quick_update(out_hash, p->arKey, p->nKeyLength, p->h, &entry, sizeof(zval *), NULL);
+			zend_hash_quick_update(out_hash, p->arKey, zend_bucket_key_length(p), p->h, &entry, sizeof(zval *), NULL);
 		}
 	}
 
@@ -1851,10 +1845,10 @@ PHPAPI HashTable* php_splice(HashTable *in_hash, int offset, int length, zval **
 		for ( ; pos < offset + length && p; pos++, p = p->pListNext) {
 			entry = *((zval **) zend_bucket_data(p));
 			Z_ADDREF_P(entry);
-			if (p->nKeyLength == 0) {
+			if (!p->arKey) {
 				zend_hash_next_index_insert(*removed, &entry, sizeof(zval *), NULL);
 			} else {
-				zend_hash_quick_update(*removed, p->arKey, p->nKeyLength, p->h, &entry, sizeof(zval *), NULL);
+				zend_hash_quick_update(*removed, p->arKey, zend_bucket_key_length(p), p->h, &entry, sizeof(zval *), NULL);
 			}
 		}
 	} else { /* otherwise just skip those entries */
@@ -1875,10 +1869,10 @@ PHPAPI HashTable* php_splice(HashTable *in_hash, int offset, int length, zval **
 	for ( ; p ; p = p->pListNext) {
 		entry = *((zval **) zend_bucket_data(p));
 		Z_ADDREF_P(entry);
-		if (p->nKeyLength == 0) {
+		if (!p->arKey) {
 			zend_hash_next_index_insert(out_hash, &entry, sizeof(zval *), NULL);
 		} else {
-			zend_hash_quick_update(out_hash, p->arKey, p->nKeyLength, p->h, &entry, sizeof(zval *), NULL);
+			zend_hash_quick_update(out_hash, p->arKey, zend_bucket_key_length(p), p->h, &entry, sizeof(zval *), NULL);
 		}
 	}
 
@@ -1961,7 +1955,7 @@ static void _phpi_pop(INTERNAL_FUNCTION_PARAMETERS, int off_the_end)
 		int should_rehash = 0;
 		Bucket *p = Z_ARRVAL_P(stack)->pListHead;
 		while (p != NULL) {
-			if (p->nKeyLength == 0) {
+			if (!p->arKey) {
 				if (p->h != k) {
 					p->h = k++;
 					should_rehash = 1;
@@ -2859,13 +2853,13 @@ PHP_FUNCTION(array_unique)
 			} else {
 				p = cmpdata->b;
 			}
-			if (p->nKeyLength == 0) {
+			if (!p->arKey) {
 				zend_hash_index_del(Z_ARRVAL_P(return_value), p->h);
 			} else {
 				if (Z_ARRVAL_P(return_value) == &EG(symbol_table)) {
-					zend_delete_global_variable(p->arKey, p->nKeyLength - 1 TSRMLS_CC);
+					zend_delete_global_variable(p->arKey, zend_bucket_key_length(p) - 1 TSRMLS_CC);
 				} else {
-					zend_hash_quick_del(Z_ARRVAL_P(return_value), p->arKey, p->nKeyLength, p->h);
+					zend_hash_quick_del(Z_ARRVAL_P(return_value), p->arKey, zend_bucket_key_length(p), p->h);
 				}
 			}
 		}
@@ -2984,7 +2978,7 @@ static void php_array_intersect_key(INTERNAL_FUNCTION_PARAMETERS, int data_compa
 	array_init(return_value);
 
 	for (p = Z_ARRVAL_PP(args[0])->pListHead; p != NULL; p = p->pListNext) {
-		if (p->nKeyLength == 0) {
+		if (!p->arKey) {
 			ok = 1;
 			for (i = 1; i < argc; i++) {
 				if (zend_hash_index_find(Z_ARRVAL_PP(args[i]), p->h, (void**)&data) == FAILURE ||
@@ -3002,7 +2996,7 @@ static void php_array_intersect_key(INTERNAL_FUNCTION_PARAMETERS, int data_compa
 		} else {
 			ok = 1;
 			for (i = 1; i < argc; i++) {
-				if (zend_hash_quick_find(Z_ARRVAL_PP(args[i]), p->arKey, p->nKeyLength, p->h, (void**)&data) == FAILURE ||
+				if (zend_hash_quick_find(Z_ARRVAL_PP(args[i]), p->arKey, zend_bucket_key_length(p), p->h, (void**)&data) == FAILURE ||
 					(intersect_data_compare_func &&
 					intersect_data_compare_func((zval**) zend_bucket_data(p), data TSRMLS_CC) != 0)
 				) {
@@ -3012,7 +3006,7 @@ static void php_array_intersect_key(INTERNAL_FUNCTION_PARAMETERS, int data_compa
 			}
 			if (ok) {
 				Z_ADDREF_PP((zval**) zend_bucket_data(p));
-				zend_hash_quick_update(Z_ARRVAL_P(return_value), p->arKey, p->nKeyLength, p->h, zend_bucket_data(p), sizeof(zval*), NULL);
+				zend_hash_quick_update(Z_ARRVAL_P(return_value), p->arKey, zend_bucket_key_length(p), p->h, zend_bucket_data(p), sizeof(zval*), NULL);
 			}
 		}
 	}
@@ -3229,10 +3223,10 @@ static void php_array_intersect(INTERNAL_FUNCTION_PARAMETERS, int behavior, int 
 					if (!p) {
 						goto out;
 					}
-					if (p->nKeyLength == 0) {
+					if (!p->arKey) {
 						zend_hash_index_del(Z_ARRVAL_P(return_value), p->h);
 					} else {
-						zend_hash_quick_del(Z_ARRVAL_P(return_value), p->arKey, p->nKeyLength, p->h);
+						zend_hash_quick_del(Z_ARRVAL_P(return_value), p->arKey, zend_bucket_key_length(p), p->h);
 					}
 				}
 			}
@@ -3245,10 +3239,10 @@ static void php_array_intersect(INTERNAL_FUNCTION_PARAMETERS, int behavior, int 
 			/* with value < value of ptrs[i] */
 			for (;;) {
 				p = *ptrs[0];
-				if (p->nKeyLength == 0) {
+				if (!p->arKey) {
 					zend_hash_index_del(Z_ARRVAL_P(return_value), p->h);
 				} else {
-					zend_hash_quick_del(Z_ARRVAL_P(return_value), p->arKey, p->nKeyLength, p->h);
+					zend_hash_quick_del(Z_ARRVAL_P(return_value), p->arKey, zend_bucket_key_length(p), p->h);
 				}
 				if (!*++ptrs[0]) {
 					goto out;
@@ -3402,7 +3396,7 @@ static void php_array_diff_key(INTERNAL_FUNCTION_PARAMETERS, int data_compare_ty
 	array_init(return_value);
 
 	for (p = Z_ARRVAL_PP(args[0])->pListHead; p != NULL; p = p->pListNext) {
-		if (p->nKeyLength == 0) {
+		if (!p->arKey) {
 			ok = 1;
 			for (i = 1; i < argc; i++) {
 				if (zend_hash_index_find(Z_ARRVAL_PP(args[i]), p->h, (void**)&data) == SUCCESS &&
@@ -3420,7 +3414,7 @@ static void php_array_diff_key(INTERNAL_FUNCTION_PARAMETERS, int data_compare_ty
 		} else {
 			ok = 1;
 			for (i = 1; i < argc; i++) {
-				if (zend_hash_quick_find(Z_ARRVAL_PP(args[i]), p->arKey, p->nKeyLength, p->h, (void**)&data) == SUCCESS &&
+				if (zend_hash_quick_find(Z_ARRVAL_PP(args[i]), p->arKey, zend_bucket_key_length(p), p->h, (void**)&data) == SUCCESS &&
 					(!diff_data_compare_func ||
 					diff_data_compare_func((zval**) zend_bucket_data(p), data TSRMLS_CC) == 0)
 				) {
@@ -3430,7 +3424,7 @@ static void php_array_diff_key(INTERNAL_FUNCTION_PARAMETERS, int data_compare_ty
 			}
 			if (ok) {
 				Z_ADDREF_PP((zval**) zend_bucket_data(p));
-				zend_hash_quick_update(Z_ARRVAL_P(return_value), p->arKey, p->nKeyLength, p->h, zend_bucket_data(p), sizeof(zval*), NULL);
+				zend_hash_quick_update(Z_ARRVAL_P(return_value), p->arKey, zend_bucket_key_length(p), p->h, zend_bucket_data(p), sizeof(zval*), NULL);
 			}
 		}
 	}
@@ -3658,10 +3652,10 @@ static void php_array_diff(INTERNAL_FUNCTION_PARAMETERS, int behavior, int data_
 			/* delete all entries with value as ptrs[0] */
 			for (;;) {
 				p = *ptrs[0];
-				if (p->nKeyLength == 0) {
+				if (!p->arKey) {
 					zend_hash_index_del(Z_ARRVAL_P(return_value), p->h);
 				} else {
-					zend_hash_quick_del(Z_ARRVAL_P(return_value), p->arKey, p->nKeyLength, p->h);
+					zend_hash_quick_del(Z_ARRVAL_P(return_value), p->arKey, zend_bucket_key_length(p), p->h);
 				}
 				if (!*++ptrs[0]) {
 					goto out;
@@ -3963,7 +3957,7 @@ PHP_FUNCTION(array_multisort)
 		p = hash->pListHead;
 		k = 0;
 		while (p != NULL) {
-			if (p->nKeyLength == 0)
+			if (!p->arKey)
 				p->h = k++;
 			p = p->pListNext;
 		}
