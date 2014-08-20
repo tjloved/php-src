@@ -857,7 +857,8 @@ void zend_set_utility_values(zend_utility_values *utility_values) /* {{{ */
 /* this should be compatible with the standard zenderror */
 void zenderror(const char *error) /* {{{ */
 {
-	zend_error(E_PARSE, "%s", error);
+	TSRMLS_FETCH();
+	zend_throw_exception(zend_get_parse_exception(TSRMLS_C), error, 0 TSRMLS_CC);
 }
 /* }}} */
 

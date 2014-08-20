@@ -31,6 +31,7 @@
 
 static zend_class_entry *default_exception_ce;
 static zend_class_entry *error_exception_ce;
+static zend_class_entry *parse_exception_ce;
 static zend_object_handlers default_exception_handlers;
 ZEND_API void (*zend_throw_exception_hook)(zval *ex TSRMLS_DC);
 
@@ -179,6 +180,29 @@ static zend_object *zend_default_exception_new(zend_class_entry *class_type TSRM
 static zend_object *zend_error_exception_new(zend_class_entry *class_type TSRMLS_DC) /* {{{ */
 {
 	return zend_default_exception_new_ex(class_type, 2 TSRMLS_CC);
+}
+/* }}} */
+
+static zend_object *zend_parse_exception_new(zend_class_entry *class_type TSRMLS_DC) /* {{{ */
+{
+	zval obj, trace;
+	zend_object *object;
+
+	Z_OBJ(obj) = object = zend_objects_new(class_type TSRMLS_CC);
+	Z_OBJ_HT(obj) = &default_exception_handlers;
+
+	object_properties_init(object, class_type);
+
+	array_init(&trace);
+	Z_DELREF(trace);
+
+	zend_update_property_str(parse_exception_ce, &obj, "file", sizeof("file") - 1,
+		zend_get_compiled_filename(TSRMLS_C) TSRMLS_CC);
+	zend_update_property_long(parse_exception_ce, &obj, "line", sizeof("line") - 1,
+		zend_get_compiled_lineno(TSRMLS_C) TSRMLS_CC);
+	zend_update_property(default_exception_ce, &obj, "trace", sizeof("trace")-1, &trace TSRMLS_CC);
+
+	return object;
 }
 /* }}} */
 
@@ -785,6 +809,10 @@ void zend_register_default_exception(TSRMLS_D) /* {{{ */
 	error_exception_ce = zend_register_internal_class_ex(&ce, default_exception_ce TSRMLS_CC);
 	error_exception_ce->create_object = zend_error_exception_new;
 	zend_declare_property_long(error_exception_ce, "severity", sizeof("severity")-1, E_ERROR, ZEND_ACC_PROTECTED TSRMLS_CC);
+
+	INIT_CLASS_ENTRY(ce, "ParseException", NULL);
+	parse_exception_ce = zend_register_internal_class_ex(&ce, default_exception_ce TSRMLS_CC);
+	parse_exception_ce->create_object = zend_parse_exception_new;
 }
 /* }}} */
 
@@ -797,6 +825,12 @@ ZEND_API zend_class_entry *zend_exception_get_default(TSRMLS_D) /* {{{ */
 ZEND_API zend_class_entry *zend_get_error_exception(TSRMLS_D) /* {{{ */
 {
 	return error_exception_ce;
+}
+/* }}} */
+
+ZEND_API zend_class_entry *zend_get_parse_exception(TSRMLS_D) /* {{{ */
+{
+	return parse_exception_ce;
 }
 /* }}} */
 
