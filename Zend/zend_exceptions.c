@@ -193,7 +193,11 @@ static zend_object *zend_parse_exception_new(zend_class_entry *class_type TSRMLS
 
 	object_properties_init(object, class_type);
 
-	array_init(&trace);
+	if (EG(current_execute_data)) {
+		zend_fetch_debug_backtrace(&trace, 0, 0, 0 TSRMLS_CC);
+	} else {
+		array_init(&trace);
+	}
 	Z_DELREF(trace);
 
 	zend_update_property_str(parse_exception_ce, &obj, "file", sizeof("file") - 1,
