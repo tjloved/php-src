@@ -2161,20 +2161,6 @@ void zend_compile_static_prop(znode *result, zend_ast *ast, uint32_t type TSRMLS
 }
 /* }}} */
 
-static inline zend_uchar get_list_fetch_opcode(zend_uchar op_type) /* {{{ */
-{
-	switch (op_type) {
-		case IS_VAR:
-		case IS_CV:
-			return ZEND_FETCH_DIM_R;
-		case IS_TMP_VAR:
-		case IS_CONST:
-			return ZEND_FETCH_DIM_TMP_VAR;
-		EMPTY_SWITCH_DEFAULT_CASE()
-	}
-}
-/* }}} */
-
 static void zend_compile_list_assign(znode *result, zend_ast *ast, znode *expr_node TSRMLS_DC) /* {{{ */
 {
 	zend_ast_list *list = zend_ast_get_list(ast);
@@ -2200,8 +2186,7 @@ static void zend_compile_list_assign(znode *result, zend_ast *ast, znode *expr_n
 			Z_TRY_ADDREF(expr_node->u.constant);
 		}
 
-		opline = zend_emit_op(&fetch_result,
-			get_list_fetch_opcode(expr_node->op_type), expr_node, &dim_node TSRMLS_CC);
+		opline = zend_emit_op(&fetch_result, ZEND_FETCH_DIM_R, expr_node, &dim_node TSRMLS_CC);
 		opline->extended_value |= ZEND_FETCH_ADD_LOCK;
 
 		zend_emit_assign_znode(var_ast, &fetch_result TSRMLS_CC);
