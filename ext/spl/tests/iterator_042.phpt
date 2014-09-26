@@ -3,17 +3,14 @@ SPL: AppendIterator and its ArrayIterator
 --FILE--
 <?php
 
-function test_error_handler($errno, $msg, $filename, $linenum, $vars)
-{
-	echo "Error $msg in $filename on line $linenum\n";
-	return true;
-}
-
-set_error_handler('test_error_handler');
-
 $it = new AppendIterator;
 
-$it->append(array());
+try {
+    $it->append(array());
+} catch (Exception $e) {
+    echo $e->getMessage(), "\n";
+}
+
 $it->append(new ArrayIterator(array(1)));
 $it->append(new ArrayIterator(array(21, 22)));
 
@@ -37,7 +34,7 @@ foreach($it as $k => $v)
 ===DONE===
 <?php exit(0); ?>
 --EXPECTF--
-Error Argument 1 passed to AppendIterator::append() must implement interface Iterator, array given in %siterator_042.php on line %d
+Argument 1 passed to AppendIterator::append() must implement interface Iterator, array given
 object(ArrayIterator)#%d (1) {
   %s"storage"%s"ArrayIterator":private]=>
   array(2) {

@@ -23,5 +23,5 @@ try {
 }
 
 ?>
---EXPECTF--
-Catchable fatal error: Argument 2 passed to ReflectionMethod::invokeArgs() must be of the type array, boolean given in %s on line %d
+--EXPECT--
+string(92) "Argument 2 passed to ReflectionMethod::invokeArgs() must be of the type array, boolean given"

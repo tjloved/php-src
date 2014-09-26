@@ -297,6 +297,24 @@ $op2_free_op_var_ptr = array(
 	"CV"     => "",
 );
 
+$op1_free_unfetched = array(
+	"ANY"    => "zend_free_unfetched_op(opline->op1_type, &opline->op1, execute_data TSRMLS_CC);",
+	"TMP"    => "zval_ptr_dtor_nogc(EX_VAR(opline->op1.var));",
+	"VAR"    => "zval_ptr_dtor_nogc(EX_VAR(opline->op1.var));",
+	"CONST"  => "",
+	"UNUSED" => "",
+	"CV"     => "",
+);
+
+$op2_free_unfetched = array(
+	"ANY"    => "zend_free_unfetched_op(opline->op2_type, &opline->op2, execute_data TSRMLS_CC);",
+	"TMP"    => "zval_ptr_dtor_nogc(EX_VAR(opline->op2.var));",
+	"VAR"    => "zval_ptr_dtor_nogc(EX_VAR(opline->op2.var));",
+	"CONST"  => "",
+	"UNUSED" => "",
+	"CV"     => "",
+);
+
 $list    = array(); // list of opcode handlers and helpers in original order
 $opcodes = array(); // opcode handlers by code
 $helpers = array(); // opcode helpers by name
@@ -350,7 +368,8 @@ function gen_code($f, $spec, $kind, $export, $code, $op1, $op2, $name) {
 		$op1_get_obj_zval_ptr_ptr, $op2_get_obj_zval_ptr_ptr,
 		$op1_free, $op2_free,
 		$op1_free_op, $op2_free_op, $op1_free_op_if_var, $op2_free_op_if_var,
-		$op1_free_op_var_ptr, $op2_free_op_var_ptr, $prefix;
+        $op1_free_op_var_ptr, $op2_free_op_var_ptr,
+		$op1_free_unfetched, $op2_free_unfetched, $prefix;
 
 	// Specializing
 	$code = preg_replace(
@@ -379,6 +398,8 @@ function gen_code($f, $spec, $kind, $export, $code, $op1, $op2, $name) {
 			"/FREE_OP2_IF_VAR\(\)/",
 			"/FREE_OP1_VAR_PTR\(\)/",
 			"/FREE_OP2_VAR_PTR\(\)/",
+			"/FREE_UNFETCHED_OP1\(\)/",
+			"/FREE_UNFETCHED_OP2\(\)/",
 			"/^#ifdef\s+ZEND_VM_SPEC\s*\n/m",
 			"/^#ifndef\s+ZEND_VM_SPEC\s*\n/m",
 			"/\!defined\(ZEND_VM_SPEC\)/m",
@@ -415,6 +436,8 @@ function gen_code($f, $spec, $kind, $export, $code, $op1, $op2, $name) {
 			$op2_free_op_if_var[$op2],
 			$op1_free_op_var_ptr[$op1],
 			$op2_free_op_var_ptr[$op2],
+			$op1_free_unfetched[$op1],
+			$op2_free_unfetched[$op2],
 			($op1!="ANY"||$op2!="ANY")?"#if 1\n":"#if 0\n",
 			($op1!="ANY"||$op2!="ANY")?"#if 0\n":"#if 1\n",
 			($op1!="ANY"||$op2!="ANY")?"0":"1",

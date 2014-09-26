@@ -14,4 +14,7 @@ $a();
 
 ?>
 --EXPECTF--
-Fatal error: Call to undefined function foo::() in %s on line %d
+Fatal error: Uncaught exception 'EngineException' with message 'Call to undefined function foo::()' in %s:%d
+Stack trace:
+#0 {main}
+  thrown in %s on line %d

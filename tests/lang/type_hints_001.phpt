@@ -22,5 +22,8 @@ type_hint_foo($bar);
 
 ?>
 --EXPECTF--
-
-Catchable fatal error: Argument 1 passed to type_hint_foo() must be an instance of Foo, instance of Bar given, called in %s on line 16 and defined in %s on line 9
+Fatal error: Uncaught exception 'EngineException' with message 'Argument 1 passed to type_hint_foo() must be an instance of Foo, instance of Bar given, called in %s on line %d and defined' in %s:%d
+Stack trace:
+#0 %s(%d): type_hint_foo(Object(Bar))
+#1 {main}
+  thrown in %s on line %d

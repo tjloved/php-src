@@ -17,4 +17,8 @@ var_dump($a);
 ?>
 --EXPECTF--
 
-Catchable fatal error: Argument 1 passed to ReflectionClass::newInstanceArgs() must be of the type array, string given in %s on line 8
+Fatal error: Uncaught exception 'EngineException' with message 'Argument 1 passed to ReflectionClass::newInstanceArgs() must be of the type array, string given' in %s:%d
+Stack trace:
+#0 %s(%d): ReflectionClass->newInstanceArgs('x')
+#1 {main}
+  thrown in %s on line %d

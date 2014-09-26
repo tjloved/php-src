@@ -51,11 +51,8 @@ ZEND_METHOD(Closure, __invoke) /* {{{ */
 	zval *arguments;
 
 	arguments = emalloc(sizeof(zval) * ZEND_NUM_ARGS());
-	if (zend_get_parameters_array_ex(ZEND_NUM_ARGS(), arguments) == FAILURE) {
-		efree(arguments);
-		zend_error(E_RECOVERABLE_ERROR, "Cannot get arguments for calling closure");
-		RETVAL_FALSE;
-	} else if (call_user_function_ex(CG(function_table), NULL, getThis(), return_value, ZEND_NUM_ARGS(), arguments, 1, NULL TSRMLS_CC) == FAILURE) {
+	zend_get_parameters_array_ex(ZEND_NUM_ARGS(), arguments);
+	if (call_user_function_ex(CG(function_table), NULL, getThis(), return_value, ZEND_NUM_ARGS(), arguments, 1, NULL TSRMLS_CC) == FAILURE) {
 		RETVAL_FALSE;
 	}
 	efree(arguments);
@@ -165,7 +162,7 @@ ZEND_METHOD(Closure, bind)
 
 static zend_function *zend_closure_get_constructor(zend_object *object TSRMLS_DC) /* {{{ */
 {
-	zend_error(E_RECOVERABLE_ERROR, "Instantiation of 'Closure' is not allowed");
+	zend_throw_engine_exception("Instantiation of 'Closure' is not allowed" TSRMLS_CC);
 	return NULL;
 }
 /* }}} */
@@ -410,7 +407,7 @@ static HashTable *zend_closure_get_gc(zval *obj, zval **table, int *n TSRMLS_DC)
    Private constructor preventing instantiation */
 ZEND_METHOD(Closure, __construct)
 {
-	zend_error(E_RECOVERABLE_ERROR, "Instantiation of 'Closure' is not allowed");
+	zend_throw_engine_exception("Instantiation of 'Closure' is not allowed" TSRMLS_CC);
 }
 /* }}} */
 

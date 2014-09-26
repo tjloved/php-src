@@ -462,6 +462,13 @@ static inline zval *_get_obj_zval_ptr_ptr(int op_type, const znode_op *node, con
 	return get_zval_ptr_ptr(op_type, node, execute_data, should_free, type);
 }
 
+static inline void zend_free_unfetched_op(int op_type, const znode_op *node, const zend_execute_data *execute_data TSRMLS_DC)
+{
+	if (op_type == IS_TMP_VAR || op_type == IS_VAR) {
+		zval_ptr_dtor_nogc(EX_VAR(node->var));
+	}
+}
+
 static inline void zend_assign_to_variable_reference(zval *variable_ptr, zval *value_ptr TSRMLS_DC)
 {
 	if (EXPECTED(variable_ptr != value_ptr)) {
@@ -509,13 +516,12 @@ ZEND_API char * zend_verify_arg_class_kind(const zend_arg_info *cur_arg_info, ze
 	}
 }
 
-ZEND_API void zend_verify_arg_error(int error_type, const zend_function *zf, uint32_t arg_num, const char *need_msg, const char *need_kind, const char *given_msg, const char *given_kind, zval *arg TSRMLS_DC)
+ZEND_API void zend_verify_arg_error(const zend_function *zf, uint32_t arg_num, const char *need_msg, const char *need_kind, const char *given_msg, const char *given_kind, zval *arg TSRMLS_DC)
 {
 	zend_execute_data *ptr = EG(current_execute_data)->prev_execute_data;
 	const char *fname = zf->common.function_name->val;
 	const char *fsep;
 	const char *fclass;
-	zval old_arg;
 
 	if (zf->common.scope) {
 		fsep =  "::";
@@ -525,19 +531,16 @@ ZEND_API void zend_verify_arg_error(int error_type, const zend_function *zf, uin
 		fclass = "";
 	}
 
-	if (arg && zf->common.type == ZEND_USER_FUNCTION) {
-		ZVAL_COPY_VALUE(&old_arg, arg);
-		ZVAL_UNDEF(arg);
-	}
-
 	if (zf->common.type == ZEND_USER_FUNCTION && ptr && ptr->func && ZEND_USER_CODE(ptr->func->common.type)) {
-		zend_error(error_type, "Argument %d passed to %s%s%s() must %s%s, %s%s given, called in %s on line %d and defined", arg_num, fclass, fsep, fname, need_msg, need_kind, given_msg, given_kind, ptr->func->op_array.filename->val, ptr->opline->lineno);
+		zend_throw_engine_exception_ex(
+			"Argument %d passed to %s%s%s() must %s%s, %s%s given, "
+			"called in %s on line %d and defined" TSRMLS_CC,
+			arg_num, fclass, fsep, fname, need_msg, need_kind, given_msg, given_kind,
+			ptr->func->op_array.filename->val, ptr->opline->lineno);
 	} else {
-		zend_error(error_type, "Argument %d passed to %s%s%s() must %s%s, %s%s given", arg_num, fclass, fsep, fname, need_msg, need_kind, given_msg, given_kind);
-	}
-
-	if (arg && zf->common.type == ZEND_USER_FUNCTION) {
-		ZVAL_COPY_VALUE(arg, &old_arg);
+		zend_throw_engine_exception_ex(
+			"Argument %d passed to %s%s%s() must %s%s, %s%s given" TSRMLS_CC,
+			arg_num, fclass, fsep, fname, need_msg, need_kind, given_msg, given_kind);
 	}
 }
 
@@ -566,26 +569,26 @@ static void zend_verify_arg_type(zend_function *zf, uint32_t arg_num, zval *arg,
 		if (Z_TYPE_P(arg) == IS_OBJECT) {
 			need_msg = zend_verify_arg_class_kind(cur_arg_info, fetch_type, &class_name, &ce TSRMLS_CC);
 			if (!ce || !instanceof_function(Z_OBJCE_P(arg), ce TSRMLS_CC)) {
-				zend_verify_arg_error(E_RECOVERABLE_ERROR, zf, arg_num, need_msg, class_name, "instance of ", Z_OBJCE_P(arg)->name->val, arg TSRMLS_CC);
+				zend_verify_arg_error(zf, arg_num, need_msg, class_name, "instance of ", Z_OBJCE_P(arg)->name->val, arg TSRMLS_CC);
 			}
 		} else if (Z_TYPE_P(arg) != IS_NULL || !cur_arg_info->allow_null) {
 			need_msg = zend_verify_arg_class_kind(cur_arg_info, fetch_type, &class_name, &ce TSRMLS_CC);
-			zend_verify_arg_error(E_RECOVERABLE_ERROR, zf, arg_num, need_msg, class_name, zend_zval_type_name(arg), "", arg TSRMLS_CC);
+			zend_verify_arg_error(zf, arg_num, need_msg, class_name, zend_zval_type_name(arg), "", arg TSRMLS_CC);
 		}
 	} else if (cur_arg_info->type_hint) {
-		if (cur_arg_info->type_hint == IS_ARRAY) {
-			ZVAL_DEREF(arg);
-			if (Z_TYPE_P(arg) != IS_ARRAY && (Z_TYPE_P(arg) != IS_NULL || !cur_arg_info->allow_null)) {
-				zend_verify_arg_error(E_RECOVERABLE_ERROR, zf, arg_num, "be of the type array", "", zend_zval_type_name(arg), "", arg TSRMLS_CC);
-			}
-		} else if (cur_arg_info->type_hint == IS_CALLABLE) {
-			if (!zend_is_callable(arg, IS_CALLABLE_CHECK_SILENT, NULL TSRMLS_CC) && (Z_TYPE_P(arg) != IS_NULL || !cur_arg_info->allow_null)) {
-				zend_verify_arg_error(E_RECOVERABLE_ERROR, zf, arg_num, "be callable", "", zend_zval_type_name(arg), "", arg TSRMLS_CC);
-			}
-#if ZEND_DEBUG
-		} else {
-			zend_error(E_ERROR, "Unknown typehint");
-#endif
+		switch (cur_arg_info->type_hint) {
+			case IS_ARRAY:
+				ZVAL_DEREF(arg);
+				if (Z_TYPE_P(arg) != IS_ARRAY && (Z_TYPE_P(arg) != IS_NULL || !cur_arg_info->allow_null)) {
+					zend_verify_arg_error(zf, arg_num, "be of the type array", "", zend_zval_type_name(arg), "", arg TSRMLS_CC);
+				}
+				break;
+			case IS_CALLABLE:
+				if (!zend_is_callable(arg, IS_CALLABLE_CHECK_SILENT, NULL TSRMLS_CC) && (Z_TYPE_P(arg) != IS_NULL || !cur_arg_info->allow_null)) {
+					zend_verify_arg_error(zf, arg_num, "be callable", "", zend_zval_type_name(arg), "", arg TSRMLS_CC);
+				}
+				break;
+			EMPTY_SWITCH_DEFAULT_CASE()
 		}
 	}
 }
@@ -612,17 +615,17 @@ static inline int zend_verify_missing_arg_type(zend_function *zf, uint32_t arg_n
 		char *class_name;
 
 		need_msg = zend_verify_arg_class_kind(cur_arg_info, fetch_type, &class_name, &ce TSRMLS_CC);
-		zend_verify_arg_error(E_RECOVERABLE_ERROR, zf, arg_num, need_msg, class_name, "none", "", NULL TSRMLS_CC);
+		zend_verify_arg_error(zf, arg_num, need_msg, class_name, "none", "", NULL TSRMLS_CC);
 		return 0;
 	} else if (cur_arg_info->type_hint) {
-		if (cur_arg_info->type_hint == IS_ARRAY) {
-			zend_verify_arg_error(E_RECOVERABLE_ERROR, zf, arg_num, "be of the type array", "", "none", "", NULL TSRMLS_CC);
-		} else if (cur_arg_info->type_hint == IS_CALLABLE) {
-			zend_verify_arg_error(E_RECOVERABLE_ERROR, zf, arg_num, "be callable", "", "none", "", NULL TSRMLS_CC);
-#if ZEND_DEBUG
-		} else {
-			zend_error(E_ERROR, "Unknown typehint");
-#endif
+		switch (cur_arg_info->type_hint) {
+			case IS_ARRAY:
+				zend_verify_arg_error(zf, arg_num, "be of the type array", "", "none", "", NULL TSRMLS_CC);
+				break;
+			case IS_CALLABLE:
+				zend_verify_arg_error( zf, arg_num, "be callable", "", "none", "", NULL TSRMLS_CC);
+				break;
+			EMPTY_SWITCH_DEFAULT_CASE()
 		}
 		return 0;
 	}

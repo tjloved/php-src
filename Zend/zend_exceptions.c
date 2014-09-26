@@ -32,6 +32,7 @@
 
 static zend_class_entry *default_exception_ce;
 static zend_class_entry *error_exception_ce;
+static zend_class_entry *engine_exception_ce;
 static zend_object_handlers default_exception_handlers;
 ZEND_API void (*zend_throw_exception_hook)(zval *ex TSRMLS_DC);
 
@@ -180,6 +181,12 @@ static zend_object *zend_default_exception_new(zend_class_entry *class_type TSRM
 static zend_object *zend_error_exception_new(zend_class_entry *class_type TSRMLS_DC) /* {{{ */
 {
 	return zend_default_exception_new_ex(class_type, 2 TSRMLS_CC);
+}
+/* }}} */
+
+static zend_object *zend_engine_exception_new(zend_class_entry *class_type TSRMLS_DC) /* {{{ */
+{
+	return zend_default_exception_new_ex(class_type, 0 TSRMLS_CC);
 }
 /* }}} */
 
@@ -730,6 +737,10 @@ void zend_register_default_exception(TSRMLS_D) /* {{{ */
 	error_exception_ce = zend_register_internal_class_ex(&ce, default_exception_ce TSRMLS_CC);
 	error_exception_ce->create_object = zend_error_exception_new;
 	zend_declare_property_long(error_exception_ce, "severity", sizeof("severity")-1, E_ERROR, ZEND_ACC_PROTECTED TSRMLS_CC);
+
+	INIT_CLASS_ENTRY(ce, "EngineException", NULL);
+	engine_exception_ce = zend_register_internal_class_ex(&ce, default_exception_ce TSRMLS_CC);
+	engine_exception_ce->create_object = zend_engine_exception_new;
 }
 /* }}} */
 
@@ -742,6 +753,12 @@ ZEND_API zend_class_entry *zend_exception_get_default(TSRMLS_D) /* {{{ */
 ZEND_API zend_class_entry *zend_get_error_exception(TSRMLS_D) /* {{{ */
 {
 	return error_exception_ce;
+}
+/* }}} */
+
+ZEND_API zend_class_entry *zend_get_engine_exception(TSRMLS_D) /* {{{ */
+{
+	return engine_exception_ce;
 }
 /* }}} */
 
@@ -794,6 +811,30 @@ ZEND_API zend_object *zend_throw_error_exception(zend_class_entry *exception_ce,
 	ZVAL_OBJ(&ex, obj);
 	zend_update_property_long(default_exception_ce, &ex, "severity", sizeof("severity")-1, severity TSRMLS_CC);
 	return obj;
+}
+/* }}} */
+
+ZEND_API void zend_throw_engine_exception_ex(const char *format TSRMLS_DC, ...) /* {{{ */
+{
+	va_list arg;
+	char *message;
+
+#ifndef ZTS
+	va_start(arg, format);
+#else
+	va_start(arg, tsrm_ls);
+#endif
+
+	zend_vspprintf(&message, 0, format, arg);
+	va_end(arg);
+	zend_throw_exception(engine_exception_ce, message, 0 TSRMLS_CC);
+	efree(message);
+}
+/* }}} */
+
+ZEND_API void zend_throw_engine_exception(const char *message TSRMLS_DC) /* {{{ */
+{
+	zend_throw_exception(engine_exception_ce, message, 0 TSRMLS_CC);
 }
 /* }}} */
 

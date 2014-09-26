@@ -1,5 +1,5 @@
 --TEST--
-ZE2 An abstrcat method cannot be called indirectly
+ZE2 An abstract method cannot be called indirectly
 --FILE--
 <?php
 
@@ -27,4 +27,7 @@ call_user_func(array($o, 'test_base::func'));
 --EXPECTF--
 test::func()
 
-Fatal error: Cannot call abstract method test_base::func() in %s on line %d
+Fatal error: Uncaught exception 'EngineException' with message 'Cannot call abstract method test_base::func()' in %s:%d
+Stack trace:
+#0 {main}
+  thrown in %s on line %d

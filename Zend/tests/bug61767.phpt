@@ -21,6 +21,10 @@ Fatal error: Uncaught exception 'ErrorException' with message 'Undefined variabl
 Stack trace:
 #0 %sbug61767.php(%d): {closure}(%s, 'Undefined varia...', '%s', %d, Array)
 #1 {main}
+
+Next exception 'EngineException' with message 'Call to a member function foo() on null' in %s:%d
+Stack trace:
+#0 {main}
   thrown in %sbug61767.php on line %d
 Shutting down
 Array
