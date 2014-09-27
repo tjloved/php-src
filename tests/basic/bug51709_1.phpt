@@ -13,4 +13,7 @@ class foo {
 ===DONE===
 <?php exit(0); ?>
 --EXPECTF--
-Parse error: syntax error, unexpected %s, expecting %s in %sbug51709_1.php on line %d
+Fatal error: Uncaught exception 'ParseException' with message 'syntax error, unexpected 'for' (T_FOR), expecting identifier (T_STRING)' in %s:%d
+Stack trace:
+#0 {main}
+  thrown in %s on line %d

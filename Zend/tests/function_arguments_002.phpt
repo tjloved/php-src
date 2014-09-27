@@ -5,5 +5,7 @@ Argument parsing error #002
 function foo($arg1/) {}
 ?>
 --EXPECTF--
-Parse error: %s error, %s)%s in %sfunction_arguments_002.php on line %d
-
+Fatal error: Uncaught exception 'ParseException' with message 'syntax error, unexpected '%s:%d
+Stack trace:
+#0 {main}
+  thrown in %s on line %d

@@ -19,4 +19,7 @@ print "{$x}";
 
 ?>
 --EXPECTF--
-Parse error: %s in %sheredoc_005.php on line 6
+Fatal error: Uncaught exception 'ParseException' with message '%s' in %s:6
+Stack trace:
+#0 {main}
+  thrown in %s on line 6

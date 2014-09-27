@@ -9,4 +9,7 @@ MYLABEL;
 echo $var;
 ?>
 --EXPECTF--
-Parse error: %s in %sheredoc_013.php on line %d
+Fatal error: Uncaught exception 'ParseException' with message '%s' in %s:%d
+Stack trace:
+#0 {main}
+  thrown in %s on line %d

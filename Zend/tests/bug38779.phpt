@@ -29,4 +29,7 @@ require 'Loader://qqq.php';
 echo "Done\n";
 ?>
 --EXPECTF--	
-Parse error: %s error%sin Loader://qqq.php on line %d
+Fatal error: Uncaught exception 'ParseException' with message '%s' in Loader://qqq.php:%d
+Stack trace:
+#0 {main}
+  thrown in Loader://qqq.php on line %d

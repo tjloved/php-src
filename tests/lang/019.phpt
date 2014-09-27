@@ -35,4 +35,7 @@ hey, this is a function inside an eval()!
 hey, this is a regular echo'd eval()
 hey, this is a function inside an eval()!
 
-Parse error: syntax error, unexpected %s in %s019.php(12) : eval()'d code on line 1
+Fatal error: Uncaught exception 'ParseException' with message 'syntax error, unexpected end of file' in %s(12) : eval()'d code:1
+Stack trace:
+#0 {main}
+  thrown in %s(12) : eval()'d code on line 1

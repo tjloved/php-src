@@ -7,5 +7,7 @@ function a() {
 }
 echo "Done\n";
 --EXPECTF--
-
-Parse error: memory exhausted in %s on line %d 
+Fatal error: Uncaught exception 'ParseException' with message 'memory exhausted' in %s:%d
+Stack trace:
+#0 {main}
+  thrown in %s on line %d

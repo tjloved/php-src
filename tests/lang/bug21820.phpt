@@ -10,4 +10,7 @@ echo "$arr['foo']";
 
 ?>
 --EXPECTF--
-Parse error: %s error, %s(T_STRING)%s(T_VARIABLE)%s(T_NUM_STRING)%sin %sbug21820.php on line %d
+Fatal error: Uncaught exception 'ParseException' with message 'syntax error, unexpected %s, expecting identifier (T_STRING) or variable (T_VARIABLE) or number (T_NUM_STRING)' in %s:%d
+Stack trace:
+#0 {main}
+  thrown in %s on line %d

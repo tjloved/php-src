@@ -33,6 +33,7 @@
 static zend_class_entry *default_exception_ce;
 static zend_class_entry *error_exception_ce;
 static zend_class_entry *engine_exception_ce;
+static zend_class_entry *parse_exception_ce;
 static zend_object_handlers default_exception_handlers;
 ZEND_API void (*zend_throw_exception_hook)(zval *ex TSRMLS_DC);
 
@@ -166,6 +167,32 @@ static zend_object *zend_default_exception_new_ex(zend_class_entry *class_type, 
 
 	zend_update_property_string(default_exception_ce, &obj, "file", sizeof("file")-1, zend_get_executed_filename(TSRMLS_C) TSRMLS_CC);
 	zend_update_property_long(default_exception_ce, &obj, "line", sizeof("line")-1, zend_get_executed_lineno(TSRMLS_C) TSRMLS_CC);
+	zend_update_property(default_exception_ce, &obj, "trace", sizeof("trace")-1, &trace TSRMLS_CC);
+
+	return object;
+}
+/* }}} */
+
+static zend_object *zend_parse_exception_new(zend_class_entry *class_type TSRMLS_DC) /* {{{ */
+{
+	zval obj;
+	zend_object *object;
+	zval trace;
+
+	Z_OBJ(obj) = object = zend_objects_new(class_type TSRMLS_CC);
+	Z_OBJ_HT(obj) = &default_exception_handlers;
+
+	object_properties_init(object, class_type);
+
+	if (EG(current_execute_data)) {
+		zend_fetch_debug_backtrace(&trace, /* skip top traces */ 0, 0, 0 TSRMLS_CC);
+	} else {
+		array_init(&trace);
+	}
+	Z_SET_REFCOUNT(trace, 0);
+
+	zend_update_property_str(default_exception_ce, &obj, "file", sizeof("file")-1, zend_get_compiled_filename(TSRMLS_C) TSRMLS_CC);
+	zend_update_property_long(default_exception_ce, &obj, "line", sizeof("line")-1, zend_get_compiled_lineno(TSRMLS_C) TSRMLS_CC);
 	zend_update_property(default_exception_ce, &obj, "trace", sizeof("trace")-1, &trace TSRMLS_CC);
 
 	return object;
@@ -741,6 +768,10 @@ void zend_register_default_exception(TSRMLS_D) /* {{{ */
 	INIT_CLASS_ENTRY(ce, "EngineException", NULL);
 	engine_exception_ce = zend_register_internal_class_ex(&ce, default_exception_ce TSRMLS_CC);
 	engine_exception_ce->create_object = zend_engine_exception_new;
+
+	INIT_CLASS_ENTRY(ce, "ParseException", NULL);
+	parse_exception_ce = zend_register_internal_class_ex(&ce, default_exception_ce TSRMLS_CC);
+	parse_exception_ce->create_object = zend_parse_exception_new;
 }
 /* }}} */
 
@@ -759,6 +790,12 @@ ZEND_API zend_class_entry *zend_get_error_exception(TSRMLS_D) /* {{{ */
 ZEND_API zend_class_entry *zend_get_engine_exception(TSRMLS_D) /* {{{ */
 {
 	return engine_exception_ce;
+}
+/* }}} */
+
+ZEND_API zend_class_entry *zend_get_parse_exception(TSRMLS_D) /* {{{ */
+{
+	return parse_exception_ce;
 }
 /* }}} */
 

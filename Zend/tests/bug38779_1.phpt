@@ -40,6 +40,9 @@ include $filename;
 echo "Done\n";
 ?>
 --EXPECTF--	
-Parse error: %s error%sin %s on line %d
+Fatal error: Uncaught exception 'ParseException' with message '%s' in %s:%d
+Stack trace:
+#0 {main}
+  thrown in %s on line %d
 string(6) "flush!"
 string(6) "close!"

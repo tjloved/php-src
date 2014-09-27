@@ -3,26 +3,38 @@ Bug #48693 (Double declaration of __lambda_func when lambda wrongly formatted)
 --FILE--
 <?php
 
-$x = create_function('', 'return 1; }');
+try {
+    $x = create_function('', 'return 1; }');
+} catch (ParseException $e) {
+    echo "$e\n\n";
+}
+
 $y = create_function('', 'function a() { }; return 2;');
-$z = create_function('', '{');
+
+try {
+    $z = create_function('', '{');
+} catch (ParseException $e) {
+    echo "$e\n\n";
+}
+
 $w = create_function('', 'return 3;');
 
 var_dump(
-	$x,
 	$y(),
-	$z,
-	$w(),
-	$y != $z
+	$w()
 );
 
 ?>
 --EXPECTF--
-Parse error: %s in %s(%d) : runtime-created function on line 1
+exception 'ParseException' with message '%s' in %s(%d) : runtime-created function:1
+Stack trace:
+#0 %s(%d): create_function('', 'return 1; }')
+#1 {main}
 
-Parse error: %s %s(%d) : runtime-created function on line 1
-bool(false)
+exception 'ParseException' with message '%s' in %s(%d) : runtime-created function:1
+Stack trace:
+#0 %s(%d): create_function('', '{')
+#1 {main}
+
 int(2)
-bool(false)
 int(3)
-bool(true)

@@ -8,4 +8,7 @@ $foo = 'bar';
 var_dump(new namespace::$foo);
 ?>
 --EXPECTF--
-Parse error: %s error%sexpecting%sT_NS_SEPARATOR%sin %sbug43343.php on line 5
+Fatal error: Uncaught exception 'ParseException' with message 'syntax error, unexpected '::' (T_PAAMAYIM_NEKUDOTAYIM), expecting \\ (T_NS_SEPARATOR)' in %s:5
+Stack trace:
+#0 {main}
+  thrown in %s on line 5
