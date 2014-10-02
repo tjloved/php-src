@@ -307,6 +307,8 @@ struct _zend_op_array {
 	int  last_cache_slot;
 	void **run_time_cache;
 
+	HashTable *import_table;
+
 	void *reserved[ZEND_MAX_RESERVED_RESOURCES];
 };
 

@@ -2105,6 +2105,37 @@ ZEND_METHOD(reflection_function, getExtensionName)
 }
 /* }}} */
 
+/* {{{ proto public array|false ReflectionFunction::getDefinedAliases()
+ * Returns defined aliases (use) or false if such information is not available */
+ZEND_METHOD(reflection_function, getDefinedAliases)
+{
+	reflection_object *intern;
+	zend_function *fptr;
+	HashTable *import_table;
+
+	METHOD_NOTSTATIC(reflection_function_abstract_ptr);
+	GET_REFLECTION_OBJECT_PTR(fptr);
+
+	if (fptr->type != ZEND_USER_FUNCTION) {
+		RETURN_FALSE;
+	}
+	
+	if (fptr->common.scope) {
+		import_table = fptr->common.scope->info.user.import_table;
+	} else {
+		import_table = fptr->op_array.import_table;
+	}
+
+	if (!import_table) {
+		array_init(return_value);
+		return;
+	}
+
+	ZVAL_NEW_ARR(return_value);
+	zend_array_dup(Z_ARRVAL_P(return_value), import_table);
+}
+/* }}} */
+
 /* {{{ proto public static mixed ReflectionParameter::export(mixed function, mixed parameter [, bool return]) throws ReflectionException
    Exports a reflection object. Returns the output if TRUE is specified for return, printing it otherwise. */
 ZEND_METHOD(reflection_parameter, export)
@@ -4706,6 +4737,33 @@ ZEND_METHOD(reflection_class, getShortName)
 }
 /* }}} */
 
+/* {{{ proto public array|false ReflectionClass::getDefinedAliases()
+ * Returns defined aliases (use) or false if such information is not available */
+ZEND_METHOD(reflection_class, getDefinedAliases)
+{
+	reflection_object *intern;
+	zend_class_entry *ce;
+	HashTable *import_table;
+
+	METHOD_NOTSTATIC(reflection_class_ptr);
+	GET_REFLECTION_OBJECT_PTR(ce);
+
+	if (ce->type != ZEND_USER_CLASS) {
+		RETURN_FALSE;
+	}
+	
+	import_table = ce->info.user.import_table;
+	if (!import_table) {
+		array_init(return_value);
+		return;
+	}
+
+	ZVAL_NEW_ARR(return_value);
+	zend_array_dup(Z_ARRVAL_P(return_value), import_table);
+}
+/* }}} */
+
+
 /* {{{ proto public static mixed ReflectionObject::export(mixed argument [, bool return]) throws ReflectionException
    Exports a reflection object. Returns the output if TRUE is specified for return, printing it otherwise. */
 ZEND_METHOD(reflection_object, export)
@@ -5720,6 +5778,7 @@ static const zend_function_entry reflection_function_abstract_functions[] = {
 	ZEND_ME(reflection_function, getShortName, arginfo_reflection__void, 0)
 	ZEND_ME(reflection_function, getStartLine, arginfo_reflection__void, 0)
 	ZEND_ME(reflection_function, getStaticVariables, arginfo_reflection__void, 0)
+	ZEND_ME(reflection_function, getDefinedAliases, arginfo_reflection__void, 0)
 	ZEND_ME(reflection_function, returnsReference, arginfo_reflection__void, 0)
 	PHP_FE_END
 };
@@ -5912,6 +5971,7 @@ static const zend_function_entry reflection_class_functions[] = {
 	ZEND_ME(reflection_class, inNamespace, arginfo_reflection__void, 0)
 	ZEND_ME(reflection_class, getNamespaceName, arginfo_reflection__void, 0)
 	ZEND_ME(reflection_class, getShortName, arginfo_reflection__void, 0)
+	ZEND_ME(reflection_class, getDefinedAliases, arginfo_reflection__void, 0)
 	PHP_FE_END
 };
 

@@ -1391,6 +1391,7 @@ ZEND_API void zend_initialize_class_data(zend_class_entry *ce, zend_bool nullify
 	} else {
 		ce->static_members_table = ce->default_static_members_table;
 		ce->info.user.doc_comment = NULL;
+		ce->info.user.import_table = NULL;
 	}
 
 	ce->default_properties_count = 0;
@@ -4087,6 +4088,28 @@ void zend_begin_method_decl(zend_op_array *op_array, zend_string *name, zend_boo
 }
 /* }}} */
 
+static void copy_import(zval *zv) /* {{{ */
+{
+	ZVAL_STR(zv, zend_string_copy(Z_STR_P(zv)));
+}
+/* }}} */
+
+static HashTable *zend_copy_import_table(TSRMLS_D) /* {{{ */
+{
+	HashTable *imports;
+
+	if (!CG(current_import)) {
+		return NULL;
+	}
+
+	ALLOC_HASHTABLE(imports);
+	zend_hash_init(imports, zend_hash_num_elements(CG(current_import)), NULL, ZVAL_PTR_DTOR, 0);
+	zend_hash_copy(imports, CG(current_import), copy_import);
+
+	return imports;
+}
+/* }}} */
+
 static void zend_begin_func_decl(znode *result, zend_op_array *op_array, zend_ast_decl *decl TSRMLS_DC) /* {{{ */
 {
 	zend_ast *params_ast = decl->child[0];
@@ -4132,6 +4155,8 @@ static void zend_begin_func_decl(znode *result, zend_op_array *op_array, zend_as
 	}
 
 	zend_string_release(lcname);
+
+	op_array->import_table = zend_copy_import_table(TSRMLS_C);
 }
 /* }}} */
 
@@ -4519,6 +4544,7 @@ void zend_compile_class_decl(zend_ast *ast TSRMLS_DC) /* {{{ */
 	ce->info.user.filename = zend_get_compiled_filename(TSRMLS_C);
 	ce->info.user.line_start = decl->start_lineno;
 	ce->info.user.line_end = decl->end_lineno;
+	ce->info.user.import_table = zend_copy_import_table(TSRMLS_C);
 	if (decl->doc_comment) {
 		ce->info.user.doc_comment = zend_string_copy(decl->doc_comment);
 	}
