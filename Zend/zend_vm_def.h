@@ -1711,8 +1711,13 @@ ZEND_VM_HANDLER(39, ZEND_ASSIGN_REF, VAR|CV, VAR|CV)
 	value_ptr = GET_OP2_ZVAL_PTR_PTR(BP_VAR_W);
 
 	if (OP2_TYPE == IS_VAR && UNEXPECTED(value_ptr == NULL)) {
-		zend_error_noreturn(E_ERROR, "Cannot create references to/from string offsets nor overloaded objects");
+		zend_throw_engine_exception(
+			"Cannot create references to/from string offsets nor overloaded objects" TSRMLS_CC);
+		FREE_OP2_VAR_PTR();
+		FREE_UNFETCHED_OP1();
+		HANDLE_EXCEPTION();
 	}
+
 	if (OP2_TYPE == IS_VAR &&
 	    (value_ptr == &EG(uninitialized_zval) ||
 	     (opline->extended_value == ZEND_RETURNS_FUNCTION &&
@@ -2357,8 +2362,6 @@ ZEND_VM_HANDLER(113, ZEND_INIT_STATIC_METHOD_CALL, CONST|VAR, CONST|TMP|VAR|UNUS
 					object ? ", assuming $this from incompatible context" : "");
 				HANDLE_EXCEPTION();
 			}
-
-			GC_REFCOUNT(object)++;
 		}
 	}
 
@@ -2507,10 +2510,11 @@ ZEND_VM_HANDLER(59, ZEND_INIT_FCALL_BY_NAME, ANY, CONST|TMP|VAR|CV)
 						"Non-static method %s::%s() should not be called statically",
 						fbc->common.scope->name->val, fbc->common.function_name->val);
 					} else {
-						zend_error_noreturn(
-							E_ERROR,
-							"Non-static method %s::%s() cannot be called statically",
+						zend_throw_engine_exception_ex(
+							"Non-static method %s::%s() cannot be called statically" TSRMLS_CC,
 							fbc->common.scope->name->val, fbc->common.function_name->val);
+						FREE_OP2();
+						HANDLE_EXCEPTION();
 					}
 				}
 			} else {
@@ -2577,10 +2581,11 @@ ZEND_VM_HANDLER(118, ZEND_INIT_USER_CALL, CONST, CONST|TMP|VAR|CV)
 				"Non-static method %s::%s() should not be called statically",
 				func->common.scope->name->val, func->common.function_name->val);
 			} else {
-				zend_error_noreturn(
-					E_ERROR,
-					"Non-static method %s::%s() cannot be called statically",
+				zend_throw_engine_exception_ex(
+					"Non-static method %s::%s() cannot be called statically" TSRMLS_CC,
 					func->common.scope->name->val, func->common.function_name->val);
+				FREE_OP2();
+				HANDLE_EXCEPTION();
 			}
 		}
 	} else {

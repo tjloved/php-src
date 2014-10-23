@@ -1568,10 +1568,11 @@ static int ZEND_FASTCALL  ZEND_INIT_FCALL_BY_NAME_SPEC_CONST_HANDLER(ZEND_OPCODE
 						"Non-static method %s::%s() should not be called statically",
 						fbc->common.scope->name->val, fbc->common.function_name->val);
 					} else {
-						zend_error_noreturn(
-							E_ERROR,
-							"Non-static method %s::%s() cannot be called statically",
+						zend_throw_engine_exception_ex(
+							"Non-static method %s::%s() cannot be called statically" TSRMLS_CC,
 							fbc->common.scope->name->val, fbc->common.function_name->val);
+
+						HANDLE_EXCEPTION();
 					}
 				}
 			} else {
@@ -1926,10 +1927,11 @@ static int ZEND_FASTCALL  ZEND_INIT_FCALL_BY_NAME_SPEC_TMP_HANDLER(ZEND_OPCODE_H
 						"Non-static method %s::%s() should not be called statically",
 						fbc->common.scope->name->val, fbc->common.function_name->val);
 					} else {
-						zend_error_noreturn(
-							E_ERROR,
-							"Non-static method %s::%s() cannot be called statically",
+						zend_throw_engine_exception_ex(
+							"Non-static method %s::%s() cannot be called statically" TSRMLS_CC,
 							fbc->common.scope->name->val, fbc->common.function_name->val);
+						zval_ptr_dtor_nogc(free_op2.var);
+						HANDLE_EXCEPTION();
 					}
 				}
 			} else {
@@ -2128,10 +2130,11 @@ static int ZEND_FASTCALL  ZEND_INIT_FCALL_BY_NAME_SPEC_VAR_HANDLER(ZEND_OPCODE_H
 						"Non-static method %s::%s() should not be called statically",
 						fbc->common.scope->name->val, fbc->common.function_name->val);
 					} else {
-						zend_error_noreturn(
-							E_ERROR,
-							"Non-static method %s::%s() cannot be called statically",
+						zend_throw_engine_exception_ex(
+							"Non-static method %s::%s() cannot be called statically" TSRMLS_CC,
 							fbc->common.scope->name->val, fbc->common.function_name->val);
+						zval_ptr_dtor_nogc(free_op2.var);
+						HANDLE_EXCEPTION();
 					}
 				}
 			} else {
@@ -2364,10 +2367,11 @@ static int ZEND_FASTCALL  ZEND_INIT_FCALL_BY_NAME_SPEC_CV_HANDLER(ZEND_OPCODE_HA
 						"Non-static method %s::%s() should not be called statically",
 						fbc->common.scope->name->val, fbc->common.function_name->val);
 					} else {
-						zend_error_noreturn(
-							E_ERROR,
-							"Non-static method %s::%s() cannot be called statically",
+						zend_throw_engine_exception_ex(
+							"Non-static method %s::%s() cannot be called statically" TSRMLS_CC,
 							fbc->common.scope->name->val, fbc->common.function_name->val);
+
+						HANDLE_EXCEPTION();
 					}
 				}
 			} else {
@@ -4311,8 +4315,6 @@ static int ZEND_FASTCALL  ZEND_INIT_STATIC_METHOD_CALL_SPEC_CONST_CONST_HANDLER(
 					object ? ", assuming $this from incompatible context" : "");
 				HANDLE_EXCEPTION();
 			}
-
-			GC_REFCOUNT(object)++;
 		}
 	}
 
@@ -4366,10 +4368,11 @@ static int ZEND_FASTCALL  ZEND_INIT_USER_CALL_SPEC_CONST_CONST_HANDLER(ZEND_OPCO
 				"Non-static method %s::%s() should not be called statically",
 				func->common.scope->name->val, func->common.function_name->val);
 			} else {
-				zend_error_noreturn(
-					E_ERROR,
-					"Non-static method %s::%s() cannot be called statically",
+				zend_throw_engine_exception_ex(
+					"Non-static method %s::%s() cannot be called statically" TSRMLS_CC,
 					func->common.scope->name->val, func->common.function_name->val);
+
+				HANDLE_EXCEPTION();
 			}
 		}
 	} else {
@@ -5667,8 +5670,6 @@ static int ZEND_FASTCALL  ZEND_INIT_STATIC_METHOD_CALL_SPEC_CONST_TMP_HANDLER(ZE
 					object ? ", assuming $this from incompatible context" : "");
 				HANDLE_EXCEPTION();
 			}
-
-			GC_REFCOUNT(object)++;
 		}
 	}
 
@@ -5722,10 +5723,11 @@ static int ZEND_FASTCALL  ZEND_INIT_USER_CALL_SPEC_CONST_TMP_HANDLER(ZEND_OPCODE
 				"Non-static method %s::%s() should not be called statically",
 				func->common.scope->name->val, func->common.function_name->val);
 			} else {
-				zend_error_noreturn(
-					E_ERROR,
-					"Non-static method %s::%s() cannot be called statically",
+				zend_throw_engine_exception_ex(
+					"Non-static method %s::%s() cannot be called statically" TSRMLS_CC,
 					func->common.scope->name->val, func->common.function_name->val);
+				zval_ptr_dtor_nogc(free_op2.var);
+				HANDLE_EXCEPTION();
 			}
 		}
 	} else {
@@ -6899,8 +6901,6 @@ static int ZEND_FASTCALL  ZEND_INIT_STATIC_METHOD_CALL_SPEC_CONST_VAR_HANDLER(ZE
 					object ? ", assuming $this from incompatible context" : "");
 				HANDLE_EXCEPTION();
 			}
-
-			GC_REFCOUNT(object)++;
 		}
 	}
 
@@ -6954,10 +6954,11 @@ static int ZEND_FASTCALL  ZEND_INIT_USER_CALL_SPEC_CONST_VAR_HANDLER(ZEND_OPCODE
 				"Non-static method %s::%s() should not be called statically",
 				func->common.scope->name->val, func->common.function_name->val);
 			} else {
-				zend_error_noreturn(
-					E_ERROR,
-					"Non-static method %s::%s() cannot be called statically",
+				zend_throw_engine_exception_ex(
+					"Non-static method %s::%s() cannot be called statically" TSRMLS_CC,
 					func->common.scope->name->val, func->common.function_name->val);
+				zval_ptr_dtor_nogc(free_op2.var);
+				HANDLE_EXCEPTION();
 			}
 		}
 	} else {
@@ -7864,8 +7865,6 @@ static int ZEND_FASTCALL  ZEND_INIT_STATIC_METHOD_CALL_SPEC_CONST_UNUSED_HANDLER
 					object ? ", assuming $this from incompatible context" : "");
 				HANDLE_EXCEPTION();
 			}
-
-			GC_REFCOUNT(object)++;
 		}
 	}
 
@@ -8881,8 +8880,6 @@ static int ZEND_FASTCALL  ZEND_INIT_STATIC_METHOD_CALL_SPEC_CONST_CV_HANDLER(ZEN
 					object ? ", assuming $this from incompatible context" : "");
 				HANDLE_EXCEPTION();
 			}
-
-			GC_REFCOUNT(object)++;
 		}
 	}
 
@@ -8936,10 +8933,11 @@ static int ZEND_FASTCALL  ZEND_INIT_USER_CALL_SPEC_CONST_CV_HANDLER(ZEND_OPCODE_
 				"Non-static method %s::%s() should not be called statically",
 				func->common.scope->name->val, func->common.function_name->val);
 			} else {
-				zend_error_noreturn(
-					E_ERROR,
-					"Non-static method %s::%s() cannot be called statically",
+				zend_throw_engine_exception_ex(
+					"Non-static method %s::%s() cannot be called statically" TSRMLS_CC,
 					func->common.scope->name->val, func->common.function_name->val);
+
+				HANDLE_EXCEPTION();
 			}
 		}
 	} else {
@@ -19284,8 +19282,6 @@ static int ZEND_FASTCALL  ZEND_INIT_STATIC_METHOD_CALL_SPEC_VAR_CONST_HANDLER(ZE
 					object ? ", assuming $this from incompatible context" : "");
 				HANDLE_EXCEPTION();
 			}
-
-			GC_REFCOUNT(object)++;
 		}
 	}
 
@@ -21607,8 +21603,6 @@ static int ZEND_FASTCALL  ZEND_INIT_STATIC_METHOD_CALL_SPEC_VAR_TMP_HANDLER(ZEND
 					object ? ", assuming $this from incompatible context" : "");
 				HANDLE_EXCEPTION();
 			}
-
-			GC_REFCOUNT(object)++;
 		}
 	}
 
@@ -23622,8 +23616,13 @@ static int ZEND_FASTCALL  ZEND_ASSIGN_REF_SPEC_VAR_VAR_HANDLER(ZEND_OPCODE_HANDL
 	value_ptr = _get_zval_ptr_ptr_var(opline->op2.var, execute_data, &free_op2 TSRMLS_CC);
 
 	if (IS_VAR == IS_VAR && UNEXPECTED(value_ptr == NULL)) {
-		zend_error_noreturn(E_ERROR, "Cannot create references to/from string offsets nor overloaded objects");
+		zend_throw_engine_exception(
+			"Cannot create references to/from string offsets nor overloaded objects" TSRMLS_CC);
+		if (free_op2.var) {zval_ptr_dtor_nogc(free_op2.var);};
+		zval_ptr_dtor_nogc(EX_VAR(opline->op1.var));;
+		HANDLE_EXCEPTION();
 	}
+
 	if (IS_VAR == IS_VAR &&
 	    (value_ptr == &EG(uninitialized_zval) ||
 	     (opline->extended_value == ZEND_RETURNS_FUNCTION &&
@@ -23872,8 +23871,6 @@ static int ZEND_FASTCALL  ZEND_INIT_STATIC_METHOD_CALL_SPEC_VAR_VAR_HANDLER(ZEND
 					object ? ", assuming $this from incompatible context" : "");
 				HANDLE_EXCEPTION();
 			}
-
-			GC_REFCOUNT(object)++;
 		}
 	}
 
@@ -25405,8 +25402,6 @@ static int ZEND_FASTCALL  ZEND_INIT_STATIC_METHOD_CALL_SPEC_VAR_UNUSED_HANDLER(Z
 					object ? ", assuming $this from incompatible context" : "");
 				HANDLE_EXCEPTION();
 			}
-
-			GC_REFCOUNT(object)++;
 		}
 	}
 
@@ -27131,8 +27126,13 @@ static int ZEND_FASTCALL  ZEND_ASSIGN_REF_SPEC_VAR_CV_HANDLER(ZEND_OPCODE_HANDLE
 	value_ptr = _get_zval_ptr_cv_BP_VAR_W(execute_data, opline->op2.var TSRMLS_CC);
 
 	if (IS_CV == IS_VAR && UNEXPECTED(value_ptr == NULL)) {
-		zend_error_noreturn(E_ERROR, "Cannot create references to/from string offsets nor overloaded objects");
+		zend_throw_engine_exception(
+			"Cannot create references to/from string offsets nor overloaded objects" TSRMLS_CC);
+
+		zval_ptr_dtor_nogc(EX_VAR(opline->op1.var));;
+		HANDLE_EXCEPTION();
 	}
+
 	if (IS_CV == IS_VAR &&
 	    (value_ptr == &EG(uninitialized_zval) ||
 	     (opline->extended_value == ZEND_RETURNS_FUNCTION &&
@@ -27379,8 +27379,6 @@ static int ZEND_FASTCALL  ZEND_INIT_STATIC_METHOD_CALL_SPEC_VAR_CV_HANDLER(ZEND_
 					object ? ", assuming $this from incompatible context" : "");
 				HANDLE_EXCEPTION();
 			}
-
-			GC_REFCOUNT(object)++;
 		}
 	}
 
@@ -40902,8 +40900,13 @@ static int ZEND_FASTCALL  ZEND_ASSIGN_REF_SPEC_CV_VAR_HANDLER(ZEND_OPCODE_HANDLE
 	value_ptr = _get_zval_ptr_ptr_var(opline->op2.var, execute_data, &free_op2 TSRMLS_CC);
 
 	if (IS_VAR == IS_VAR && UNEXPECTED(value_ptr == NULL)) {
-		zend_error_noreturn(E_ERROR, "Cannot create references to/from string offsets nor overloaded objects");
+		zend_throw_engine_exception(
+			"Cannot create references to/from string offsets nor overloaded objects" TSRMLS_CC);
+		if (free_op2.var) {zval_ptr_dtor_nogc(free_op2.var);};
+
+		HANDLE_EXCEPTION();
 	}
+
 	if (IS_VAR == IS_VAR &&
 	    (value_ptr == &EG(uninitialized_zval) ||
 	     (opline->extended_value == ZEND_RETURNS_FUNCTION &&
@@ -44121,8 +44124,13 @@ static int ZEND_FASTCALL  ZEND_ASSIGN_REF_SPEC_CV_CV_HANDLER(ZEND_OPCODE_HANDLER
 	value_ptr = _get_zval_ptr_cv_BP_VAR_W(execute_data, opline->op2.var TSRMLS_CC);
 
 	if (IS_CV == IS_VAR && UNEXPECTED(value_ptr == NULL)) {
-		zend_error_noreturn(E_ERROR, "Cannot create references to/from string offsets nor overloaded objects");
+		zend_throw_engine_exception(
+			"Cannot create references to/from string offsets nor overloaded objects" TSRMLS_CC);
+
+
+		HANDLE_EXCEPTION();
 	}
+
 	if (IS_CV == IS_VAR &&
 	    (value_ptr == &EG(uninitialized_zval) ||
 	     (opline->extended_value == ZEND_RETURNS_FUNCTION &&
