@@ -284,32 +284,30 @@ static zend_bool zend_do_perform_implementation_check(const zend_function *fe, c
 		if (fe_arg_info->class_name) {
 			zend_string *fe_class_name, *proto_class_name;
 
-			if (!strcasecmp(fe_arg_info->class_name, "parent") && proto->common.scope) {
-				fe_class_name = zend_string_copy(proto->common.scope->name);
-			} else if (!strcasecmp(fe_arg_info->class_name, "self") && fe->common.scope) {
-				fe_class_name = zend_string_copy(fe->common.scope->name);
+			if (zend_string_equals_literal_ci(fe_arg_info->class_name, "parent")
+					&& proto->common.scope) {
+				fe_class_name = proto->common.scope->name;
+			} else if (zend_string_equals_literal_ci(fe_arg_info->class_name, "self")
+					&& fe->common.scope) {
+				fe_class_name = fe->common.scope->name;
 			} else {
-				fe_class_name = zend_string_init(
-					fe_arg_info->class_name,
-					fe_arg_info->class_name_len, 0);
+				fe_class_name = fe_arg_info->class_name;
 			}
 
-			if (!strcasecmp(proto_arg_info->class_name, "parent") && proto->common.scope && proto->common.scope->parent) {
-				proto_class_name = zend_string_copy(proto->common.scope->parent->name);
-			} else if (!strcasecmp(proto_arg_info->class_name, "self") && proto->common.scope) {
-				proto_class_name = zend_string_copy(proto->common.scope->name);
+			if (zend_string_equals_literal_ci(proto_arg_info->class_name, "parent")
+					&& proto->common.scope && proto->common.scope->parent) {
+				proto_class_name = proto->common.scope->parent->name;
+			} else if (zend_string_equals_literal_ci(proto_arg_info->class_name, "self")
+					&& proto->common.scope) {
+				proto_class_name = proto->common.scope->name;
 			} else {
-				proto_class_name = zend_string_init(
-					proto_arg_info->class_name,
-					proto_arg_info->class_name_len, 0);
+				proto_class_name = proto_arg_info->class_name;
 			}
 
-			if (strcasecmp(fe_class_name->val, proto_class_name->val)!=0) {
+			if (strcasecmp(fe_class_name->val, proto_class_name->val) != 0) {
 				const char *colon;
 
 				if (fe->common.type != ZEND_USER_FUNCTION) {
-					zend_string_release(proto_class_name);
-					zend_string_release(fe_class_name);
 					return 0;
 			    } else if (strchr(proto_class_name->val, '\\') != NULL ||
 						(colon = zend_memrchr(fe_class_name->val, '\\', fe_class_name->len)) == NULL ||
@@ -324,14 +322,10 @@ static zend_bool zend_do_perform_implementation_check(const zend_function *fe, c
 							fe_ce->type == ZEND_INTERNAL_CLASS ||
 							proto_ce->type == ZEND_INTERNAL_CLASS ||
 							fe_ce != proto_ce) {
-						zend_string_release(proto_class_name);
-						zend_string_release(fe_class_name);
 						return 0;
 					}
 				}
 			}
-			zend_string_release(proto_class_name);
-			zend_string_release(fe_class_name);
 		}
 		if (fe_arg_info->type_hint != proto_arg_info->type_hint) {
 			/* Incompatible type hint */
@@ -371,20 +365,18 @@ static zend_string *zend_get_function_declaration(zend_function *fptr TSRMLS_DC)
 		required = fptr->common.required_num_args;
 		for (i = 0; i < fptr->common.num_args;) {
 			if (arg_info->class_name) {
-				const char *class_name;
-				size_t class_name_len;
-				if (!strcasecmp(arg_info->class_name, "self") && fptr->common.scope) {
-					class_name = fptr->common.scope->name->val;
-					class_name_len = fptr->common.scope->name->len;
-				} else if (!strcasecmp(arg_info->class_name, "parent") && fptr->common.scope->parent) {
-					class_name = fptr->common.scope->parent->name->val;
-					class_name_len = fptr->common.scope->parent->name->len;
+				zend_string *class_name;
+				if (zend_string_equals_literal_ci(arg_info->class_name, "self")
+						&& fptr->common.scope) {
+					class_name = fptr->common.scope->name;
+				} else if (zend_string_equals_literal_ci(arg_info->class_name, "parent")
+						&& fptr->common.scope->parent) {
+					class_name = fptr->common.scope->parent->name;
 				} else {
 					class_name = arg_info->class_name;
-					class_name_len = arg_info->class_name_len;
 				}
 
-				smart_str_appendl(&str, class_name, class_name_len);
+				smart_str_append(&str, class_name);
 				smart_str_appendc(&str, ' ');
 			} else if (arg_info->type_hint) {
 				const char *type_name = zend_get_type_by_const(arg_info->type_hint);
@@ -403,7 +395,7 @@ static zend_string *zend_get_function_declaration(zend_function *fptr TSRMLS_DC)
 			smart_str_appendc(&str, '$');
 
 			if (arg_info->name) {
-				smart_str_appendl(&str, arg_info->name, arg_info->name_len);
+				smart_str_append(&str, arg_info->name);
 			} else {
 				smart_str_appends(&str, "param");
 				smart_str_append_unsigned(&str, i);

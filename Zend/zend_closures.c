@@ -370,7 +370,7 @@ static HashTable *zend_closure_get_debug_info(zval *object, int *is_temp TSRMLS_
 				if (arg_info->name) {
 					name = zend_strpprintf(0, "%s$%s",
 							arg_info->pass_by_reference ? "&" : "",
-							arg_info->name);
+							arg_info->name->val);
 				} else {
 					name = zend_strpprintf(0, "%s$param%d",
 							arg_info->pass_by_reference ? "&" : "",

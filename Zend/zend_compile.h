@@ -245,10 +245,8 @@ typedef struct _zend_property_info {
 	((offset - OBJ_PROP_TO_OFFSET(0)) / sizeof(zval))
 
 typedef struct _zend_arg_info {
-	const char *name;			// TODO: convert into zend_string ???
-	uint32_t name_len;
-	const char *class_name;		// TODO: convert into zend_string ???
-	uint32_t class_name_len;
+	zend_string *name;
+	zend_string *class_name;
 	zend_uchar type_hint;
 	zend_uchar pass_by_reference;
 	zend_bool allow_null;
@@ -261,10 +259,8 @@ typedef struct _zend_arg_info {
  */
 typedef struct _zend_internal_function_info {
 	const char *_name;
-	uint32_t _name_len;
 	const char *_class_name;
-	uint32_t required_num_args;
-	zend_uchar _type_hint;
+	zend_uchar required_num_args;
 	zend_bool return_reference;
 	zend_bool _allow_null;
 	zend_bool _is_variadic;

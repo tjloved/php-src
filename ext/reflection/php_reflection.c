@@ -688,7 +688,7 @@ static void _parameter_string(string *str, zend_function *fptr, struct _zend_arg
 		string_printf(str, "<required> ");
 	}
 	if (arg_info->class_name) {
-		string_printf(str, "%s ", arg_info->class_name);
+		string_printf(str, "%s ", arg_info->class_name->val);
 		if (arg_info->allow_null) {
 			string_printf(str, "or NULL ");
 		}
@@ -705,7 +705,7 @@ static void _parameter_string(string *str, zend_function *fptr, struct _zend_arg
 		string_write(str, "...", sizeof("...")-1);
 	}
 	if (arg_info->name) {
-		string_printf(str, "$%s", arg_info->name);
+		string_printf(str, "$%s", arg_info->name->val);
 	} else {
 		string_printf(str, "$param%d", offset);
 	}
@@ -1226,7 +1226,7 @@ static void reflection_parameter_factory(zend_function *fptr, zval *closure_obje
 	zval name;
 
 	if (arg_info->name) {
-		ZVAL_STRINGL(&name, arg_info->name, arg_info->name_len);
+		ZVAL_STR_COPY(&name, arg_info->name);
 	} else {
 		ZVAL_NULL(&name);
 	}
@@ -2244,7 +2244,7 @@ ZEND_METHOD(reflection_parameter, __construct)
 		position= -1;
 		convert_to_string_ex(parameter);
 		for (i = 0; i < fptr->common.num_args; i++) {
-			if (arg_info[i].name && strcmp(arg_info[i].name, Z_STRVAL_P(parameter)) == 0) {
+			if (arg_info[i].name && zend_string_equals(arg_info[i].name, Z_STR_P(parameter))) {
 				position= i;
 				break;
 			}
@@ -2265,7 +2265,7 @@ ZEND_METHOD(reflection_parameter, __construct)
 	}
 
 	if (arg_info[position].name) {
-		ZVAL_STRINGL(&name, arg_info[position].name, arg_info[position].name_len);
+		ZVAL_STR_COPY(&name, arg_info[position].name);
 	} else {
 		ZVAL_NULL(&name);
 	}
@@ -2379,14 +2379,14 @@ ZEND_METHOD(reflection_parameter, getClass)
 		 * TODO: Think about moving these checks to the compiler or some sort of
 		 * lint-mode.
 		 */
-		if (0 == zend_binary_strcasecmp(param->arg_info->class_name, param->arg_info->class_name_len, "self", sizeof("self")- 1)) {
+		if (zend_string_equals_literal_ci(param->arg_info->class_name, "self")) {
 			ce = param->fptr->common.scope;
 			if (!ce) {
 				zend_throw_exception_ex(reflection_exception_ptr, 0 TSRMLS_CC,
 					"Parameter uses 'self' as type hint but function is not a class member!");
 				return;
 			}
-		} else if (0 == zend_binary_strcasecmp(param->arg_info->class_name, param->arg_info->class_name_len, "parent", sizeof("parent")- 1)) {
+		} else if (zend_string_equals_literal_ci(param->arg_info->class_name, "parent")) {
 			ce = param->fptr->common.scope;
 			if (!ce) {
 				zend_throw_exception_ex(reflection_exception_ptr, 0 TSRMLS_CC,
@@ -2400,12 +2400,10 @@ ZEND_METHOD(reflection_parameter, getClass)
 			}
 			ce = ce->parent;
 		} else {
-			zend_string *name = zend_string_init(param->arg_info->class_name, param->arg_info->class_name_len, 0);
-			ce = zend_lookup_class(name TSRMLS_CC);
-			zend_string_release(name);
+			ce = zend_lookup_class(param->arg_info->class_name TSRMLS_CC);
 			if (!ce) {
 				zend_throw_exception_ex(reflection_exception_ptr, 0 TSRMLS_CC,
-					"Class %s does not exist", param->arg_info->class_name);
+					"Class %s does not exist", param->arg_info->class_name->val);
 				return;
 			}
 		}

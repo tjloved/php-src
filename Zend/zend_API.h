@@ -98,16 +98,29 @@ typedef struct _zend_fcall_info_cache {
 
 #define ZEND_FE_END            { NULL, NULL, NULL, 0, 0 }
 
-#define ZEND_ARG_INFO(pass_by_ref, name)							{ #name, sizeof(#name)-1, NULL, 0, 0, pass_by_ref, 0, 0 },
-#define ZEND_ARG_PASS_INFO(pass_by_ref)								{ NULL, 0, NULL, 0, 0, pass_by_ref, 0, 0 },
-#define ZEND_ARG_OBJ_INFO(pass_by_ref, name, classname, allow_null) { #name, sizeof(#name)-1, #classname, sizeof(#classname)-1, IS_OBJECT, pass_by_ref, allow_null, 0 },
-#define ZEND_ARG_ARRAY_INFO(pass_by_ref, name, allow_null) { #name, sizeof(#name)-1, NULL, 0, IS_ARRAY, pass_by_ref, allow_null, 0 },
-#define ZEND_ARG_TYPE_INFO(pass_by_ref, name, type_hint, allow_null) { #name, sizeof(#name)-1, NULL, 0, type_hint, pass_by_ref, allow_null, 0 },
-#define ZEND_ARG_VARIADIC_INFO(pass_by_ref, name) 					{ #name, sizeof(#name)-1, NULL, 0, 0, pass_by_ref, 0, 1 },
+#define ZEND_STRING_CT(str) \
+	(zend_string *) (struct { \
+		uint32_t refcount; uint32_t type_info; \
+		zend_ulong h; size_t len; \
+		char val[sizeof(str)]; \
+	}[1]) {{ 1, IS_STRING | (IS_STR_PERSISTENT << 8), 0, sizeof(str)-1, str }}
 
-#define ZEND_BEGIN_ARG_INFO_EX(name, _unused, return_reference, required_num_args)	\
-	static const zend_arg_info name[] = {																		\
-		{ NULL, 0, NULL, required_num_args, 0, return_reference, 0, 0 },
+#define ZEND_ARG_INFO(pass_by_ref, name) \
+	{ ZEND_STRING_CT(#name), NULL, 0, pass_by_ref, 0, 0 },
+#define ZEND_ARG_PASS_INFO(pass_by_ref) \
+	{ NULL, NULL, 0, pass_by_ref, 0, 0 },
+#define ZEND_ARG_OBJ_INFO(pass_by_ref, name, classname, allow_null) \
+	{ ZEND_STRING_CT(#name), ZEND_STRING_CT(#classname), IS_OBJECT, pass_by_ref, allow_null, 0 },
+#define ZEND_ARG_ARRAY_INFO(pass_by_ref, name, allow_null) \
+	{ ZEND_STRING_CT(#name), NULL, IS_ARRAY, pass_by_ref, allow_null, 0 },
+#define ZEND_ARG_TYPE_INFO(pass_by_ref, name, type_hint, allow_null) \
+	{ ZEND_STRING_CT(#name), NULL, type_hint, pass_by_ref, allow_null, 0 },
+#define ZEND_ARG_VARIADIC_INFO(pass_by_ref, name) \
+	{ ZEND_STRING_CT(#name), NULL, 0, pass_by_ref, 0, 1 },
+
+#define ZEND_BEGIN_ARG_INFO_EX(name, _unused, return_reference, required_num_args) \
+	static const zend_arg_info name[] = { \
+		{ NULL, NULL, required_num_args, return_reference, 0, 0 },
 #define ZEND_BEGIN_ARG_INFO(name, _unused)	\
 	ZEND_BEGIN_ARG_INFO_EX(name, 0, ZEND_RETURN_VALUE, -1)
 #define ZEND_END_ARG_INFO()		};
