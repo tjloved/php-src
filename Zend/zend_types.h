@@ -84,6 +84,7 @@ typedef struct _zend_ast_ref    zend_ast_ref;
 typedef struct _zend_ast        zend_ast;
 
 typedef int  (*compare_func_t)(const void *, const void *);
+typedef int  (*compare_zval_func_t)(const zval *, const zval *);
 typedef void (*sort_func_t)(void *, size_t, size_t, compare_func_t);
 typedef void (*dtor_func_t)(zval *pDest);
 typedef void (*copy_ctor_func_t)(zval *pElement);
@@ -172,7 +173,10 @@ typedef struct _HashTable {
 	uint32_t          nNumOfElements;
 	uint32_t          nInternalPointer; 
 	zend_long         nNextFreeElement;
-	Bucket           *arData;
+	union {
+		Bucket       *arBucket;
+		zval         *arZval;
+	} data;
 	uint32_t         *arHash;
 	dtor_func_t       pDestructor;
 } HashTable;

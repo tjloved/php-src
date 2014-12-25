@@ -1345,15 +1345,18 @@ static zend_string *php_replace_in_subject(zval *regex, zval *replace, zval *sub
 				 empty_replace;
 	zend_string *result;
 	zend_string	*subject_str = zval_get_string(subject);
-	uint32_t replace_idx;
 
 	/* FIXME: This might need to be changed to STR_EMPTY_ALLOC(). Check if this zval could be dtor()'ed somehow */
 	ZVAL_EMPTY_STRING(&empty_replace);
 	
 	/* If regex is an array */
 	if (Z_TYPE_P(regex) == IS_ARRAY) {
+		HashPosition replace_pos;
+		if (Z_TYPE_P(replace) == IS_ARRAY && !is_callable_replace) {
+			zend_hash_internal_pointer_reset_ex(Z_ARRVAL_P(replace), &replace_pos);
+		}
+
 		replace_value = replace;
-		replace_idx = 0;
 
 		/* For each entry in the regex array, get the entry */
 		ZEND_HASH_FOREACH_VAL(Z_ARRVAL_P(regex), regex_entry) {
@@ -1363,20 +1366,14 @@ static zend_string *php_replace_in_subject(zval *regex, zval *replace, zval *sub
 			/* If replace is an array and not a callable construct */
 			if (Z_TYPE_P(replace) == IS_ARRAY && !is_callable_replace) {
 				/* Get current entry */
-				replace_entry = NULL;
-				while (replace_idx < Z_ARRVAL_P(replace)->nNumUsed) {
-					if (Z_TYPE(Z_ARRVAL_P(replace)->arData[replace_idx].val) != IS_UNUSED) {
-						replace_entry = &Z_ARRVAL_P(replace)->arData[replace_idx].val;
-						break;
-					}
-					replace_idx++;
-				}
+				replace_entry = zend_hash_get_current_data_ex(Z_ARRVAL_P(replace), &replace_pos);
+
 				if (replace_entry != NULL) {
 					if (!is_callable_replace) {
 						convert_to_string_ex(replace_entry);
 					}
 					replace_value = replace_entry;
-					replace_idx++;
+					zend_hash_move_forward_ex(Z_ARRVAL_P(replace), &replace_pos);
 				} else {
 					/* We've run out of replacement strings, so use an empty one */
 					replace_value = &empty_replace;

@@ -520,11 +520,10 @@ static void zend_accel_adjust_fcall_stack_size(zend_op_array *op_array, zend_opt
 
 int zend_accel_script_optimize(zend_persistent_script *script)
 {
-	uint idx, j;
-	Bucket *p, *q;
 	zend_class_entry *ce;
 	zend_op_array *op_array;
 	zend_optimizer_ctx ctx;
+	zend_string *key;
 
 	ctx.arena = zend_arena_create(64 * 1024);
 	ctx.script = script;
@@ -532,64 +531,46 @@ int zend_accel_script_optimize(zend_persistent_script *script)
 
 	zend_accel_optimize(&script->main_op_array, &ctx);
 
-	for (idx = 0; idx < script->function_table.nNumUsed; idx++) {
-		p = script->function_table.arData + idx;
-		if (Z_TYPE(p->val) == IS_UNDEF) continue;
-		op_array = (zend_op_array*)Z_PTR(p->val);
+	ZEND_HASH_FOREACH_PTR(&script->function_table, op_array) {
 		zend_accel_optimize(op_array, &ctx);
-	}
+	} ZEND_HASH_FOREACH_END();
 
-	for (idx = 0; idx < script->class_table.nNumUsed; idx++) {
-		p = script->class_table.arData + idx;
-		if (Z_TYPE(p->val) == IS_UNDEF) continue;
-		ce = (zend_class_entry*)Z_PTR(p->val);
-		for (j = 0; j < ce->function_table.nNumUsed; j++) {
-			q = ce->function_table.arData + j;
-			if (Z_TYPE(q->val) == IS_UNDEF) continue;
-			op_array = (zend_op_array*)Z_PTR(q->val);
+	ZEND_HASH_FOREACH_PTR(&script->class_table, ce) {
+		ZEND_HASH_FOREACH_STR_KEY_PTR(&ce->function_table, key, op_array) {
 			if (op_array->scope == ce) {
 				zend_accel_optimize(op_array, &ctx);
 			} else if (op_array->type == ZEND_USER_FUNCTION) {
 				zend_op_array *orig_op_array;
-				if ((orig_op_array = zend_hash_find_ptr(&op_array->scope->function_table, q->key)) != NULL) {
+				if ((orig_op_array = zend_hash_find_ptr(&op_array->scope->function_table, key)) != NULL) {
 					HashTable *ht = op_array->static_variables;
 					*op_array = *orig_op_array;
 					op_array->static_variables = ht;
 				}
 			}
-		}
-	}
+		} ZEND_HASH_FOREACH_END();
+	} ZEND_HASH_FOREACH_END();
 
 	if (ZEND_OPTIMIZER_PASS_12 & OPTIMIZATION_LEVEL) {
 		zend_accel_adjust_fcall_stack_size(&script->main_op_array, &ctx);
 
-		for (idx = 0; idx < script->function_table.nNumUsed; idx++) {
-			p = script->function_table.arData + idx;
-			if (Z_TYPE(p->val) == IS_UNDEF) continue;
-			op_array = (zend_op_array*)Z_PTR(p->val);
+		ZEND_HASH_FOREACH_PTR(&script->function_table, op_array) {
 			zend_accel_adjust_fcall_stack_size(op_array, &ctx);
-		}
+		} ZEND_HASH_FOREACH_END();
 
-		for (idx = 0; idx < script->class_table.nNumUsed; idx++) {
-			p = script->class_table.arData + idx;
-			if (Z_TYPE(p->val) == IS_UNDEF) continue;
-			ce = (zend_class_entry*)Z_PTR(p->val);
-			for (j = 0; j < ce->function_table.nNumUsed; j++) {
-				q = ce->function_table.arData + j;
-				if (Z_TYPE(q->val) == IS_UNDEF) continue;
-				op_array = (zend_op_array*)Z_PTR(q->val);
+		ZEND_HASH_FOREACH_PTR(&script->class_table, ce) {
+			ZEND_HASH_FOREACH_STR_KEY_PTR(&ce->function_table, key, op_array) {
 				if (op_array->scope == ce) {
 					zend_accel_adjust_fcall_stack_size(op_array, &ctx);
 				} else if (op_array->type == ZEND_USER_FUNCTION) {
 					zend_op_array *orig_op_array;
-					if ((orig_op_array = zend_hash_find_ptr(&op_array->scope->function_table, q->key)) != NULL) {
+					if ((orig_op_array = zend_hash_find_ptr(&op_array->scope->function_table, key)) != NULL) {
 						HashTable *ht = op_array->static_variables;
 						*op_array = *orig_op_array;
 						op_array->static_variables = ht;
 					}
 				}
-			}
-		}
+			} ZEND_HASH_FOREACH_END();
+		} ZEND_HASH_FOREACH_END();
 	}
 
 	if (ctx.constants) {

@@ -37,20 +37,13 @@
 
 static uint zend_obj_num_elements(HashTable *ht)
 {
-	Bucket *p;
-	uint idx;
-	uint num;
-
-	num = ht->nNumOfElements;
-	for (idx = 0; idx < ht->nNumUsed; idx++) {
-		p = ht->arData + idx;
-		if (Z_TYPE(p->val) == IS_UNDEF) continue;
-		if (Z_TYPE(p->val) == IS_INDIRECT) {
-			if (Z_TYPE_P(Z_INDIRECT(p->val)) == IS_UNDEF) {
-				num--;
-			}			
+	zval *val;
+	uint32_t num = ht->nNumOfElements;
+	ZEND_HASH_FOREACH_VAL(ht, val) {
+		if (Z_TYPE_P(val) == IS_INDIRECT && Z_ISUNDEF_P(Z_INDIRECT_P(val))) {
+			num--;
 		}
-	}
+	} ZEND_HASH_FOREACH_END();
 	return num;
 }
 

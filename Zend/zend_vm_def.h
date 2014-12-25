@@ -4726,33 +4726,53 @@ ZEND_VM_HANDLER(77, ZEND_FE_RESET, CONST|TMP|VAR|CV, ANY)
 		HashPosition pos = 0;
 		Bucket *p;
 
-		while (1) {
-			if (pos >= fe_ht->nNumUsed) {
-				is_empty = 1;
+		if (fe_ht->u.flags & HASH_FLAG_PACKED) {
+			if (fe_ht->nNumUsed == 0) {
 				if (OP1_TYPE == IS_VAR && opline->extended_value & ZEND_FE_FETCH_BYREF) {
 					FREE_OP1_VAR_PTR();
 				}
 				ZEND_VM_JMP(OP_JMP_ADDR(opline, opline->op2));
 			}
-			p = fe_ht->arData + pos;
-			if (Z_TYPE(p->val) == IS_UNDEF ||
-			    (Z_TYPE(p->val) == IS_INDIRECT &&
-			     Z_TYPE_P(Z_INDIRECT(p->val)) == IS_UNDEF)) {
+
+			while (1) {
+				zval *zv = &fe_ht->data.arZval[pos];
+				if (!Z_ISUNDEF_P(zv)
+					&& (Z_TYPE_P(zv) != IS_INDIRECT || !Z_ISUNDEF_P(Z_INDIRECT_P(zv)))
+				) {
+					break;
+				}
 				pos++;
-				continue;
 			}
-			if (!ce ||
-			    !p->key ||
-			    zend_check_property_access(Z_OBJ_P(array_ptr), p->key) == SUCCESS) {
-				break;
+			ptr->h = pos;
+			ptr->key = NULL;
+		} else {
+			while (1) {
+				if (pos >= fe_ht->nNumUsed) {
+					if (OP1_TYPE == IS_VAR && opline->extended_value & ZEND_FE_FETCH_BYREF) {
+						FREE_OP1_VAR_PTR();
+					}
+					ZEND_VM_JMP(OP_JMP_ADDR(opline, opline->op2));
+				}
+				p = fe_ht->data.arBucket + pos;
+				if (Z_TYPE(p->val) == IS_UNDEF ||
+					(Z_TYPE(p->val) == IS_INDIRECT &&
+					 Z_TYPE_P(Z_INDIRECT(p->val)) == IS_UNDEF)) {
+					pos++;
+					continue;
+				}
+				if (!ce ||
+					!p->key ||
+					zend_check_property_access(Z_OBJ_P(array_ptr), p->key) == SUCCESS) {
+					break;
+				}
+				pos++;
 			}
-			pos++;
+			ptr->h = fe_ht->data.arBucket[pos].h;
+			ptr->key = fe_ht->data.arBucket[pos].key;
 		}
 		fe_ht->nInternalPointer = pos;
 		ptr->pos = pos;
 		ptr->ht = fe_ht;
-		ptr->h = fe_ht->arData[pos].h;
-		ptr->key = fe_ht->arData[pos].key;
 		is_empty = 0;
 	} else {
 		zend_error(E_WARNING, "Invalid argument supplied for foreach()");
@@ -4811,60 +4831,87 @@ ZEND_VM_HANDLER(78, ZEND_FE_FETCH, VAR, ANY)
 					if (pos == INVALID_IDX) {
 						pos = fe_ht->nInternalPointer;
 						break;
-					} else if (fe_ht->arData[pos].h == ptr->h && fe_ht->arData[pos].key == ptr->key) {
+					} else if (fe_ht->data.arBucket[pos].h == ptr->h
+							   && fe_ht->data.arBucket[pos].key == ptr->key) {
 						break;
 					}
-					pos = Z_NEXT(fe_ht->arData[pos].val);
+					pos = Z_NEXT(fe_ht->data.arBucket[pos].val);
 				}
 			}
 		}
-		while (1) {
-			if (UNEXPECTED(pos >= fe_ht->nNumUsed)) {
-				/* reached end of iteration */
-				ZEND_VM_JMP(OP_JMP_ADDR(opline, opline->op2));
-			}
-			p = fe_ht->arData + pos;
-			value = &p->val;
-			if (UNEXPECTED(Z_TYPE_P(value) == IS_UNDEF)) {
-				pos++;
-				continue;
-			} else if (UNEXPECTED(Z_TYPE_P(value) == IS_INDIRECT)) {
-				value = Z_INDIRECT_P(value);
-				if (UNEXPECTED(Z_TYPE_P(value) == IS_UNDEF)) {
-					pos++;
+		if (fe_ht->u.flags & HASH_FLAG_PACKED) {
+			for (;; pos++) {
+				if (UNEXPECTED(pos >= fe_ht->nNumUsed)) {
+					/* reached end of iteration */
+					ZEND_VM_JMP(OP_JMP_ADDR(opline, opline->op2));
+				}
+				value = &fe_ht->data.arZval[pos];
+				if (UNEXPECTED(Z_ISUNDEF_P(value))
+					|| (UNEXPECTED(Z_TYPE_P(value) == IS_INDIRECT)
+						&& UNEXPECTED(Z_ISUNDEF_P(value = Z_INDIRECT_P(value))))) {
 					continue;
 				}
-			}
-			if (opline->extended_value & ZEND_FE_FETCH_BYREF) {
-				ZVAL_MAKE_REF(value);
-				Z_ADDREF_P(value);
-				ZVAL_REF(EX_VAR(opline->result.var), Z_REF_P(value));
-			} else {
-				ZVAL_COPY(EX_VAR(opline->result.var), value);
-			}
-			if (opline->extended_value & ZEND_FE_FETCH_WITH_KEY) {
-				if (!p->key) {
-					ZVAL_LONG(EX_VAR((opline+1)->result.var), p->h);
-				} else {
-					ZVAL_STR_COPY(EX_VAR((opline+1)->result.var), p->key);
+				if (opline->extended_value & ZEND_FE_FETCH_WITH_KEY) {
+					ZVAL_LONG(EX_VAR((opline+1)->result.var), pos);
 				}
+				break;
 			}
-			break;
+		} else {
+			for (;; pos++) {
+				if (UNEXPECTED(pos >= fe_ht->nNumUsed)) {
+					/* reached end of iteration */
+					ZEND_VM_JMP(OP_JMP_ADDR(opline, opline->op2));
+				}
+				p = &fe_ht->data.arBucket[pos];
+				value = &p->val;
+				if (UNEXPECTED(Z_ISUNDEF_P(value))
+					|| (UNEXPECTED(Z_TYPE_P(value) == IS_INDIRECT)
+						&& UNEXPECTED(Z_ISUNDEF_P(value = Z_INDIRECT_P(value))))) {
+					continue;
+				}
+				if (opline->extended_value & ZEND_FE_FETCH_WITH_KEY) {
+					if (!p->key) {
+						ZVAL_LONG(EX_VAR((opline+1)->result.var), p->h);
+					} else {
+						ZVAL_STR_COPY(EX_VAR((opline+1)->result.var), p->key);
+					}
+				}
+				break;
+			}
 		}
-		do {
-			pos++;
-			if (pos >= fe_ht->nNumUsed) {
-				fe_ht->nInternalPointer = ptr->pos = INVALID_IDX;
-				ZEND_VM_INC_OPCODE();
-				ZEND_VM_NEXT_OPCODE();
-			}
-			p = fe_ht->arData + pos;
-		} while (Z_TYPE(p->val) == IS_UNDEF ||
-			     (Z_TYPE(p->val) == IS_INDIRECT &&
-			      Z_TYPE_P(Z_INDIRECT(p->val)) == IS_UNDEF));
+		if (opline->extended_value & ZEND_FE_FETCH_BYREF) {
+			ZVAL_MAKE_REF(value);
+			Z_ADDREF_P(value);
+			ZVAL_REF(EX_VAR(opline->result.var), Z_REF_P(value));
+		} else {
+			ZVAL_COPY(EX_VAR(opline->result.var), value);
+		}
+		if (fe_ht->u.flags & HASH_FLAG_PACKED) {
+			do {
+				if (++pos >= fe_ht->nNumUsed) {
+					fe_ht->nInternalPointer = ptr->pos = INVALID_IDX;
+					ZEND_VM_INC_OPCODE();
+					ZEND_VM_NEXT_OPCODE();
+				}
+				value = &fe_ht->data.arZval[pos];
+			} while (Z_ISUNDEF_P(value) ||
+					 (Z_TYPE_P(value) == IS_INDIRECT && Z_ISUNDEF_P(Z_INDIRECT_P(value))));
+			ptr->h = pos;
+			ptr->key = NULL;
+		} else {
+			do {
+				if (++pos >= fe_ht->nNumUsed) {
+					fe_ht->nInternalPointer = ptr->pos = INVALID_IDX;
+					ZEND_VM_INC_OPCODE();
+					ZEND_VM_NEXT_OPCODE();
+				}
+				value = &fe_ht->data.arBucket[pos].val;
+			} while (Z_ISUNDEF_P(value) ||
+					 (Z_TYPE_P(value) == IS_INDIRECT && Z_ISUNDEF_P(Z_INDIRECT_P(value))));
+			ptr->h = fe_ht->data.arBucket[pos].h;
+			ptr->key = fe_ht->data.arBucket[pos].key;
+		}
 		fe_ht->nInternalPointer = ptr->pos = pos;
-		ptr->h = fe_ht->arData[pos].h;
-		ptr->key = fe_ht->arData[pos].key;
 		ZEND_VM_INC_OPCODE();
 		ZEND_VM_NEXT_OPCODE();
 	} else if (EXPECTED(Z_TYPE_P(array) == IS_OBJECT)) {
@@ -4877,6 +4924,10 @@ ZEND_VM_HANDLER(78, ZEND_FE_FETCH, VAR, ANY)
  			fe_ht = Z_OBJPROP_P(array);
 			ptr = (HashPointer*)EX_VAR((opline+1)->op1.var);
 			pos = ptr->pos;
+			if (fe_ht->u.flags & HASH_FLAG_PACKED) {
+				/* Don't deal with the unlikely case of a packed object hash */
+				zend_hash_packed_to_hash(fe_ht);
+			}
 			if (pos == INVALID_IDX) {
 				/* reached end of iteration */
 				ZEND_VM_JMP(OP_JMP_ADDR(opline, opline->op2));
@@ -4884,19 +4935,16 @@ ZEND_VM_HANDLER(78, ZEND_FE_FETCH, VAR, ANY)
 				ptr->ht = fe_ht;
 				pos = 0;
 			} else if (UNEXPECTED(fe_ht->nInternalPointer != ptr->pos)) {
-				if (fe_ht->u.flags & HASH_FLAG_PACKED) {
-					pos = ptr->h;
-				} else {
-					pos = fe_ht->arHash[ptr->h & fe_ht->nTableMask];
-					while (1) {
-						if (pos == INVALID_IDX) {
-							pos = fe_ht->nInternalPointer;
-							break;
-						} else if (fe_ht->arData[pos].h == ptr->h && fe_ht->arData[pos].key == ptr->key) {
-							break;
-						}
-						pos = Z_NEXT(fe_ht->arData[pos].val);
+				pos = fe_ht->arHash[ptr->h & fe_ht->nTableMask];
+				while (1) {
+					if (pos == INVALID_IDX) {
+						pos = fe_ht->nInternalPointer;
+						break;
+					} else if (fe_ht->data.arBucket[pos].h == ptr->h
+							   && fe_ht->data.arBucket[pos].key == ptr->key) {
+						break;
 					}
+					pos = Z_NEXT(fe_ht->data.arBucket[pos].val);
 				}
 			}
 			while (1) {
@@ -4905,7 +4953,7 @@ ZEND_VM_HANDLER(78, ZEND_FE_FETCH, VAR, ANY)
 					ZEND_VM_JMP(OP_JMP_ADDR(opline, opline->op2));
 				}
 
-				p = fe_ht->arData + pos;
+				p = fe_ht->data.arBucket + pos;
 				value = &p->val;
 				if (UNEXPECTED(Z_TYPE_P(value) == IS_UNDEF)) {
 					pos++;
@@ -4953,15 +5001,15 @@ ZEND_VM_HANDLER(78, ZEND_FE_FETCH, VAR, ANY)
 					ZEND_VM_INC_OPCODE();
 					ZEND_VM_NEXT_OPCODE();
 				}
-				p = fe_ht->arData + pos;
+				p = fe_ht->data.arBucket + pos;
 			} while (Z_TYPE(p->val) == IS_UNDEF ||
 				     (Z_TYPE(p->val) == IS_INDIRECT &&
 				      Z_TYPE_P(Z_INDIRECT(p->val)) == IS_UNDEF) ||
 				     (EXPECTED(p->key != NULL) &&
 				      zend_check_property_access(zobj, p->key) == FAILURE));
 			fe_ht->nInternalPointer = ptr->pos = pos;
-			ptr->h = fe_ht->arData[pos].h;
-			ptr->key = fe_ht->arData[pos].key;
+			ptr->h = fe_ht->data.arBucket[pos].h;
+			ptr->key = fe_ht->data.arBucket[pos].key;
 			ZEND_VM_INC_OPCODE();
 			ZEND_VM_NEXT_OPCODE();
 		} else {
@@ -6161,11 +6209,13 @@ ZEND_VM_HANDLER(168, ZEND_BIND_GLOBAL, CV, CONST)
 
 	SAVE_OPLINE();
 	varname = GET_OP2_ZVAL_PTR(BP_VAR_R);
+
+	ZEND_ASSERT(!(EG(symbol_table).ht.u.flags & HASH_FLAG_PACKED));
 	
 	/* We store "hash slot index" + 1 (NULL is a mark of uninitialized cache slot) */
 	idx = (uint32_t)(uintptr_t)CACHED_PTR(Z_CACHE_SLOT_P(varname)) - 1;
 	if (EXPECTED(idx < EG(symbol_table).ht.nNumUsed)) {
-		Bucket *p = EG(symbol_table).ht.arData + idx; 
+		Bucket *p = EG(symbol_table).ht.data.arBucket + idx; 
 
 		if (EXPECTED(Z_TYPE(p->val) != IS_UNDEF) &&
 	        (EXPECTED(p->key == Z_STR_P(varname)) ||
@@ -6174,7 +6224,7 @@ ZEND_VM_HANDLER(168, ZEND_BIND_GLOBAL, CV, CONST)
 	          EXPECTED(p->key->len == Z_STRLEN_P(varname)) &&
 	          EXPECTED(memcmp(p->key->val, Z_STRVAL_P(varname), Z_STRLEN_P(varname)) == 0)))) {
 	
-			value = &EG(symbol_table).ht.arData[idx].val;
+			value = &EG(symbol_table).ht.data.arBucket[idx].val;
 			ZEND_VM_C_GOTO(check_indirect);
 		}
 	}
@@ -6182,11 +6232,11 @@ ZEND_VM_HANDLER(168, ZEND_BIND_GLOBAL, CV, CONST)
 	value = zend_hash_find(&EG(symbol_table).ht, Z_STR_P(varname));
 	if (UNEXPECTED(value == NULL)) {
 		value = zend_hash_add_new(&EG(symbol_table).ht, Z_STR_P(varname), &EG(uninitialized_zval));
-		idx = ((char*)value - (char*)EG(symbol_table).ht.arData) / sizeof(Bucket);
+		idx = ((char*)value - (char*)EG(symbol_table).ht.data.arBucket) / sizeof(Bucket);
 		/* Store "hash slot index" + 1 (NULL is a mark of uninitialized cache slot) */
 		CACHE_PTR(Z_CACHE_SLOT_P(varname), (void*)(uintptr_t)(idx + 1));
 	} else {
-		idx = ((char*)value - (char*)EG(symbol_table).ht.arData) / sizeof(Bucket);
+		idx = ((char*)value - (char*)EG(symbol_table).ht.data.arBucket) / sizeof(Bucket);
 		/* Store "hash slot index" + 1 (NULL is a mark of uninitialized cache slot) */
 		CACHE_PTR(Z_CACHE_SLOT_P(varname), (void*)(uintptr_t)(idx + 1));
 ZEND_VM_C_LABEL(check_indirect):

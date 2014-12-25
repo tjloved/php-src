@@ -110,9 +110,13 @@ static void spl_array_rewind(spl_array_object *intern);
 
 static void spl_array_update_pos(HashTable *ht, spl_array_object* intern) /* {{{ */
 {
-	uint pos = intern->pos;
+	uint32_t pos = intern->pos;
 	if (pos != INVALID_IDX) {
-		intern->pos_h = ht->arData[pos].h;
+		if (ht->u.flags & HASH_FLAG_PACKED) {
+			intern->pos_h = pos;
+		} else {
+			intern->pos_h = ht->data.arBucket[pos].h;
+		}
 	}
 } /* }}} */
 
@@ -130,7 +134,7 @@ SPL_API int spl_hash_verify_pos_ex(spl_array_object * intern, HashTable * ht) /*
 
 /*	HASH_PROTECT_RECURSION(ht);*/
 	if (ht->u.flags & HASH_FLAG_PACKED) {
-		if (intern->pos_h == intern->pos && Z_TYPE(ht->arData[intern->pos_h].val) != IS_UNDEF) {
+		if (intern->pos_h == intern->pos && !Z_ISUNDEF(ht->data.arZval[intern->pos_h])) {
 			return SUCCESS;
 		}
 	} else {
@@ -139,7 +143,7 @@ SPL_API int spl_hash_verify_pos_ex(spl_array_object * intern, HashTable * ht) /*
 			if (idx == intern->pos) {
 				return SUCCESS;
 			}
-			idx = Z_NEXT(ht->arData[idx].val);
+			idx = Z_NEXT(ht->data.arBucket[idx].val);
 		}
 	}
 /*	HASH_UNPROTECT_RECURSION(ht); */
@@ -785,8 +789,14 @@ void spl_array_iterator_append(zval *object, zval *append_value) /* {{{ */
 
 	spl_array_write_dimension(object, NULL, append_value);
 	if (intern->pos == INVALID_IDX) {
-		if (aht->nNumUsed && !Z_ISUNDEF(aht->arData[aht->nNumUsed-1].val)) {
-			spl_array_set_pos(intern, aht, aht->nNumUsed - 1);
+		if (aht->u.flags & HASH_FLAG_PACKED) {
+			if (aht->nNumUsed && !Z_ISUNDEF(aht->data.arZval[aht->nNumUsed-1])) {
+				spl_array_set_pos(intern, aht, aht->nNumUsed - 1);
+			}
+		} else {
+			if (aht->nNumUsed && !Z_ISUNDEF(aht->data.arBucket[aht->nNumUsed-1].val)) {
+				spl_array_set_pos(intern, aht, aht->nNumUsed - 1);
+			}
 		}
 	}
 } /* }}} */

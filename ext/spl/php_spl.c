@@ -443,10 +443,11 @@ PHP_FUNCTION(spl_autoload_call)
 
 #define HT_MOVE_TAIL_TO_HEAD(ht)						        \
 	do {												        \
-		Bucket tmp = (ht)->arData[(ht)->nNumUsed-1];				\
-		memmove((ht)->arData + 1, (ht)->arData,					\
+		ZEND_ASSERT(!((ht)->u.flags & HASH_FLAG_PACKED));		\
+		Bucket tmp = (ht)->data.arBucket[(ht)->nNumUsed-1];		\
+		memmove((ht)->data.arBucket + 1, (ht)->data.arBucket,	\
 			sizeof(Bucket) * ((ht)->nNumUsed - 1));				\
-		(ht)->arData[0] = tmp;									\
+		(ht)->data.arBucket[0] = tmp;							\
 		zend_hash_rehash(ht);						        	\
 	} while (0)
 

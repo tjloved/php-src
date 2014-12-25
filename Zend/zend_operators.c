@@ -1934,7 +1934,7 @@ ZEND_API int is_identical_function(zval *result, zval *op1, zval *op2) /* {{{ */
 			break;
 		case IS_ARRAY:
 			ZVAL_BOOL(result, Z_ARRVAL_P(op1) == Z_ARRVAL_P(op2) ||
-				zend_hash_compare(Z_ARRVAL_P(op1), Z_ARRVAL_P(op2), (compare_func_t) hash_zval_identical_function, 1)==0);
+				zend_hash_compare(Z_ARRVAL_P(op1), Z_ARRVAL_P(op2), (compare_zval_func_t) hash_zval_identical_function, 1)==0);
 			break;
 		case IS_OBJECT:
 			if (Z_OBJ_HT_P(op1) == Z_OBJ_HT_P(op2)) {
@@ -2576,7 +2576,7 @@ static int hash_zval_compare_function(zval *z1, zval *z2) /* {{{ */
 
 ZEND_API int zend_compare_symbol_tables(HashTable *ht1, HashTable *ht2) /* {{{ */
 {
-	return ht1 == ht2 ? 0 : zend_hash_compare(ht1, ht2, (compare_func_t) hash_zval_compare_function, 0);
+	return ht1 == ht2 ? 0 : zend_hash_compare(ht1, ht2, (compare_zval_func_t) hash_zval_compare_function, 0);
 }
 /* }}} */
 

@@ -51,30 +51,34 @@ static void zend_persist_zval_calc(zval *z);
 
 static void zend_hash_persist_calc(HashTable *ht, void (*pPersistElement)(zval *pElement))
 {
-	uint idx;
-	Bucket *p;
+	uint32_t idx;
 
 	if (!(ht->u.flags & HASH_FLAG_INITIALIZED)) {
 		return;
 	}
-	if (ht->u.flags & HASH_FLAG_PACKED) {
-		ADD_SIZE(sizeof(Bucket) * ht->nNumUsed);
+
+	if (zend_hash_is_packed(ht)) {
+		ADD_SIZE(sizeof(zval) * ht->nNumUsed);
+		for (idx = 0; idx < ht->nNumUsed; idx++) {
+			zval *zv = &ht->data.arZval[idx];
+			if (Z_ISUNDEF_P(zv)) continue;
+			pPersistElement(zv);
+		}
 	} else {
 		ADD_SIZE(sizeof(Bucket) * ht->nNumUsed + sizeof(uint32_t) * ht->nTableSize);
-	}
+		for (idx = 0; idx < ht->nNumUsed; idx++) {
+			Bucket *p = &ht->data.arBucket[idx];
+			if (Z_ISUNDEF(p->val)) continue;
 
-	for (idx = 0; idx < ht->nNumUsed; idx++) {
-		p = ht->arData + idx;
-		if (Z_TYPE(p->val) == IS_UNDEF) continue;
+			/* persist bucket and key */
+			if (p->key) {
+				zend_uchar flags = GC_FLAGS(p->key) & ~(IS_STR_PERSISTENT | IS_STR_INTERNED | IS_STR_PERMANENT);
+				ADD_INTERNED_STRING(p->key, 1);
+				GC_FLAGS(p->key) |= flags;
+			}
 
-		/* persist bucket and key */
-		if (p->key) {
-			zend_uchar flags = GC_FLAGS(p->key) & ~ (IS_STR_PERSISTENT | IS_STR_INTERNED | IS_STR_PERMANENT);
-			ADD_INTERNED_STRING(p->key, 1);
-			GC_FLAGS(p->key) |= flags;
+			pPersistElement(&p->val);
 		}
-
-		pPersistElement(&p->val);
 	}
 }
 

@@ -291,18 +291,17 @@ static zend_ast *zend_ast_clone(zend_ast *ast)
 
 static void zend_hash_clone_zval(HashTable *ht, HashTable *source, int bind)
 {
-	uint idx;
-	Bucket *p, *q, *r;
+	uint32_t idx;
+	Bucket *q;
 	zend_ulong nIndex;
 
 	ht->nTableSize = source->nTableSize;
 	ht->nTableMask = source->nTableMask;
-	ht->nNumUsed = 0;
 	ht->nNumOfElements = source->nNumOfElements;
 	ht->nNextFreeElement = source->nNextFreeElement;
 	ht->pDestructor = ZVAL_PTR_DTOR;
 	ht->u.flags = (source->u.flags & HASH_FLAG_INITIALIZED) | HASH_FLAG_APPLY_PROTECTION;
-	ht->arData = NULL;
+	ht->data.arBucket = NULL;
 	ht->arHash = NULL;
 	ht->nInternalPointer = source->nNumOfElements ? 0 : INVALID_IDX;
 
@@ -311,44 +310,37 @@ static void zend_hash_clone_zval(HashTable *ht, HashTable *source, int bind)
 		return;
 	}
 
-	if (source->u.flags & HASH_FLAG_PACKED) {
+	if (zend_hash_is_packed(source)) {
 		ht->u.flags |= HASH_FLAG_PACKED;
-		ht->arData = (Bucket *) emalloc(ht->nTableSize * sizeof(Bucket));
-		ht->arHash = (uint32_t*)&uninitialized_bucket;
+		ht->data.arZval = emalloc(ht->nTableSize * sizeof(zval));
+		ht->arHash = (uint32_t*) &uninitialized_bucket;
+		ht->nNumUsed = source->nNumUsed;
 	
 		for (idx = 0; idx < source->nNumUsed; idx++) {
-			p = source->arData + idx;
-			if (Z_TYPE(p->val) == IS_UNDEF) continue;
-			nIndex = p->h & ht->nTableMask;
-
-			r = ht->arData + ht->nNumUsed;
-			q = ht->arData + p->h;
-			while (r != q) {
-				ZVAL_UNDEF(&r->val);
-				r++;
+			zval *zv_source = &source->data.arZval[idx];
+			zval *zv_target = &ht->data.arZval[idx];
+			if (Z_ISUNDEF_P(zv_source)) {
+				ZVAL_UNDEF(zv_target);
+				continue;
 			}
-			ht->nNumUsed = p->h + 1;
-
-			/* Initialize key */
-			q->h = p->h;
-			q->key = NULL;
 
 			/* Copy data */
-			ZVAL_COPY_VALUE(&q->val, &p->val);
-			zend_clone_zval(&q->val, bind);
+			ZVAL_COPY_VALUE(zv_target, zv_source);
+			zend_clone_zval(zv_target, bind);
 		}
 	} else {
-		ht->arData = (Bucket *) emalloc(ht->nTableSize * (sizeof(Bucket) + sizeof(uint32_t)));
-		ht->arHash = (uint32_t*)(ht->arData + ht->nTableSize);
+		ht->data.arBucket = (Bucket *) emalloc(ht->nTableSize * (sizeof(Bucket) + sizeof(uint32_t)));
+		ht->arHash = (uint32_t*) (ht->data.arBucket + ht->nTableSize);
 		memset(ht->arHash, INVALID_IDX, sizeof(uint32_t) * ht->nTableSize);
+		ht->nNumUsed = 0;
 	
 		for (idx = 0; idx < source->nNumUsed; idx++) {
-			p = source->arData + idx;
+			Bucket *p = &source->data.arBucket[idx];
 			if (Z_TYPE(p->val) == IS_UNDEF) continue;
 			nIndex = p->h & ht->nTableMask;
 
 			/* Insert into hash collision list */
-			q = ht->arData + ht->nNumUsed;
+			q = &ht->data.arBucket[ht->nNumUsed];
 			Z_NEXT(q->val) = ht->arHash[nIndex];
 			ht->arHash[nIndex] = ht->nNumUsed++;
 
@@ -390,19 +382,19 @@ static void zend_hash_clone_methods(HashTable *ht, HashTable *source, zend_class
 		return;
 	}
 
-	ZEND_ASSERT(!(source->u.flags & HASH_FLAG_PACKED));
-	ht->arData = (Bucket *) emalloc(ht->nTableSize * (sizeof(Bucket) + sizeof(uint32_t)));
-	ht->arHash = (uint32_t *)(ht->arData + ht->nTableSize);
+	ZEND_ASSERT(!zend_hash_is_packed(source));
+	ht->data.arBucket = (Bucket *) emalloc(ht->nTableSize * (sizeof(Bucket) + sizeof(uint32_t)));
+	ht->arHash = (uint32_t *)(ht->data.arBucket + ht->nTableSize);
 	memset(ht->arHash, INVALID_IDX, sizeof(uint32_t) * ht->nTableSize);
 
 	for (idx = 0; idx < source->nNumUsed; idx++) {		
-		p = source->arData + idx;
+		p = source->data.arBucket + idx;
 		if (Z_TYPE(p->val) == IS_UNDEF) continue;
 
 		nIndex = p->h & ht->nTableMask;
 
 		/* Insert into hash collision list */
-		q = ht->arData + ht->nNumUsed;
+		q = ht->data.arBucket + ht->nNumUsed;
 		Z_NEXT(q->val) = ht->arHash[nIndex];
 		ht->arHash[nIndex] = ht->nNumUsed++;
 
@@ -466,19 +458,19 @@ static void zend_hash_clone_prop_info(HashTable *ht, HashTable *source, zend_cla
 		return;
 	}
 
-	ZEND_ASSERT(!(source->u.flags & HASH_FLAG_PACKED));
-	ht->arData = (Bucket *) emalloc(ht->nTableSize * (sizeof(Bucket) + sizeof(uint32_t)));
-	ht->arHash = (uint32_t*)(ht->arData + ht->nTableSize);
+	ZEND_ASSERT(!zend_hash_is_packed(source));
+	ht->data.arBucket = (Bucket *) emalloc(ht->nTableSize * (sizeof(Bucket) + sizeof(uint32_t)));
+	ht->arHash = (uint32_t*)(ht->data.arBucket + ht->nTableSize);
 	memset(ht->arHash, INVALID_IDX, sizeof(uint32_t) * ht->nTableSize);
 
 	for (idx = 0; idx < source->nNumUsed; idx++) {		
-		p = source->arData + idx;
+		p = source->data.arBucket + idx;
 		if (Z_TYPE(p->val) == IS_UNDEF) continue;
 
 		nIndex = p->h & ht->nTableMask;
 
 		/* Insert into hash collision list */
-		q = ht->arData + ht->nNumUsed;
+		q = ht->data.arBucket + ht->nNumUsed;
 		Z_NEXT(q->val) = ht->arHash[nIndex];
 		ht->arHash[nIndex] = ht->nNumUsed++;
 
@@ -716,8 +708,9 @@ static void zend_accel_function_hash_copy(HashTable *target, HashTable *source, 
 	Bucket *p;
 	zval *t;
 
+	ZEND_ASSERT(!zend_hash_is_packed(source));
 	for (idx = 0; idx < source->nNumUsed; idx++) {		
-		p = source->arData + idx;
+		p = source->data.arBucket + idx;
 		if (Z_TYPE(p->val) == IS_UNDEF) continue;
 		if (p->key) {
 			t = zend_hash_add(target, p->key, &p->val);
@@ -769,8 +762,9 @@ static void zend_accel_class_hash_copy(HashTable *target, HashTable *source, uni
 	Bucket *p;
 	zval *t;
 
+	ZEND_ASSERT(!zend_hash_is_packed(source));
 	for (idx = 0; idx < source->nNumUsed; idx++) {		
-		p = source->arData + idx;
+		p = source->data.arBucket + idx;
 		if (Z_TYPE(p->val) == IS_UNDEF) continue;
 		if (p->key) {
 			t = zend_hash_add(target, p->key, &p->val);

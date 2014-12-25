@@ -51,8 +51,8 @@ void zend_interned_strings_init(void)
 	zend_hash_init(&CG(interned_strings), 1024, NULL, _str_dtor, 1);
 	
 	CG(interned_strings).nTableMask = CG(interned_strings).nTableSize - 1;
-	CG(interned_strings).arData = (Bucket*) pecalloc(CG(interned_strings).nTableSize, sizeof(Bucket), 1);
-	CG(interned_strings).arHash = (uint32_t*) pecalloc(CG(interned_strings).nTableSize, sizeof(uint32_t), 1);
+	CG(interned_strings).data.arBucket = pecalloc(CG(interned_strings).nTableSize, sizeof(Bucket), 1);
+	CG(interned_strings).arHash = pecalloc(CG(interned_strings).nTableSize, sizeof(uint32_t), 1);
 	memset(CG(interned_strings).arHash, INVALID_IDX, CG(interned_strings).nTableSize * sizeof(uint32_t));
 
 	/* interned empty string */
@@ -92,7 +92,7 @@ static zend_string *zend_new_interned_string_int(zend_string *str)
 	nIndex = h & CG(interned_strings).nTableMask;
 	idx = CG(interned_strings).arHash[nIndex];
 	while (idx != INVALID_IDX) {
-		p = CG(interned_strings).arData + idx;
+		p = CG(interned_strings).data.arBucket + idx;
 		if ((p->h == h) && (p->key->len == str->len)) {
 			if (!memcmp(p->key->val, str->val, str->len)) {
 				zend_string_release(str);
@@ -107,12 +107,12 @@ static zend_string *zend_new_interned_string_int(zend_string *str)
 
 	if (CG(interned_strings).nNumUsed >= CG(interned_strings).nTableSize) {
 		if ((CG(interned_strings).nTableSize << 1) > 0) {	/* Let's double the table size */
-			Bucket *d = (Bucket *) perealloc_recoverable(CG(interned_strings).arData, (CG(interned_strings).nTableSize << 1) * sizeof(Bucket), 1);
+			Bucket *d = (Bucket *) perealloc_recoverable(CG(interned_strings).data.arBucket, (CG(interned_strings).nTableSize << 1) * sizeof(Bucket), 1);
 			uint32_t *h = (uint32_t *) perealloc_recoverable(CG(interned_strings).arHash, (CG(interned_strings).nTableSize << 1) * sizeof(uint32_t), 1);
 
 			if (d && h) {
 				HANDLE_BLOCK_INTERRUPTIONS();
-				CG(interned_strings).arData = d;
+				CG(interned_strings).data.arBucket = d;
 				CG(interned_strings).arHash = h;
 				CG(interned_strings).nTableSize = (CG(interned_strings).nTableSize << 1);
 				CG(interned_strings).nTableMask = CG(interned_strings).nTableSize - 1;
@@ -126,7 +126,7 @@ static zend_string *zend_new_interned_string_int(zend_string *str)
 	
 	idx = CG(interned_strings).nNumUsed++;
 	CG(interned_strings).nNumOfElements++;
-	p = CG(interned_strings).arData + idx;
+	p = CG(interned_strings).data.arBucket + idx;
 	p->h = h;
 	p->key = str;
 	Z_STR(p->val) = str;
@@ -152,7 +152,7 @@ static void zend_interned_strings_snapshot_int(void)
 	idx = CG(interned_strings).nNumUsed;
 	while (idx > 0) {
 		idx--;
-		p = CG(interned_strings).arData + idx;
+		p = CG(interned_strings).data.arBucket + idx;
 		ZEND_ASSERT(GC_FLAGS(p->key) & IS_STR_PERSISTENT);
 		GC_FLAGS(p->key) |= IS_STR_PERMANENT;
 	}
@@ -169,7 +169,7 @@ static void zend_interned_strings_restore_int(void)
 	idx = CG(interned_strings).nNumUsed;
 	while (idx > 0) {
 		idx--;
-		p = CG(interned_strings).arData + idx;
+		p = CG(interned_strings).data.arBucket + idx;
 		if (GC_FLAGS(p->key) & IS_STR_PERMANENT) break;
 		CG(interned_strings).nNumUsed--;
 		CG(interned_strings).nNumOfElements--;
@@ -183,10 +183,10 @@ static void zend_interned_strings_restore_int(void)
 			CG(interned_strings).arHash[nIndex] = Z_NEXT(p->val);
 		} else {
 			uint prev = CG(interned_strings).arHash[nIndex];
-			while (Z_NEXT(CG(interned_strings).arData[prev].val) != idx) {
-				prev = Z_NEXT(CG(interned_strings).arData[prev].val);
+			while (Z_NEXT(CG(interned_strings).data.arBucket[prev].val) != idx) {
+				prev = Z_NEXT(CG(interned_strings).data.arBucket[prev].val);
  			}
-			Z_NEXT(CG(interned_strings).arData[prev].val) = Z_NEXT(p->val);
+			Z_NEXT(CG(interned_strings).data.arBucket[prev].val) = Z_NEXT(p->val);
  		}
  	}
 #endif

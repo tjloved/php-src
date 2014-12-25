@@ -71,74 +71,88 @@ static const uint32_t uninitialized_bucket = {INVALID_IDX};
 
 static void zend_hash_persist(HashTable *ht, zend_persist_func_t pPersistElement)
 {
-	uint idx;
-	Bucket *p;
+	uint32_t idx;
 
 	if (!(ht->u.flags & HASH_FLAG_INITIALIZED)) {
 		ht->arHash = (uint32_t*)&uninitialized_bucket;
 		return;
 	}
-	if (ht->u.flags & HASH_FLAG_PACKED) {
-		zend_accel_store(ht->arData, sizeof(Bucket) * ht->nNumUsed);
+
+	if (zend_hash_is_packed(ht)) {
+		zend_accel_store(ht->data.arZval, sizeof(zval) * ht->nNumUsed);
 		ht->arHash = (uint32_t*)&uninitialized_bucket;
+
+		for (idx = 0; idx < ht->nNumUsed; idx++) {
+			zval *zv = &ht->data.arZval[idx];
+			if (Z_ISUNDEF_P(zv)) continue;
+			pPersistElement(zv);
+		}
 	} else {
 		Bucket *d = (Bucket*)ZCG(mem);
 		uint32_t *h = (uint32_t*)(d + ht->nNumUsed);
 
 		ZCG(mem) = (void*)(h + ht->nTableSize);
-		memcpy(d, ht->arData, sizeof(Bucket) * ht->nNumUsed);
+		memcpy(d, ht->data.arBucket, sizeof(Bucket) * ht->nNumUsed);
 		memcpy(h, ht->arHash, sizeof(uint32_t) * ht->nTableSize);
-		efree(ht->arData);
-		ht->arData = d;
+		efree(ht->data.arBucket);
+		ht->data.arBucket = d;
 		ht->arHash = h;
-	}
-	for (idx = 0; idx < ht->nNumUsed; idx++) {
-		p = ht->arData + idx;
-		if (Z_TYPE(p->val) == IS_UNDEF) continue;
 
-		/* persist bucket and key */
-		if (p->key) {
-			zend_accel_store_interned_string(p->key);
+		for (idx = 0; idx < ht->nNumUsed; idx++) {
+			Bucket *p = &ht->data.arBucket[idx];
+			if (Z_ISUNDEF(p->val)) continue;
+
+			/* persist key */
+			if (p->key) {
+				zend_accel_store_interned_string(p->key);
+			}
+
+			/* persist the data itself */
+			pPersistElement(&p->val);
 		}
-
-		/* persist the data itself */
-		pPersistElement(&p->val);
 	}
 }
 
 static void zend_hash_persist_immutable(HashTable *ht)
 {
-	uint idx;
-	Bucket *p;
+	uint32_t idx;
 
 	if (!(ht->u.flags & HASH_FLAG_INITIALIZED)) {
 		ht->arHash = (uint32_t*)&uninitialized_bucket;
 		return;
 	}
-	if (ht->u.flags & HASH_FLAG_PACKED) {
-		ht->arData = zend_accel_memdup(ht->arData, sizeof(Bucket) * ht->nNumUsed);
+
+	if (zend_hash_is_packed(ht)) {
+		ht->data.arZval = zend_accel_memdup(ht->data.arZval, sizeof(Bucket) * ht->nNumUsed);
 		ht->arHash = (uint32_t*)&uninitialized_bucket;
+
+		for (idx = 0; idx < ht->nNumUsed; idx++) {
+			zval *zv = &ht->data.arZval[idx];
+			if (Z_ISUNDEF_P(zv)) continue;
+			zend_persist_zval_const(zv);
+		}
 	} else {
 		Bucket *d = (Bucket*)ZCG(mem);
 		uint32_t *h = (uint32_t*)(d + ht->nNumUsed);
 
 		ZCG(mem) = (void*)(h + ht->nTableSize);
-		memcpy(d, ht->arData, sizeof(Bucket) * ht->nNumUsed);
+		memcpy(d, ht->data.arBucket, sizeof(Bucket) * ht->nNumUsed);
 		memcpy(h, ht->arHash, sizeof(uint32_t) * ht->nTableSize);
-		ht->arData = d;
+		ht->data.arBucket = d;
 		ht->arHash = h;
-	}
-	for (idx = 0; idx < ht->nNumUsed; idx++) {
-		p = ht->arData + idx;
-		if (Z_TYPE(p->val) == IS_UNDEF) continue;
 
-		/* persist bucket and key */
-		if (p->key) {
-			zend_accel_memdup_interned_string(p->key);
+		for (idx = 0; idx < ht->nNumUsed; idx++) {
+			Bucket *p = &ht->data.arBucket[idx];
+			if (Z_ISUNDEF(p->val)) continue;
+
+			/* persist key */
+			if (p->key) {
+				zend_accel_memdup_interned_string(p->key);
+			}
+
+			/* persist the data itself */
+			zend_persist_zval_const(&p->val);
 		}
-
-		/* persist the data itself */
-		zend_persist_zval_const(&p->val);
 	}
 }
 

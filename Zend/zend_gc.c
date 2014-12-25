@@ -201,7 +201,6 @@ static void gc_scan_black(zend_refcounted *ref)
 {
 	HashTable *ht;
 	uint idx;
-	Bucket *p;
 
 tail_call:
 	ht = NULL;
@@ -263,9 +262,10 @@ tail_call:
 	}
 	if (!ht) return;
 	for (idx = 0; idx < ht->nNumUsed; idx++) {
-		p = ht->arData + idx;
-		if (!Z_REFCOUNTED(p->val)) continue;
-		ref = Z_COUNTED(p->val);
+		zval *val = ht->u.flags & HASH_FLAG_PACKED
+			? &ht->data.arZval[idx] : &ht->data.arBucket[idx].val;
+		if (!Z_REFCOUNTED_P(val)) continue;
+		ref = Z_COUNTED_P(val);
 		if (GC_TYPE(ref) != IS_ARRAY || (zend_array*)ref != &EG(symbol_table)) {
 			GC_REFCOUNT(ref)++;
 		}
@@ -283,7 +283,6 @@ static void gc_mark_grey(zend_refcounted *ref)
 {
     HashTable *ht;
     uint idx;
-	Bucket *p;
 
 tail_call:
 	if (GC_GET_COLOR(GC_INFO(ref)) != GC_GREY) {
@@ -346,9 +345,10 @@ tail_call:
 		}
 		if (!ht) return;
 		for (idx = 0; idx < ht->nNumUsed; idx++) {
-			p = ht->arData + idx;
-			if (!Z_REFCOUNTED(p->val)) continue;
-			ref = Z_COUNTED(p->val);
+			zval *val = ht->u.flags & HASH_FLAG_PACKED
+				? &ht->data.arZval[idx] : &ht->data.arBucket[idx].val;
+			if (!Z_REFCOUNTED_P(val)) continue;
+			ref = Z_COUNTED_P(val);
 			if (GC_TYPE(ref) != IS_ARRAY || ((zend_array*)ref) != &EG(symbol_table)) {
 				GC_REFCOUNT(ref)--;
 			}
@@ -377,7 +377,6 @@ static void gc_scan(zend_refcounted *ref)
 {
     HashTable *ht;
     uint idx;
-	Bucket *p;
 
 tail_call:	
 	if (GC_GET_COLOR(GC_INFO(ref)) == GC_GREY) {
@@ -435,9 +434,10 @@ tail_call:
 		}
 		if (!ht) return;
 		for (idx = 0; idx < ht->nNumUsed; idx++) {
-			p = ht->arData + idx;
-			if (!Z_REFCOUNTED(p->val)) continue;
-			ref = Z_COUNTED(p->val);
+			zval *val = ht->u.flags & HASH_FLAG_PACKED
+				? &ht->data.arZval[idx] : &ht->data.arBucket[idx].val;
+			if (!Z_REFCOUNTED_P(val)) continue;
+			ref = Z_COUNTED_P(val);
 			if (idx == ht->nNumUsed-1) {
 				goto tail_call;
 			} else {
@@ -462,7 +462,6 @@ static int gc_collect_white(zend_refcounted *ref)
 	int count = 0;
 	HashTable *ht;
 	uint idx;
-	Bucket *p;
 
 tail_call:
 	if (GC_GET_COLOR(GC_INFO(ref)) == GC_WHITE) {
@@ -561,15 +560,16 @@ tail_call:
 
 		if (!ht) return count;
 		for (idx = 0; idx < ht->nNumUsed; idx++) {
-			p = ht->arData + idx;
-			if (!Z_REFCOUNTED(p->val)) {
+			zval *val = ht->u.flags & HASH_FLAG_PACKED
+				? &ht->data.arZval[idx] : &ht->data.arBucket[idx].val;
+			if (!Z_REFCOUNTED_P(val)) {
 				/* count non-refcounted for compatibility ??? */
-				if (Z_TYPE(p->val) != IS_UNDEF && Z_TYPE(p->val) != IS_INDIRECT) {
+				if (Z_TYPE_P(val) != IS_UNDEF && Z_TYPE_P(val) != IS_INDIRECT) {
 					count++;
 				}
 				continue;
 			}
-			ref = Z_COUNTED(p->val);
+			ref = Z_COUNTED_P(val);
 			if (GC_TYPE(ref) != IS_ARRAY || (zend_array*)ref != &EG(symbol_table)) {
 				GC_REFCOUNT(ref)++;
 			}
@@ -643,7 +643,6 @@ static void gc_remove_nested_data_from_buffer(zend_refcounted *ref)
 {
 	HashTable *ht = NULL;
 	uint idx;
-	Bucket *p;
 
 tail_call:
 	if (GC_ADDRESS(GC_INFO(ref)) != 0) {
@@ -694,9 +693,10 @@ tail_call:
 		}
 		if (!ht) return;
 		for (idx = 0; idx < ht->nNumUsed; idx++) {
-			p = ht->arData + idx;
-			if (!Z_REFCOUNTED(p->val)) continue;
-			ref = Z_COUNTED(p->val);
+			zval *val = ht->u.flags & HASH_FLAG_PACKED
+				? &ht->data.arZval[idx] : &ht->data.arBucket[idx].val;
+			if (!Z_REFCOUNTED_P(val)) continue;
+			ref = Z_COUNTED_P(val);
 			if (idx == ht->nNumUsed-1) {
 				goto tail_call;
 			} else {

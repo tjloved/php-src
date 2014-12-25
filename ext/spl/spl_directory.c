@@ -2203,13 +2203,12 @@ static int spl_filesystem_file_is_empty_line(spl_filesystem_object *intern) /* {
 			case IS_ARRAY:
 				if (SPL_HAS_FLAG(intern->flags, SPL_FILE_OBJECT_READ_CSV)
 						&& zend_hash_num_elements(Z_ARRVAL(intern->u.file.current_zval)) == 1) {
-					uint idx = 0;
+					uint32_t idx;
 					zval *first;
-
-					while (Z_ISUNDEF(Z_ARRVAL(intern->u.file.current_zval)->arData[idx].val)) {
-						idx++;
-					}
-					first = &Z_ARRVAL(intern->u.file.current_zval)->arData[idx].val;
+					zend_hash_internal_pointer_reset_ex(
+						Z_ARRVAL(intern->u.file.current_zval), &idx);
+					first = zend_hash_get_current_data_ex(
+						Z_ARRVAL(intern->u.file.current_zval), &idx);
 					return Z_TYPE_P(first) == IS_STRING && Z_STRLEN_P(first) == 0;
 				}
 				return zend_hash_num_elements(Z_ARRVAL(intern->u.file.current_zval)) == 0;
