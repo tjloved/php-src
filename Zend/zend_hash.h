@@ -35,6 +35,7 @@
 #define HASH_ADD_NEXT			(1<<4)
 
 #define INVALID_IDX ((uint32_t) -1)
+#define DELETED_IDX ((uint32_t) -2)
 
 #define HASH_FLAG_PERSISTENT       (1<<0)
 #define HASH_FLAG_APPLY_PROTECTION (1<<1)
