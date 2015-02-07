@@ -89,10 +89,10 @@ static void zend_hash_do_resize(HashTable *ht);
 			(ht)->arData = (Bucket *) safe_pemalloc((ht)->nTableSize, sizeof(Bucket), 0, (ht)->u.flags & HASH_FLAG_PERSISTENT); \
 		} else { \
 			(ht)->u.flags |= HASH_FLAG_INITIALIZED; \
-			(ht)->nTableMask = (ht)->nTableSize - 1; \
-			(ht)->arData = (Bucket *) safe_pemalloc((ht)->nTableSize, sizeof(Bucket) + sizeof(uint32_t), 0, (ht)->u.flags & HASH_FLAG_PERSISTENT); \
+			(ht)->nTableMask = 2 * (ht)->nTableSize - 1; \
+			(ht)->arData = (Bucket *) safe_pemalloc((ht)->nTableSize, sizeof(Bucket) + 2 * sizeof(uint32_t), 0, (ht)->u.flags & HASH_FLAG_PERSISTENT); \
 			(ht)->arHash = (uint32_t*)((ht)->arData + (ht)->nTableSize); \
-			memset((ht)->arHash, INVALID_IDX, (ht)->nTableSize * sizeof(uint32_t)); \
+			memset((ht)->arHash, INVALID_IDX, 2 * (ht)->nTableSize * sizeof(uint32_t)); \
 		} \
 	} \
 } while (0)
@@ -158,8 +158,8 @@ ZEND_API void zend_hash_packed_to_hash(HashTable *ht)
 {
 	HANDLE_BLOCK_INTERRUPTIONS();
 	ht->u.flags &= ~HASH_FLAG_PACKED;
-	ht->nTableMask = ht->nTableSize - 1;
-	ht->arData = (Bucket *) safe_perealloc(ht->arData, ht->nTableSize, sizeof(Bucket) + sizeof(uint32_t), 0, ht->u.flags & HASH_FLAG_PERSISTENT);
+	ht->nTableMask = 2 * ht->nTableSize - 1;
+	ht->arData = (Bucket *) safe_perealloc(ht->arData, ht->nTableSize, sizeof(Bucket) + 2 * sizeof(uint32_t), 0, ht->u.flags & HASH_FLAG_PERSISTENT);
 	ht->arHash = (uint32_t*)(ht->arData + ht->nTableSize);
 	zend_hash_rehash(ht);
 	HANDLE_UNBLOCK_INTERRUPTIONS();
@@ -570,10 +570,10 @@ static void zend_hash_do_resize(HashTable *ht)
 		HANDLE_UNBLOCK_INTERRUPTIONS();
 	} else if ((ht->nTableSize << 1) > 0) {	/* Let's double the table size */
 		HANDLE_BLOCK_INTERRUPTIONS();
-		ht->arData = (Bucket *) safe_perealloc(ht->arData, (ht->nTableSize << 1), sizeof(Bucket) + sizeof(uint32_t), 0, ht->u.flags & HASH_FLAG_PERSISTENT);
+		ht->arData = (Bucket *) safe_perealloc(ht->arData, ht->nTableSize << 1, sizeof(Bucket) + 2* sizeof(uint32_t), 0, ht->u.flags & HASH_FLAG_PERSISTENT);
 		ht->arHash = (uint32_t*)(ht->arData + (ht->nTableSize << 1));
 		ht->nTableSize = (ht->nTableSize << 1);
-		ht->nTableMask = ht->nTableSize - 1;
+		ht->nTableMask = 2 * ht->nTableSize - 1;
 		zend_hash_rehash(ht);
 		HANDLE_UNBLOCK_INTERRUPTIONS();
 	}
@@ -588,12 +588,12 @@ ZEND_API int zend_hash_rehash(HashTable *ht)
 
 	if (UNEXPECTED(ht->nNumOfElements == 0)) {
 		if (ht->u.flags & HASH_FLAG_INITIALIZED) {
-			memset(ht->arHash, INVALID_IDX, ht->nTableSize * sizeof(uint32_t));
+			memset(ht->arHash, INVALID_IDX, 2 * ht->nTableSize * sizeof(uint32_t));
 		}
 		return SUCCESS;
 	}
 
-	memset(ht->arHash, INVALID_IDX, ht->nTableSize * sizeof(uint32_t));
+	memset(ht->arHash, INVALID_IDX, 2 * ht->nTableSize * sizeof(uint32_t));
 	for (i = 0, j = 0; i < ht->nNumUsed; i++) {
 		p = ht->arData + i;
 		if (Z_TYPE(p->val) == IS_UNDEF) continue;
@@ -979,7 +979,7 @@ ZEND_API void zend_hash_clean(HashTable *ht)
 			}
 		}
 		if (!(ht->u.flags & HASH_FLAG_PACKED)) {
-			memset(ht->arHash, INVALID_IDX, ht->nTableSize * sizeof(uint32_t));
+			memset(ht->arHash, INVALID_IDX, 2 * ht->nTableSize * sizeof(uint32_t));
 		}
 	}
 	ht->nNumUsed = 0;
@@ -1006,7 +1006,7 @@ ZEND_API void zend_symtable_clean(HashTable *ht)
 			}
 		} while (++p != end);
 		if (!(ht->u.flags & HASH_FLAG_PACKED)) {
-			memset(ht->arHash, INVALID_IDX, ht->nTableSize * sizeof(uint32_t));
+			memset(ht->arHash, INVALID_IDX, 2 * ht->nTableSize * sizeof(uint32_t));
 		}
 	}
 	ht->nNumUsed = 0;
@@ -1289,9 +1289,9 @@ ZEND_API void zend_array_dup(HashTable *target, HashTable *source)
 			}
 		} else {
 			target->nNextFreeElement = source->nNextFreeElement;
-			target->arData = (Bucket *) safe_pemalloc(target->nTableSize, sizeof(Bucket) + sizeof(uint32_t), 0, 0);
+			target->arData = (Bucket *) safe_pemalloc(target->nTableSize, sizeof(Bucket) + 2 * sizeof(uint32_t), 0, 0);
 			target->arHash = (uint32_t*)(target->arData + target->nTableSize);
-			memset(target->arHash, INVALID_IDX, target->nTableSize * sizeof(uint32_t));
+			memset(target->arHash, INVALID_IDX, 2 * target->nTableSize * sizeof(uint32_t));
 
 			for (idx = 0; idx < source->nNumUsed; idx++) {
 				p = source->arData + idx;
