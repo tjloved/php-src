@@ -173,10 +173,10 @@ ZEND_API void zend_hash_internal_pointer_reset_ex(HashTable *ht, HashPosition *p
 ZEND_API void zend_hash_internal_pointer_end_ex(HashTable *ht, HashPosition *pos);
 
 typedef struct _HashPointer {
-	HashPosition  pos;
-	HashTable    *ht;
-	zend_ulong    h;
-	zend_string  *key;
+	HashPosition    pos;
+	uint32_t        h;
+	HashTable      *ht;
+	zend_bucket_key key;
 } HashPointer;
 
 #define zend_hash_has_more_elements(ht) \
@@ -639,6 +639,28 @@ static zend_always_inline void *zend_hash_get_current_data_ptr_ex(HashTable *ht,
 #define zend_hash_get_current_data_ptr(ht) \
 	zend_hash_get_current_data_ptr_ex(ht, &(ht)->nInternalPointer)
 
+static zend_always_inline zend_bool zend_bucket_has_str_key(const Bucket *p) {
+	return (Z_HASH(p->val) & (1 << 31)) != 0;
+}
+
+static zend_always_inline void zend_bucket_set_int_key(Bucket *p, zend_ulong num) {
+	p->key.num = num;
+	Z_HASH(p->val) = num & ~(1 << 31);
+}
+
+#define ZEND_HASH_EXTRACT_KEY(_p, _h, _key) \
+	if (zend_bucket_has_str_key(_p)) { \
+		_key = _p->key.str; \
+		_h = 0; \
+	} else { \
+		_key = NULL; \
+		_h = _p->key.num; \
+	}
+
+#define ZEND_HASH_EXTRACT_NUM_KEY(_p, _h) \
+	ZEND_ASSERT(!zend_bucket_has_str_key(_p)); \
+	_h = _p->key.num; \
+
 #define ZEND_HASH_FOREACH(_ht, indirect) do { \
 		uint _idx; \
 		for (_idx = 0; _idx < (_ht)->nNumUsed; _idx++) { \
@@ -681,58 +703,54 @@ static zend_always_inline void *zend_hash_get_current_data_ptr_ex(HashTable *ht,
 
 #define ZEND_HASH_FOREACH_NUM_KEY(ht, _h) \
 	ZEND_HASH_FOREACH(ht, 0); \
-	_h = _p->h;
+	ZEND_HASH_EXTRACT_NUM_KEY(_p, _h);
 
 #define ZEND_HASH_FOREACH_STR_KEY(ht, _key) \
 	ZEND_HASH_FOREACH(ht, 0); \
-	_key = _p->key;
+	_key = zend_bucket_has_str_key(_p) ? _p->key.str : NULL;
 
 #define ZEND_HASH_FOREACH_KEY(ht, _h, _key) \
 	ZEND_HASH_FOREACH(ht, 0); \
-	_h = _p->h; \
-	_key = _p->key;
+	ZEND_HASH_EXTRACT_KEY(_p, _h, _key);
 
 #define ZEND_HASH_FOREACH_NUM_KEY_VAL(ht, _h, _val) \
 	ZEND_HASH_FOREACH(ht, 0); \
-	_h = _p->h; \
+	ZEND_HASH_EXTRACT_NUM_KEY(_p, _h); \
 	_val = _z;
 
 #define ZEND_HASH_FOREACH_STR_KEY_VAL(ht, _key, _val) \
 	ZEND_HASH_FOREACH(ht, 0); \
-	_key = _p->key; \
+	_key = zend_bucket_has_str_key(_p) ? _p->key.str : NULL; \
 	_val = _z;
 
 #define ZEND_HASH_FOREACH_KEY_VAL(ht, _h, _key, _val) \
 	ZEND_HASH_FOREACH(ht, 0); \
-	_h = _p->h; \
-	_key = _p->key; \
+	ZEND_HASH_EXTRACT_KEY(_p, _h, _key); \
 	_val = _z;
 
 #define ZEND_HASH_FOREACH_STR_KEY_VAL_IND(ht, _key, _val) \
 	ZEND_HASH_FOREACH(ht, 1); \
-	_key = _p->key; \
+	_key = zend_bucket_has_str_key(_p) ? _p->key.str : NULL; \
 	_val = _z;
 
 #define ZEND_HASH_FOREACH_KEY_VAL_IND(ht, _h, _key, _val) \
 	ZEND_HASH_FOREACH(ht, 1); \
-	_h = _p->h; \
-	_key = _p->key; \
+	ZEND_HASH_EXTRACT_KEY(_p, _h, _key); \
 	_val = _z;
 
 #define ZEND_HASH_FOREACH_NUM_KEY_PTR(ht, _h, _ptr) \
 	ZEND_HASH_FOREACH(ht, 0); \
-	_h = _p->h; \
+	ZEND_HASH_EXTRACT_NUM_KEY(_p, _h); \
 	_ptr = Z_PTR_P(_z);
 
 #define ZEND_HASH_FOREACH_STR_KEY_PTR(ht, _key, _ptr) \
 	ZEND_HASH_FOREACH(ht, 0); \
-	_key = _p->key; \
+	_key = zend_bucket_has_str_key(_p) ? _p->key.str : NULL; \
 	_ptr = Z_PTR_P(_z);
 
 #define ZEND_HASH_FOREACH_KEY_PTR(ht, _h, _key, _ptr) \
 	ZEND_HASH_FOREACH(ht, 0); \
-	_h = _p->h; \
-	_key = _p->key; \
+	ZEND_HASH_EXTRACT_KEY(_p, _h, _key); \
 	_ptr = Z_PTR_P(_z);
 
 #define ZEND_HASH_REVERSE_FOREACH_VAL(ht, _val) \
@@ -749,14 +767,12 @@ static zend_always_inline void *zend_hash_get_current_data_ptr_ex(HashTable *ht,
 
 #define ZEND_HASH_REVERSE_FOREACH_KEY_VAL(ht, _h, _key, _val) \
 	ZEND_HASH_REVERSE_FOREACH(ht, 0); \
-	_h = _p->h; \
-	_key = _p->key; \
+	ZEND_HASH_EXTRACT_KEY(_p, _h, _key); \
 	_val = _z;
 
 #define ZEND_HASH_REVERSE_FOREACH_KEY_VAL_IND(ht, _h, _key, _val) \
 	ZEND_HASH_REVERSE_FOREACH(ht, 1); \
-	_h = _p->h; \
-	_key = _p->key; \
+	ZEND_HASH_EXTRACT_KEY(_p, _h, _key); \
 	_val = _z;
 
 #define ZEND_HASH_APPLY_PROTECTION(ht) \
@@ -781,8 +797,7 @@ static zend_always_inline void *zend_hash_get_current_data_ptr_ex(HashTable *ht,
 
 #define ZEND_HASH_FILL_ADD(_val) do { \
 		ZVAL_COPY_VALUE(&__fill_bkt->val, _val); \
-		__fill_bkt->h = (__fill_idx); \
-		__fill_bkt->key = NULL; \
+		zend_bucket_set_int_key(__fill_bkt, __fill_idx); \
 		__fill_bkt++; \
 		__fill_idx++; \
 	} while (0)

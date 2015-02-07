@@ -124,7 +124,7 @@ struct _zval_struct {
 	} u1;
 	union {
 		uint32_t     var_flags;
-		uint32_t     next;                 /* hash collision chain */
+		uint32_t     hash;                 /* truncated hash */
 		uint32_t     cache_slot;           /* literal cache slot */
 		uint32_t     lineno;               /* line number (for ast nodes) */
 		uint32_t     num_args;             /* arguments number for EX(This) */
@@ -146,15 +146,19 @@ struct _zend_refcounted {
 
 struct _zend_string {
 	zend_refcounted   gc;
-	zend_ulong        h;                /* hash value */
 	size_t            len;
+	uint32_t          h;                /* hash value */
 	char              val[1];
 };
 
+typedef union _zend_bucket_key {
+	zend_ulong   num;
+	zend_string *str;
+} zend_bucket_key;
+
 typedef struct _Bucket {
-	zval              val;
-	zend_ulong        h;                /* hash value (or numeric index)   */
-	zend_string      *key;              /* string key or NULL for numerics */
+	zval            val;
+	zend_bucket_key key;
 } Bucket;
 
 typedef struct _HashTable {
@@ -254,8 +258,8 @@ static zend_always_inline zend_uchar zval_get_type(const zval* pz) {
 #define Z_TYPE_INFO(zval)			(zval).u1.type_info
 #define Z_TYPE_INFO_P(zval_p)		Z_TYPE_INFO(*(zval_p))
 
-#define Z_NEXT(zval)				(zval).u2.next
-#define Z_NEXT_P(zval_p)			Z_NEXT(*(zval_p))
+#define Z_HASH(zval)				(zval).u2.hash
+#define Z_HASH_P(zval_p)			Z_HASH(*(zval_p))
 
 #define Z_CACHE_SLOT(zval)			(zval).u2.cache_slot
 #define Z_CACHE_SLOT_P(zval_p)		Z_CACHE_SLOT(*(zval_p))

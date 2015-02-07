@@ -112,7 +112,7 @@ static void spl_array_update_pos(HashTable *ht, spl_array_object* intern) /* {{{
 {
 	uint pos = intern->pos;
 	if (pos != INVALID_IDX) {
-		intern->pos_h = ht->arData[pos].h;
+		intern->pos_h = Z_HASH(ht->arData[pos].val);
 	}
 } /* }}} */
 
@@ -124,8 +124,6 @@ static void spl_array_set_pos(spl_array_object* intern, HashTable *ht, HashPosit
 
 SPL_API int spl_hash_verify_pos_ex(spl_array_object * intern, HashTable * ht) /* {{{ */
 {
-	uint idx;
-
 /*	IS_CONSISTENT(ht);*/
 
 /*	HASH_PROTECT_RECURSION(ht);*/
@@ -134,12 +132,15 @@ SPL_API int spl_hash_verify_pos_ex(spl_array_object * intern, HashTable * ht) /*
 			return SUCCESS;
 		}
 	} else {
-		idx = ht->arHash[intern->pos_h & ht->nTableMask];
-		while (idx != INVALID_IDX) {
-			if (idx == intern->pos) {
+		// TODO.OA
+		uint32_t h = intern->pos_h;
+		uint32_t nIndex = h & ht->nTableMask;
+		while (ht->arHash[nIndex] != INVALID_IDX) {
+			if (ht->arHash[nIndex] == intern->pos) {
 				return SUCCESS;
 			}
-			idx = Z_NEXT(ht->arData[idx].val);
+			nIndex = ((nIndex << 2) + nIndex + h + 1) & ht->nTableMask;
+			h >>= 5;
 		}
 	}
 /*	HASH_UNPROTECT_RECURSION(ht); */

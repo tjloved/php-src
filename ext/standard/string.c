@@ -2977,7 +2977,7 @@ static int php_strtr_key_compare(const void *a, const void *b) /* {{{ */
 	Bucket *f = (Bucket *) a;
 	Bucket *s = (Bucket *) b;
 
-	return f->h > s->h ? -1 : 1;
+	return f->key.num > s->key.num ? -1 : 1;
 }
 /* }}} */
 
