@@ -175,6 +175,7 @@ typedef struct _HashTable {
 	uint32_t          nTableMask;
 	uint32_t          nNumUsed;
 	uint32_t          nNumOfElements;
+	uint32_t          nResizeCounter;
 	uint32_t          nInternalPointer;
 	zend_long         nNextFreeElement;
 	Bucket           *arData;
