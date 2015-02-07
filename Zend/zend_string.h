@@ -253,9 +253,9 @@ static zend_always_inline zend_bool zend_string_equals(zend_string *s1, zend_str
  *                  -- Ralf S. Engelschall <rse@engelschall.com>
  */
 
-static zend_always_inline zend_ulong zend_inline_hash_func(const char *str, size_t len)
+static zend_always_inline uint32_t zend_inline_hash_func(const char *str, size_t len)
 {
-	register zend_ulong hash = Z_UL(5381);
+	register uint32_t hash = Z_UL(5381);
 
 	/* variant with the hash unrolled eight times */
 	for (; len >= 8; len -= 8) {
@@ -280,8 +280,8 @@ static zend_always_inline zend_ulong zend_inline_hash_func(const char *str, size
 EMPTY_SWITCH_DEFAULT_CASE()
 	}
 
-	ZEND_ASSERT(hash != 0);
-	return hash;
+	/* Always set top bit of the hash */
+	return hash | (1 << 31);
 }
 
 static zend_always_inline void zend_interned_empty_string_init(zend_string **s)
