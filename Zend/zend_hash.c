@@ -95,7 +95,7 @@ static void _zend_is_inconsistent(const HashTable *ht, const char *file, int lin
 		ZEND_HASH_DEC_APPLY_COUNT(ht);													\
 	}
 
-static void zend_hash_grow_data(HashTable *ht);
+static zend_bool zend_hash_grow_data(HashTable *ht);
 static void zend_hash_grow_hash(HashTable *ht);
 
 #define CHECK_INIT(ht, packed) do { \
@@ -364,7 +364,7 @@ static zend_always_inline Bucket *zend_hash_index_find_bucket(const HashTable *h
 }
 
 /* Element mustn't yet exist and there musn't be any deleted elements. */
-static zend_always_inline void _zend_hash_fast_insert(HashTable *ht, zend_ulong h, uint32_t idx) {
+static zend_always_inline void _zend_hash_fast_insert(HashTable *ht, uint32_t h, uint32_t idx) {
 	uint32_t nIndex = h & ht->nTableMask;
 	while (ht->arHash[nIndex] != INVALID_IDX) {
 		nIndex = ((nIndex << 2) + nIndex + h + 1) & ht->nTableMask;
@@ -373,11 +373,10 @@ static zend_always_inline void _zend_hash_fast_insert(HashTable *ht, zend_ulong 
 	ht->arHash[nIndex] = idx;
 }
 
-static zend_always_inline void _zend_hash_insert_size_check(HashTable *ht, zend_ulong h) {
+static zend_always_inline void _zend_hash_insert_size_check(HashTable *ht, uint32_t h) {
 	zend_bool rehashed = 0;
 	if (ht->nNumUsed >= ht->nTableSize) {
-		zend_hash_grow_data(ht);
-		rehashed = 1;
+		rehashed = zend_hash_grow_data(ht);
 	}
 	if (ht->nResizeCounter < 3) {
 		zend_hash_grow_hash(ht);
@@ -678,7 +677,7 @@ ZEND_API zval *_zend_hash_next_index_insert_new(HashTable *ht, zval *pData ZEND_
 	return _zend_hash_index_add_or_update_i(ht, ht->nNextFreeElement, pData, HASH_ADD | HASH_ADD_NEW | HASH_ADD_NEXT ZEND_FILE_LINE_RELAY_CC);
 }
 
-static void zend_hash_grow_data(HashTable *ht)
+static zend_bool zend_hash_grow_data(HashTable *ht)
 {
 	IS_CONSISTENT(ht);
 
@@ -686,13 +685,14 @@ static void zend_hash_grow_data(HashTable *ht)
 		HANDLE_BLOCK_INTERRUPTIONS();
 		zend_hash_rehash(ht);
 		HANDLE_UNBLOCK_INTERRUPTIONS();
+		return 1;
 	} else if ((ht->nTableSize << 1) > 0) {	/* Let's double the table size */
 		HANDLE_BLOCK_INTERRUPTIONS();
 		ht->arData = (Bucket *) safe_perealloc(ht->arData, ht->nTableSize << 1, sizeof(Bucket), 0, ht->u.flags & HASH_FLAG_PERSISTENT);
 		ht->nTableSize = (ht->nTableSize << 1);
-		zend_hash_rehash(ht);
 		HANDLE_UNBLOCK_INTERRUPTIONS();
 	}
+	return 0;
 }
 
 static void zend_hash_grow_hash(HashTable *ht) {

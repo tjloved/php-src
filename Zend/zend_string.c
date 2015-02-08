@@ -29,7 +29,7 @@ static zend_string *zend_new_interned_string_int(zend_string *str);
 static void zend_interned_strings_snapshot_int(void);
 static void zend_interned_strings_restore_int(void);
 
-ZEND_API zend_ulong zend_hash_func(const char *str, size_t len)
+ZEND_API uint32_t zend_hash_func(const char *str, size_t len)
 {
 	return zend_inline_hash_func(str, len);
 }

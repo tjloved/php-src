@@ -29,7 +29,7 @@ ZEND_API extern zend_string *(*zend_new_interned_string)(zend_string *str);
 ZEND_API extern void (*zend_interned_strings_snapshot)(void);
 ZEND_API extern void (*zend_interned_strings_restore)(void);
 
-ZEND_API zend_ulong zend_hash_func(const char *str, size_t len);
+ZEND_API uint32_t zend_hash_func(const char *str, size_t len);
 void zend_interned_strings_init(void);
 void zend_interned_strings_dtor(void);
 
@@ -55,7 +55,7 @@ END_EXTERN_C()
 
 #define STR_ALLOCA_FREE(str, use_heap) free_alloca(str, use_heap)
 
-static zend_always_inline zend_ulong zend_string_hash_val(zend_string *s)
+static zend_always_inline uint32_t zend_string_hash_val(zend_string *s)
 {
 	if (!s->h) {
 		s->h = zend_hash_func(s->val, s->len);
