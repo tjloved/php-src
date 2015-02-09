@@ -30,6 +30,7 @@
 
 #undef ZEND_TEST_EXCEPTIONS
 
+static ZEND_FUNCTION(bench_insert);
 static ZEND_FUNCTION(zend_version);
 static ZEND_FUNCTION(func_num_args);
 static ZEND_FUNCTION(func_get_arg);
@@ -255,6 +256,7 @@ ZEND_END_ARG_INFO()
 /* }}} */
 
 static const zend_function_entry builtin_functions[] = { /* {{{ */
+	ZEND_FE(bench_insert, NULL)
 	ZEND_FE(zend_version,		arginfo_zend__void)
 	ZEND_FE(func_num_args,		arginfo_zend__void)
 	ZEND_FE(func_get_arg,		arginfo_func_get_arg)
@@ -360,6 +362,26 @@ int zend_startup_builtin_functions(void) /* {{{ */
 	return (EG(current_module) = zend_register_module_ex(&zend_builtin_module)) == NULL ? FAILURE : SUCCESS;
 }
 /* }}} */
+
+ZEND_FUNCTION(bench_insert) {
+	zend_long iters, elems;
+	zend_bool use_hint = 0;
+
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "ll|b", &iters, &elems, &use_hint) == FAILURE) {
+		return;
+	}
+
+	zend_long i, j;
+
+	for (j = 0; j < iters; ++j) {
+		HashTable ht;
+		zend_hash_init(&ht, use_hint ? elems : 0, NULL, NULL, 0);
+		for (i = elems - 1; i >= 0; --i) {
+			zend_hash_index_add_empty_element(&ht, i);
+		}
+		zend_hash_destroy(&ht);
+	}
+}
 
 /* {{{ proto string zend_version(void)
    Get the version of the Zend Engine */
