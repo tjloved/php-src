@@ -1851,8 +1851,7 @@ static void php_array_data_shuffle(zval *array) /* {{{ */
 			}
 		}
 		while (--n_left) {
-			rnd_idx = php_rand();
-			RAND_RANGE(rnd_idx, 0, n_left, PHP_RAND_MAX);
+			rnd_idx = php_mt_rand_range(0, n_left);
 			if (rnd_idx != n_left) {
 				temp = hash->arData[n_left];
 				hash->arData[n_left] = hash->arData[rnd_idx];
@@ -1877,8 +1876,7 @@ static void php_array_data_shuffle(zval *array) /* {{{ */
 			}
 		}
 		while (--n_left) {
-			rnd_idx = php_rand();
-			RAND_RANGE(rnd_idx, 0, n_left, PHP_RAND_MAX);
+			rnd_idx = php_mt_rand_range(0, n_left);
 			if (rnd_idx != n_left) {
 				temp = hash->arData[n_left];
 				hash->arData[n_left] = hash->arData[rnd_idx];

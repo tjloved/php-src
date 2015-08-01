@@ -57,5 +57,6 @@ PHPAPI void php_srand(zend_long seed);
 PHPAPI zend_long php_rand(void);
 PHPAPI void php_mt_srand(php_uint32 seed);
 PHPAPI php_uint32 php_mt_rand(void);
+PHPAPI zend_long php_mt_rand_range(zend_long min, zend_long max);
 
 #endif	/* PHP_RAND_H */

@@ -225,6 +225,25 @@ PHPAPI php_uint32 php_mt_rand(void)
 }
 /* }}} */
 
+PHPAPI zend_long php_mt_rand_range(zend_long min, zend_long max)
+{
+	if (UNEXPECTED(!BG(mt_rand_is_seeded))) {
+		php_mt_srand(GENERATE_SEED());
+	}
+
+	/*
+	 * Melo: hmms.. randomMT() returns 32 random bits...
+	 * Yet, the previous php_rand only returns 31 at most.
+	 * So I put a right shift to loose the lsb. It *seems*
+	 * better than clearing the msb.
+	 * Update:
+	 * I talked with Cokus via email and it won't ruin the algorithm
+	 */
+	zend_long number = (zend_long) (php_mt_rand() >> 1);
+	RAND_RANGE(number, min, max, PHP_MT_RAND_MAX);
+	return number;
+}
+
 /* {{{ proto void srand([int seed])
    Seeds random number generator */
 PHP_FUNCTION(srand)
@@ -311,8 +330,7 @@ PHP_FUNCTION(mt_rand)
 {
 	zend_long min;
 	zend_long max;
-	zend_long number;
-	int  argc = ZEND_NUM_ARGS();
+	int argc = ZEND_NUM_ARGS();
 
 	if (argc != 0) {
 		if (zend_parse_parameters(argc, "ll", &min, &max) == FAILURE) {
@@ -323,24 +341,11 @@ PHP_FUNCTION(mt_rand)
 		}
 	}
 
-	if (!BG(mt_rand_is_seeded)) {
-		php_mt_srand(GENERATE_SEED());
-	}
-
-	/*
-	 * Melo: hmms.. randomMT() returns 32 random bits...
-	 * Yet, the previous php_rand only returns 31 at most.
-	 * So I put a right shift to loose the lsb. It *seems*
-	 * better than clearing the msb.
-	 * Update:
-	 * I talked with Cokus via email and it won't ruin the algorithm
-	 */
-	number = (zend_long) (php_mt_rand() >> 1);
 	if (argc == 2) {
-		RAND_RANGE(number, min, max, PHP_MT_RAND_MAX);
+		RETURN_LONG(php_mt_rand_range(min, max));
+	} else {
+		RETURN_LONG((zend_long) (php_mt_rand() >> 1));
 	}
-
-	RETURN_LONG(number);
 }
 /* }}} */
 
