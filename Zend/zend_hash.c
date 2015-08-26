@@ -23,7 +23,7 @@
 #include "zend_globals.h"
 #include "zend_variables.h"
 
-#define HT_DEBUG 0
+#define HT_DEBUG 1
 #if HT_DEBUG
 # define HT_ASSERT(c) ZEND_ASSERT(c)
 #else
@@ -207,7 +207,10 @@ ZEND_API void ZEND_FASTCALL zend_hash_packed_to_hash(HashTable *ht)
 	void *new_data, *old_data = HT_GET_DATA_ADDR(ht);
 	Bucket *old_buckets = ht->arData;
 
-	HT_ASSERT(GC_REFCOUNT(ht) == 1);
+	/* This function is used by zend_hash_sort, which is used with refcount=2 to protect
+	 * against modifications. */
+	/* HT_ASSERT(GC_REFCOUNT(ht) == 1); */
+
 	HANDLE_BLOCK_INTERRUPTIONS();
 	ht->u.flags &= ~HASH_FLAG_PACKED;
 	new_data = pemalloc(HT_SIZE_EX(ht->nTableSize, -ht->nTableSize), (ht)->u.flags & HASH_FLAG_PERSISTENT);
@@ -2167,7 +2170,10 @@ ZEND_API int ZEND_FASTCALL zend_hash_sort_ex(HashTable *ht, sort_func_t sort, co
 	uint32_t i, j;
 
 	IS_CONSISTENT(ht);
-	HT_ASSERT(GC_REFCOUNT(ht) == 1);
+
+	/* This assertion is disabled because we use refcount=2 as a means of protecting the sorted
+	 * array against modification by a user compare function. */
+	/* HT_ASSERT(GC_REFCOUNT(ht) == 1); */
 
 	if (!(ht->nNumOfElements>1) && !(renumber && ht->nNumOfElements>0)) { /* Doesn't require sorting */
 		return SUCCESS;
