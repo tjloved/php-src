@@ -1114,6 +1114,10 @@ ZEND_API int zend_gc_collect_cycles(void)
 				zend_array *arr = (zend_array*)p;
 
 				GC_TYPE(arr) = IS_NULL;
+#if ZEND_DEBUG
+				/* In debug mode we assert that the refcount is <= 1. Make it so. */
+				GC_REFCOUNT(arr)--;
+#endif
 				zend_hash_destroy(arr);
 			}
 			current = GC_G(next_to_free);
