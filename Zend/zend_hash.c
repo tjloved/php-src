@@ -23,6 +23,7 @@
 #include "zend.h"
 #include "zend_globals.h"
 #include "zend_variables.h"
+#include "zend_hash_func.h"
 
 #define HT_DEBUG 0
 #if HT_DEBUG
@@ -123,6 +124,16 @@ static uint32_t zend_always_inline zend_hash_check_size(uint32_t nSize)
 	nSize |= (nSize >> 16);
 	return nSize + 1;
 #endif
+}
+
+ZEND_API unsigned char zend_siphash_key[16];
+void zend_initialize_siphash_key()
+{
+	/* TODO Initialize to actually random data... */
+	int i = 0;
+	for (i = 0; i < 16; ++i) {
+		zend_siphash_key[i] = i;
+	}
 }
 
 static void zend_always_inline zend_hash_real_init_ex(HashTable *ht, int packed)
