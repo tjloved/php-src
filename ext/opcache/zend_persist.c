@@ -117,8 +117,8 @@ static void zend_hash_persist(HashTable *ht, zend_persist_func_t pPersistElement
 			if (Z_TYPE(p->val) == IS_UNDEF) continue;
 
 			/* persist bucket and key */
-			if (p->key) {
-				zend_accel_store_interned_string(p->key);
+			if (zend_bucket_has_str_key(p)) {
+				zend_accel_store_interned_string(p->key.str);
 			}
 
 			/* persist the data itself */
@@ -145,8 +145,8 @@ static void zend_hash_persist(HashTable *ht, zend_persist_func_t pPersistElement
 		if (Z_TYPE(p->val) == IS_UNDEF) continue;
 
 		/* persist bucket and key */
-		if (p->key) {
-			zend_accel_store_interned_string(p->key);
+		if (zend_bucket_has_str_key(p)) {
+			zend_accel_store_interned_string(p->key.str);
 		}
 
 		/* persist the data itself */
@@ -199,8 +199,8 @@ static void zend_hash_persist_immutable(HashTable *ht)
 			if (Z_TYPE(p->val) == IS_UNDEF) continue;
 
 			/* persist bucket and key */
-			if (p->key) {
-				zend_accel_memdup_interned_string(p->key);
+			if (zend_bucket_has_str_key(p)) {
+				zend_accel_memdup_interned_string(p->key.str);
 			}
 
 			/* persist the data itself */
@@ -224,8 +224,8 @@ static void zend_hash_persist_immutable(HashTable *ht)
 		if (Z_TYPE(p->val) == IS_UNDEF) continue;
 
 		/* persist bucket and key */
-		if (p->key) {
-			zend_accel_memdup_interned_string(p->key);
+		if (zend_bucket_has_str_key(p)) {
+			zend_accel_memdup_interned_string(p->key.str);
 		}
 
 		/* persist the data itself */

@@ -2189,9 +2189,9 @@ static inline int array_num_elements(HashTable* ht)
 {
 	if (ht->nNumUsed &&
 	    Z_TYPE(ht->arData[ht->nNumUsed-1].val) != IS_UNUSED &&
-	    ht->arData[ht->nNumUsed-1].key == NULL) {
+	    !zend_bucket_has_str_key(&ht->arData[ht->nNumUsed-1])) {
 
-	    return ht->arData[ht->nNumUsed-1].h - 1;
+	    return ht->arData[ht->nNumUsed-1].key.num - 1;
 	}
 	return 0;
 }
