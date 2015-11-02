@@ -1,0 +1,111 @@
+#ifndef SSA_HELPERS_H
+#define SSA_HELPERS_H
+
+#include "Optimizer/zend_ssa.h"
+#include "Optimizer/zend_inference.h"
+#include "Optimizer/zend_call_graph.h"
+
+#define CAN_BE(t, types) ((t) & (types))
+#define MUST_BE(t, types) (!((t & MAY_BE_ANY) & ~(types)))
+
+#define FOREACH_USE(var, use) do { \
+	int _var_num = (var) - ssa->vars; \
+	use = (var)->use_chain; \
+	while (use >= 0) { \
+		int next = zend_ssa_next_use(ssa->ops, _var_num, use);
+#define FOREACH_USE_END() \
+		use = next; \
+	} \
+} while (0)
+
+#define FOREACH_PHI_USE(var, phi) do { \
+	int _var_num = (var) - ssa->vars; \
+	phi = (var)->phi_use_chain; \
+	while (phi) {
+#define FOREACH_PHI_USE_END() \
+		phi = zend_ssa_next_use_phi(ssa, _var_num, phi); \
+	} \
+} while (0)
+
+#define FOREACH_PHI_SOURCE(phi, source) do { \
+	zend_ssa_phi *_phi = (phi); \
+	int _i, _end = ssa->cfg.blocks[_phi->block].predecessors_count; \
+	for (_i = 0; _i < _end; _i++) { \
+		source = _phi->sources[_i];
+#define FOREACH_PHI_SOURCE_END() \
+	} \
+} while (0)
+
+#define FOREACH_PHI(phi) do { \
+	int _i; \
+	for (_i = 0; _i < ssa->cfg.blocks_count; _i++) { \
+		phi = ssa->blocks[_i].phis; \
+		for (; phi; phi = phi->next) { \
+			//if (phi->ssa_var < 0) continue;
+#define FOREACH_PHI_END() \
+		} \
+	} \
+} while (0)
+
+void rename_var_uses(zend_ssa *ssa, int old, int new);
+void remove_result_use(zend_ssa *ssa, zend_ssa_op *ssa_op);
+void remove_op1_use(zend_ssa *ssa, zend_ssa_op *ssa_op);
+void remove_op2_use(zend_ssa *ssa, zend_ssa_op *ssa_op);
+void remove_phi(zend_ssa *ssa, zend_ssa_phi *phi);
+
+static inline void _remove_def(zend_ssa_var *var) {
+	ZEND_ASSERT(var->definition >= 0);
+	ZEND_ASSERT(var->use_chain < 0);
+	ZEND_ASSERT(!var->phi_use_chain);
+	var->definition = -1;
+}
+static inline void remove_result_def(zend_ssa *ssa, zend_ssa_op *ssa_op) {
+	zend_ssa_var *var = &ssa->vars[ssa_op->result_def];
+	_remove_def(var);
+	ssa_op->result_def = -1;
+}
+static inline void remove_op1_def(zend_ssa *ssa, zend_ssa_op *ssa_op) {
+	zend_ssa_var *var = &ssa->vars[ssa_op->op1_def];
+	_remove_def(var);
+	ssa_op->op1_def = -1;
+}
+static inline void remove_op2_def(zend_ssa *ssa, zend_ssa_op *ssa_op) {
+	zend_ssa_var *var = &ssa->vars[ssa_op->op2_def];
+	_remove_def(var);
+	ssa_op->op2_def = -1;
+}
+
+static inline zend_bool var_used(zend_ssa_var *var) {
+	// TODO Do we care about sym_use_chain at this point?
+	return var->use_chain >= 0 || var->phi_use_chain != NULL;
+}
+
+static inline void remove_instr(zend_ssa *ssa, zend_op *opline, zend_ssa_op *ssa_op) {
+	if (ssa_op->result_use >= 0) {
+		remove_result_use(ssa, ssa_op);
+	}
+	if (ssa_op->op1_use >= 0) {
+		remove_op1_use(ssa, ssa_op);
+	}
+	if (ssa_op->op2_use >= 0) {
+		remove_op2_use(ssa, ssa_op);
+	}
+
+	/* We let the caller make sure that all defs are gone */
+	ZEND_ASSERT(ssa_op->result_def == -1);
+	ZEND_ASSERT(ssa_op->op1_def == -1);
+	ZEND_ASSERT(ssa_op->op2_def == -1);
+
+	MAKE_NOP(opline);
+}
+
+static inline int zend_bitset_pop_first(zend_bitset set, uint32_t len) {
+	int i = zend_bitset_first(set, len);
+	if (i >= 0) {
+		zend_bitset_excl(set, i);
+	}
+	return i;
+}
+
+#endif
+
