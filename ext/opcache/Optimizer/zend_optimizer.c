@@ -771,7 +771,8 @@ static void zend_optimize(zend_op_array      *op_array,
 	 */
 	if ((ZEND_OPTIMIZER_PASS_6 & ctx->optimization_level) &&
 	    !(ZEND_OPTIMIZER_PASS_7 & ctx->optimization_level)) {
-		zend_optimize_dfa(op_array, ctx);
+		optimize_ssa(op_array, ctx);
+		//zend_optimize_dfa(op_array, ctx);
 		if (ctx->debug_level & ZEND_DUMP_AFTER_PASS_6) {
 			zend_dump_op_array(op_array, 0, "after pass 6", NULL);
 		}
@@ -791,7 +792,7 @@ static void zend_optimize(zend_op_array      *op_array,
 	/* pass 10:
 	 * - remove NOPs
 	 */
-	if (((ZEND_OPTIMIZER_PASS_10|ZEND_OPTIMIZER_PASS_5) & ctx->optimization_level) == ZEND_OPTIMIZER_PASS_10) {
+	if (ZEND_OPTIMIZER_PASS_10 & ctx->optimization_level) {
 		zend_optimizer_nop_removal(op_array);
 		if (ctx->debug_level & ZEND_DUMP_AFTER_PASS_10) {
 			zend_dump_op_array(op_array, 0, "after pass 10", NULL);
@@ -817,6 +818,7 @@ static void zend_revert_pass_two(zend_op_array *op_array)
 {
 	zend_op *opline, *end;
 
+	/* Revert pass_two() */
 	opline = op_array->opcodes;
 	end = opline + op_array->last;
 	while (opline < end) {

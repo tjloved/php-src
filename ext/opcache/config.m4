@@ -410,7 +410,13 @@ fi
 	Optimizer/zend_inference.c \
 	Optimizer/zend_func_info.c \
 	Optimizer/zend_call_graph.c \
-	Optimizer/zend_dump.c,
+	Optimizer/zend_dump.c \
+	Optimizer/ssa_pass.c \
+	Optimizer/ssa/helpers.c \
+	Optimizer/ssa/scp.c \
+	Optimizer/ssa/dce.c \
+	Optimizer/ssa/tmpvar.c \
+	Optimizer/ssa/type_specialization.c,
 	shared,,-DZEND_ENABLE_STATIC_TSRMLS_CACHE=1,,yes)
 
   PHP_ADD_BUILD_DIR([$ext_builddir/Optimizer], 1)

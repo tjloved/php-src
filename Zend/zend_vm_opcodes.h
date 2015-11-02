@@ -252,7 +252,12 @@ END_EXTERN_C()
 #define ZEND_BIND_STATIC                     183
 #define ZEND_FETCH_THIS                      184
 #define ZEND_ISSET_ISEMPTY_THIS              186
+#define ZEND_ADD_INT                         200
+#define ZEND_SUB_INT                         201
+#define ZEND_ADD_DOUBLE                      202
+#define ZEND_SUB_DOUBLE                      203
+#define ZEND_MUL_DOUBLE                      204
 
-#define ZEND_VM_LAST_OPCODE                  186
+#define ZEND_VM_LAST_OPCODE                  204
 
 #endif
