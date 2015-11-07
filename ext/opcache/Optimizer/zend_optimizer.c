@@ -165,6 +165,34 @@ int zend_optimizer_update_op1_const(zend_op_array *op_array,
                                     zval          *val)
 {
 	switch (opline->opcode) {
+		case ZEND_FETCH_DIM_W:
+		case ZEND_FETCH_DIM_RW:
+		case ZEND_FETCH_DIM_FUNC_ARG:
+		case ZEND_FETCH_DIM_UNSET:
+		case ZEND_ASSIGN_DIM:
+		case ZEND_SEPARATE:
+		case ZEND_RETURN_BY_REF:
+			zval_dtor(val);
+			return 0;
+		case ZEND_SEND_VAR:
+			opline->extended_value = 0;
+			opline->opcode = ZEND_SEND_VAL;
+			break;
+		case ZEND_SEND_VAR_EX:
+			opline->extended_value = 0;
+			opline->opcode = ZEND_SEND_VAL_EX;
+			break;
+		case ZEND_SEND_VAR_NO_REF:
+			zval_dtor(val);
+			return 0;
+		case ZEND_SEND_VAR_NO_REF_EX:
+			opline->opcode = ZEND_SEND_VAL;
+			break;
+		case ZEND_SEND_USER:
+			opline->opcode = ZEND_SEND_VAL_EX;
+			break;
+	}
+	switch (opline->opcode) {
 		case ZEND_FREE:
 			MAKE_NOP(opline);
 			zval_dtor(val);
@@ -423,32 +451,6 @@ int zend_optimizer_replace_by_const(zend_op_array *op_array,
 		if (ZEND_OP1_TYPE(opline) == type &&
 			ZEND_OP1(opline).var == var) {
 			switch (opline->opcode) {
-				case ZEND_FETCH_DIM_W:
-				case ZEND_FETCH_DIM_RW:
-				case ZEND_FETCH_DIM_FUNC_ARG:
-				case ZEND_FETCH_DIM_UNSET:
-				case ZEND_ASSIGN_DIM:
-				case ZEND_SEPARATE:
-				case ZEND_RETURN_BY_REF:
-					zval_dtor(val);
-					return 0;
-				case ZEND_SEND_VAR:
-					opline->extended_value = 0;
-					opline->opcode = ZEND_SEND_VAL;
-					break;
-				case ZEND_SEND_VAR_EX:
-					opline->extended_value = 0;
-					opline->opcode = ZEND_SEND_VAL_EX;
-					break;
-				case ZEND_SEND_VAR_NO_REF:
-					zval_dtor(val);
-					return 0;
-				case ZEND_SEND_VAR_NO_REF_EX:
-					opline->opcode = ZEND_SEND_VAL;
-					break;
-				case ZEND_SEND_USER:
-					opline->opcode = ZEND_SEND_VAL_EX;
-					break;
 				/* In most cases IS_TMP_VAR operand may be used only once.
 				 * The operands are usually destroyed by the opcode handler.
 				 * ZEND_CASE and ZEND_FETCH_LIST are exceptions, they keeps operand
