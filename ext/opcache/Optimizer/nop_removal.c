@@ -31,6 +31,37 @@
 #include "zend_execute.h"
 #include "zend_vm.h"
 
+static inline zend_bool can_smart_branch(zend_op *opline) {
+	switch (opline->opcode) {
+		case ZEND_IS_IDENTICAL:
+		case ZEND_IS_NOT_IDENTICAL:
+		case ZEND_IS_EQUAL:
+		case ZEND_IS_NOT_EQUAL:
+		case ZEND_IS_SMALLER:
+		case ZEND_IS_SMALLER_OR_EQUAL:
+		case ZEND_CASE:
+		case ZEND_ISSET_ISEMPTY_VAR:
+		case ZEND_ISSET_ISEMPTY_STATIC_PROP:
+		case ZEND_ISSET_ISEMPTY_DIM_OBJ:
+		case ZEND_ISSET_ISEMPTY_PROP_OBJ:
+		case ZEND_INSTANCEOF:
+		case ZEND_TYPE_CHECK:
+		case ZEND_DEFINED:
+			return 1;
+		default:
+			return 0;
+	}
+}
+
+/* Don't skip NOPs if it will result in a smart branch */
+static inline zend_bool can_skip_nop(zend_op_array *op_array, zend_op *opline) {
+	if (opline > op_array->opcodes && opline < op_array->opcodes + op_array->last - 1) {
+		return !can_smart_branch(opline - 1)
+			|| ((opline + 1)->opcode != ZEND_JMPZ && (opline + 1)->opcode != ZEND_JMPNZ);
+	}
+	return 1;
+}
+
 void zend_optimizer_nop_removal(zend_op_array *op_array)
 {
 	zend_op *end, *opline;
@@ -59,7 +90,7 @@ void zend_optimizer_nop_removal(zend_op_array *op_array)
 		}
 
 		shiftlist[i++] = shift;
-		if (opline->opcode == ZEND_NOP) {
+		if (opline->opcode == ZEND_NOP && can_skip_nop(op_array, opline)) {
 			shift++;
 		} else {
 			if (shift) {
