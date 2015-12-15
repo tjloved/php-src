@@ -1754,11 +1754,11 @@ convert_to_array:
 
 		if (dim == NULL) {
 			zend_throw_error(NULL, "[] operator not supported for strings");
-			ZVAL_INDIRECT(result, &EG(error_zval));
 		} else {
 			zend_check_string_offset(dim, type);
-			ZVAL_INDIRECT(result, NULL); /* wrong string offset */
+			zend_throw_error(NULL, "Cannot indirectly modify string offset");
 		}
+		ZVAL_INDIRECT(result, &EG(error_zval));
 	} else if (EXPECTED(Z_TYPE_P(container) == IS_OBJECT)) {
 		if (!Z_OBJ_HT_P(container)->read_dimension) {
 			zend_throw_error(NULL, "Cannot use object as array");

@@ -31,7 +31,7 @@ try {
 }
 ?>
 --EXPECTF--
-string(36) "Cannot use string offset as an array"
-string(27) "Cannot unset string offsets"
-string(41) "Only variables can be passed by reference"
-string(64) "Cannot increment/decrement overloaded objects nor string offsets"
+string(%d) "Cannot indirectly modify string offset"
+string(%d) "Cannot indirectly modify string offset"
+string(%d) "Cannot indirectly modify string offset"
+string(%d) "Cannot indirectly modify string offset"
