@@ -861,6 +861,11 @@ ZEND_API void zend_assert_valid_class_name(const zend_string *const_name);
 #define BP_VAR_FUNC_ARG		4
 #define BP_VAR_UNSET		5
 
+#define BP_VAR_FOR_DIM		(1<<3)
+#define BP_VAR_FOR_OBJ		(2<<3)
+#define BP_VAR_FOR_REF		(3<<3)
+#define BP_VAR_FOR_INCDEC	(4<<3)
+
 /* Bottom 3 bits are the type, top bits are arg num for BP_VAR_FUNC_ARG */
 #define BP_VAR_SHIFT 3
 #define BP_VAR_MASK  7

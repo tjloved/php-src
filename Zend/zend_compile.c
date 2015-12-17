@@ -1852,11 +1852,27 @@ ZEND_API size_t zend_dirname(char *path, size_t len)
 }
 /* }}} */
 
+static inline uint32_t change_fetch_reason(uint32_t type, uint32_t reason)
+{
+	uint32_t raw_type = type & BP_VAR_MASK;
+	if (raw_type == BP_VAR_W || raw_type == BP_VAR_RW) {
+		return raw_type | reason;
+	}
+	return type;
+}
+
 static void zend_adjust_for_fetch_type(zend_op *opline, uint32_t type) /* {{{ */
 {
 	zend_uchar factor = (opline->opcode == ZEND_FETCH_STATIC_PROP_R) ? 1 : 3;
+	uint32_t raw_type = type & BP_VAR_MASK;
+
+	if (opline->opcode == ZEND_FETCH_DIM_R && (raw_type == BP_VAR_W || raw_type == BP_VAR_RW)) {
+		/* Add "reason" flag to FETCH_DIM_(W|RW) opcodes */
+		ZEND_ASSERT((type & ~BP_VAR_MASK) != 0);
+		opline->extended_value |= type & ~BP_VAR_MASK;
+	}
 	
-	switch (type & BP_VAR_MASK) {
+	switch (raw_type) {
 		case BP_VAR_R:
 			return;
 		case BP_VAR_W:
@@ -2510,7 +2526,7 @@ static zend_op *zend_delayed_compile_dim(znode *result, zend_ast *ast, uint32_t 
 
 	znode var_node, dim_node;
 
-	zend_delayed_compile_var(&var_node, var_ast, type);
+	zend_delayed_compile_var(&var_node, var_ast, change_fetch_reason(type, BP_VAR_FOR_DIM));
 	zend_separate_if_call_and_write(&var_node, var_ast, type);
 
 	if (dim_ast == NULL) {
@@ -2567,7 +2583,7 @@ static zend_op *zend_delayed_compile_prop(znode *result, zend_ast *ast, uint32_t
 	if (is_this_fetch(obj_ast)) {
 		obj_node.op_type = IS_UNUSED;
 	} else {
-		zend_delayed_compile_var(&obj_node, obj_ast, type);
+		zend_delayed_compile_var(&obj_node, obj_ast, change_fetch_reason(type, BP_VAR_FOR_OBJ));
 		zend_separate_if_call_and_write(&obj_node, obj_ast, type);
 	}
 	zend_compile_expr(&prop_node, prop_ast);
@@ -2828,8 +2844,8 @@ void zend_compile_assign_ref(znode *result, zend_ast *ast) /* {{{ */
 	}
 	zend_ensure_writable_variable(target_ast);
 
-	zend_compile_var(&target_node, target_ast, BP_VAR_W);
-	zend_compile_var(&source_node, source_ast, BP_VAR_W);
+	zend_compile_var(&target_node, target_ast, BP_VAR_W | BP_VAR_FOR_REF);
+	zend_compile_var(&source_node, source_ast, BP_VAR_W | BP_VAR_FOR_REF);
 
 	if (source_node.op_type != IS_VAR && zend_is_call(source_ast)) {
 		zend_error_noreturn(E_COMPILE_ERROR, "Cannot use result of built-in function in write context");
@@ -2951,7 +2967,7 @@ uint32_t zend_compile_args(zend_ast *ast, zend_function *fbc) /* {{{ */
 				}
 			} else if (fbc) {
 				if (ARG_SHOULD_BE_SENT_BY_REF(fbc, arg_num)) {
-					zend_compile_var(&arg_node, arg, BP_VAR_W);
+					zend_compile_var(&arg_node, arg, BP_VAR_W | BP_VAR_FOR_REF);
 					opcode = ZEND_SEND_REF;
 				} else {
 					zend_compile_var(&arg_node, arg, BP_VAR_R);
@@ -3806,7 +3822,7 @@ void zend_compile_return(zend_ast *ast) /* {{{ */
 		expr_node.op_type = IS_CONST;
 		ZVAL_NULL(&expr_node.u.constant);
 	} else if (by_ref && zend_is_variable(expr_ast) && !zend_is_call(expr_ast)) {
-		zend_compile_var(&expr_node, expr_ast, BP_VAR_W);
+		zend_compile_var(&expr_node, expr_ast, BP_VAR_W | BP_VAR_FOR_REF);
 	} else {
 		zend_compile_expr(&expr_node, expr_ast);
 	}
@@ -4131,7 +4147,7 @@ void zend_compile_foreach(zend_ast *ast) /* {{{ */
 	}
 
 	if (by_ref && is_variable) {
-		zend_compile_var(&expr_node, expr_ast, BP_VAR_W);
+		zend_compile_var(&expr_node, expr_ast, BP_VAR_W | BP_VAR_FOR_REF);
 	} else {
 		zend_compile_expr(&expr_node, expr_ast);
 	}
@@ -6319,7 +6335,7 @@ void zend_compile_post_incdec(znode *result, zend_ast *ast) /* {{{ */
 		zend_make_tmp_result(result, opline);
 	} else {
 		znode var_node;
-		zend_compile_var(&var_node, var_ast, BP_VAR_RW);
+		zend_compile_var(&var_node, var_ast, BP_VAR_RW | BP_VAR_FOR_INCDEC);
 		zend_emit_op_tmp(result, ast->kind == ZEND_AST_POST_INC ? ZEND_POST_INC : ZEND_POST_DEC,
 			&var_node, NULL);
 	}
@@ -6338,7 +6354,7 @@ void zend_compile_pre_incdec(znode *result, zend_ast *ast) /* {{{ */
 		opline->opcode = ast->kind == ZEND_AST_PRE_INC ? ZEND_PRE_INC_OBJ : ZEND_PRE_DEC_OBJ;
 	} else {
 		znode var_node;
-		zend_compile_var(&var_node, var_ast, BP_VAR_RW);
+		zend_compile_var(&var_node, var_ast, BP_VAR_RW | BP_VAR_FOR_INCDEC);
 		zend_emit_op(result, ast->kind == ZEND_AST_PRE_INC ? ZEND_PRE_INC : ZEND_PRE_DEC,
 			&var_node, NULL);
 	}
@@ -6495,7 +6511,7 @@ void zend_compile_yield(znode *result, zend_ast *ast) /* {{{ */
 
 	if (value_ast) {
 		if (returns_by_ref && zend_is_variable(value_ast) && !zend_is_call(value_ast)) {
-			zend_compile_var(&value_node, value_ast, BP_VAR_W);
+			zend_compile_var(&value_node, value_ast, BP_VAR_W | BP_VAR_FOR_REF);
 		} else {
 			zend_compile_expr(&value_node, value_ast);
 		}
@@ -6691,7 +6707,7 @@ void zend_compile_array(znode *result, zend_ast *ast) /* {{{ */
 
 		if (by_ref) {
 			zend_ensure_writable_variable(value_ast);
-			zend_compile_var(&value_node, value_ast, BP_VAR_W);
+			zend_compile_var(&value_node, value_ast, BP_VAR_W | BP_VAR_FOR_REF);
 		} else {
 			zend_compile_expr(&value_node, value_ast);
 		}
@@ -7461,13 +7477,16 @@ void zend_compile_var(znode *result, zend_ast *ast, uint32_t type) /* {{{ */
 			*result = *zend_ast_get_znode(ast);
 			return;
 		default:
-			if (type == BP_VAR_W || type == BP_VAR_RW || type == BP_VAR_UNSET) {
+		{
+			uint32_t raw_type = type & BP_VAR_MASK;
+			if (raw_type == BP_VAR_W || raw_type == BP_VAR_RW || raw_type == BP_VAR_UNSET) {
 				zend_error_noreturn(E_COMPILE_ERROR,
 					"Cannot use temporary expression in write context");
 			}
 
 			zend_compile_expr(result, ast);
 			return;
+		}
 	}
 }
 /* }}} */
