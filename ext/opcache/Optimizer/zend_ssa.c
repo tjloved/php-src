@@ -845,7 +845,7 @@ static int zend_ssa_rename(const zend_op_array *op_array, uint32_t build_flags, 
 }
 /* }}} */
 
-int zend_build_ssa(zend_arena **arena, const zend_script *script, const zend_op_array *op_array, uint32_t build_flags, zend_ssa *ssa, uint32_t *func_flags) /* {{{ */
+int zend_build_ssa(zend_arena **arena, const zend_script *script, zend_op_array *op_array, uint32_t build_flags, zend_ssa *ssa, uint32_t *func_flags) /* {{{ */
 {
 	zend_basic_block *blocks = ssa->cfg.blocks;
 	zend_ssa_block *ssa_blocks;
@@ -863,6 +863,7 @@ int zend_build_ssa(zend_arena **arena, const zend_script *script, const zend_op_
 		return FAILURE;
 	}
 
+	ssa->op_array = op_array;
 	ssa->rt_constants = (build_flags & ZEND_RT_CONSTANTS);
 	ssa_blocks = zend_arena_calloc(arena, blocks_count, sizeof(zend_ssa_block));
 	if (!ssa_blocks) {
