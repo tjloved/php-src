@@ -1718,7 +1718,7 @@ static zend_always_inline zend_long zend_fetch_string_offset(zval *container, zv
 	return offset;
 }
 
-static zend_always_inline void zend_fetch_dimension_address(zval *result, zval *container, zval *dim, int dim_type, int type)
+static zend_always_inline void zend_fetch_dimension_address(zval *result, zval *container, zval *dim, int dim_type, int type, uint32_t reason)
 {
     zval *retval;
 
@@ -1756,7 +1756,28 @@ convert_to_array:
 			zend_throw_error(NULL, "[] operator not supported for strings");
 		} else {
 			zend_check_string_offset(dim, type);
-			zend_throw_error(NULL, "Cannot indirectly modify string offset");
+			if (type == BP_VAR_UNSET) {
+				zend_throw_error(NULL, "Cannot unset string offsets");
+			} else {
+				switch (reason) {
+					case BP_VAR_FOR_DIM:
+						zend_throw_error(NULL, "Cannot use string offset as an array");
+						break;
+					case BP_VAR_FOR_OBJ:
+						zend_throw_error(NULL, "Cannot use string offset as an object");
+						break;
+					case BP_VAR_FOR_REF:
+						zend_throw_error(NULL, "Cannot create references to/from string offsets");
+						break;
+					case BP_VAR_FOR_INCDEC:
+						zend_throw_error(NULL, "Cannot increment/decrement string offsets");
+						break;
+					case BP_VAR_FOR_COMPOUND:
+						zend_throw_error(NULL, "Cannot use assign-op operators with string offsets");
+						break;
+					EMPTY_SWITCH_DEFAULT_CASE()
+				}
+			}
 		}
 		ZVAL_INDIRECT(result, &EG(error_zval));
 	} else if (EXPECTED(Z_TYPE_P(container) == IS_OBJECT)) {
@@ -1818,19 +1839,19 @@ convert_to_array:
 	}
 }
 
-static zend_never_inline void zend_fetch_dimension_address_W(zval *result, zval *container_ptr, zval *dim, int dim_type)
+static zend_never_inline void zend_fetch_dimension_address_W(zval *result, zval *container_ptr, zval *dim, int dim_type, uint32_t reason)
 {
-	zend_fetch_dimension_address(result, container_ptr, dim, dim_type, BP_VAR_W);
+	zend_fetch_dimension_address(result, container_ptr, dim, dim_type, BP_VAR_W, reason);
 }
 
-static zend_never_inline void zend_fetch_dimension_address_RW(zval *result, zval *container_ptr, zval *dim, int dim_type)
+static zend_never_inline void zend_fetch_dimension_address_RW(zval *result, zval *container_ptr, zval *dim, int dim_type, uint32_t reason)
 {
-	zend_fetch_dimension_address(result, container_ptr, dim, dim_type, BP_VAR_RW);
+	zend_fetch_dimension_address(result, container_ptr, dim, dim_type, BP_VAR_RW, reason);
 }
 
 static zend_never_inline void zend_fetch_dimension_address_UNSET(zval *result, zval *container_ptr, zval *dim, int dim_type)
 {
-	zend_fetch_dimension_address(result, container_ptr, dim, dim_type, BP_VAR_UNSET);
+	zend_fetch_dimension_address(result, container_ptr, dim, dim_type, BP_VAR_UNSET, 0);
 }
 
 static zend_always_inline void zend_fetch_dimension_address_read(zval *result, zval *container, zval *dim, int dim_type, int type)

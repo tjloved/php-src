@@ -31,7 +31,7 @@ try {
 }
 ?>
 --EXPECTF--
-string(%d) "Cannot indirectly modify string offset"
-string(%d) "Cannot indirectly modify string offset"
-string(%d) "Cannot indirectly modify string offset"
-string(%d) "Cannot indirectly modify string offset"
+string(%d) "Cannot use string offset as an array"
+string(%d) "Cannot unset string offsets"
+string(%d) "Cannot create references to/from string offsets"
+string(%d) "Cannot increment/decrement string offsets"
