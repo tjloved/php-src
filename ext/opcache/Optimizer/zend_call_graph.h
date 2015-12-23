@@ -70,6 +70,7 @@ typedef struct _zend_call_graph {
 BEGIN_EXTERN_C()
 
 int zend_build_call_graph(zend_arena **arena, zend_script *script, uint32_t build_flags, zend_call_graph *call_graph);
+int zend_build_call_graph_ex(zend_arena **arena, zend_script *script, uint32_t build_flags, zend_call_graph *call_graph, zend_op_array *target_op_array);
 zend_call_info **zend_build_call_map(zend_arena **arena, zend_func_info *info, zend_op_array *op_array);
 int zend_analyze_calls(zend_arena **arena, zend_script *script, uint32_t build_flags, zend_op_array *op_array, zend_func_info *func_info);
 

@@ -242,7 +242,7 @@ static void zend_sort_op_arrays(zend_call_graph *call_graph)
 	// TODO: perform topological sort of cyclic call graph
 }
 
-int zend_build_call_graph(zend_arena **arena, zend_script *script, uint32_t build_flags, zend_call_graph *call_graph) /* {{{ */
+int zend_build_call_graph_ex(zend_arena **arena, zend_script *script, uint32_t build_flags, zend_call_graph *call_graph, zend_op_array *target_op_array) /* {{{ */
 {
 	int i;
 
@@ -257,7 +257,9 @@ int zend_build_call_graph(zend_arena **arena, zend_script *script, uint32_t buil
 		return FAILURE;
 	}
 	for (i = 0; i < call_graph->op_arrays_count; i++) {
-		zend_analyze_calls(arena, script, build_flags, call_graph->op_arrays[i], call_graph->func_infos + i);
+		zend_analyze_calls(arena, script,
+			call_graph->op_arrays[i] == target_op_array ? build_flags : ZEND_RT_CONSTANTS,
+			call_graph->op_arrays[i], call_graph->func_infos + i);
 	}
 	zend_analyze_recursion(call_graph);
 	zend_sort_op_arrays(call_graph);
@@ -265,6 +267,11 @@ int zend_build_call_graph(zend_arena **arena, zend_script *script, uint32_t buil
 	return SUCCESS;
 }
 /* }}} */
+
+int zend_build_call_graph(zend_arena **arena, zend_script *script, uint32_t build_flags, zend_call_graph *call_graph)
+{
+	return zend_build_call_graph_ex(arena, script, build_flags, call_graph, NULL);
+}
 
 zend_call_info **zend_build_call_map(zend_arena **arena, zend_func_info *info, zend_op_array *op_array) /* {{{ */
 {
