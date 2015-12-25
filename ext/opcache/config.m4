@@ -403,6 +403,7 @@ fi
 	Optimizer/optimize_temp_vars_5.c \
 	Optimizer/nop_removal.c \
 	Optimizer/compact_literals.c \
+	Optimizer/inlining.c \
 	Optimizer/zend_cfg.c \
 	Optimizer/zend_dfg.c \
 	Optimizer/dfa_pass.c \
