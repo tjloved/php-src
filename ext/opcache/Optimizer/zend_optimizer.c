@@ -755,6 +755,16 @@ static void zend_optimize(zend_op_array      *op_array,
 		}
 	}
 
+	/* pass 8:
+	 * - Inline functions
+	 */
+	if (ZEND_OPTIMIZER_PASS_8 & ctx->optimization_level) {
+		optimize_inlining(op_array, ctx);
+		if (ctx->debug_level & ZEND_DUMP_AFTER_PASS_8) {
+			zend_dump_op_array(op_array, 0, "after pass 8", NULL);
+		}
+	}
+
 	/* pass 5:
 	 * - CFG optimization
 	 */
