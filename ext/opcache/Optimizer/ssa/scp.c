@@ -3,11 +3,21 @@
 #include "Optimizer/ssa/helpers.h"
 #include "Optimizer/ssa/instructions.h"
 
+#if 0
+#define SCP_DEBUG(...) php_printf(__VA_ARGS__)
+#else
+#define SCP_DEBUG(...)
+#endif
+
 typedef struct _scp_ctx {
 	zend_op_array *op_array;
 	zend_ssa *ssa;
-	zend_bitset worklist;
-	uint32_t worklist_len;
+	zend_bitset var_worklist;
+	zend_bitset block_worklist;
+	zend_bitset executable_blocks;
+	zend_bitset feasible_edges; /* Encoding: 2 bits per block, one for each successor */
+	uint32_t var_worklist_len;
+	uint32_t block_worklist_len;
 	zval *values;
 	zval top;
 	zval bot;
@@ -32,10 +42,17 @@ static void set_value(scp_ctx *ctx, int var, zval *new) {
 	if (IS_BOT(value) || IS_TOP(new)) {
 		return;
 	}
+
+	if (IS_BOT(new)) {
+		SCP_DEBUG("Lowering var %d to BOT\n", var);
+	} else {
+		SCP_DEBUG("Lowering var %d to %Z\n", var, new);
+	}
+
 	if (IS_TOP(value) || IS_BOT(new)) {
 		zval_ptr_dtor_nogc(value);
 		ZVAL_COPY(value, new);
-		zend_bitset_incl(ctx->worklist, var);
+		zend_bitset_incl(ctx->var_worklist, var);
 		return;
 	}
 #if ZEND_DEBUG
@@ -464,10 +481,16 @@ static void interp_instr(scp_ctx *ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 			}
 			break;
 		case ZEND_QM_ASSIGN:
+		case ZEND_JMP_SET:
+		case ZEND_COALESCE:
+		case ZEND_FETCH_CLASS:
 			SET_RESULT(result, op1);
 			break;
-		case ZEND_FETCH_CLASS:
-			SET_RESULT(result, op2);
+		case ZEND_JMPZ_EX:
+		case ZEND_JMPNZ_EX:
+			SKIP_IF_TOP(op1);
+			ZVAL_BOOL(&zv, zend_is_true(op1));
+			SET_RESULT(result, &zv);
 			break;
 		default:
 		{
@@ -478,6 +501,73 @@ static void interp_instr(scp_ctx *ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 			break;
 		}
 	}
+}
+
+/* Returns whether there is a successor */
+static zend_bool get_feasible_successors(
+		scp_ctx *ctx, zend_basic_block *block,
+		zend_op *opline, zend_ssa_op *ssa_op, zend_bool *suc) {
+	zval *op1;
+
+	/* Terminal block without sucessors */
+	if (block->successors[0] < 0) {
+		return 0;
+	}
+
+	/* Unconditional jump */
+	if (block->successors[1] < 0) {
+		suc[0] = 1;
+		return 1;
+	}
+
+	/* We can't determine the branch target at compile-time for these */
+	switch (opline->opcode) {
+		case ZEND_ASSERT_CHECK:
+		case ZEND_CATCH:
+		case ZEND_DECLARE_ANON_CLASS:
+		case ZEND_DECLARE_ANON_INHERITED_CLASS:
+		case ZEND_FE_FETCH_R:
+		case ZEND_FE_FETCH_RW:
+		case ZEND_NEW:
+		// TODO For these two we could consider empty arrays
+		case ZEND_FE_RESET_R:
+		case ZEND_FE_RESET_RW:
+			suc[0] = 1;
+			suc[1] = 1;
+			return 1;
+	}
+
+	op1 = get_op1_value(ctx, opline, ssa_op);
+
+	/* Branch target not yet known */
+	if (IS_TOP(op1)) {
+		return 0;
+	}
+
+	/* Branch target can be either one */
+	if (IS_BOT(op1)) {
+		suc[0] = 1;
+		suc[1] = 1;
+		return 1;
+	}
+
+	switch (opline->opcode) {
+		case ZEND_JMPZ:
+		case ZEND_JMPZNZ:
+		case ZEND_JMPZ_EX:
+			suc[zend_is_true(op1)] = 1;
+			break;
+		case ZEND_JMPNZ:
+		case ZEND_JMPNZ_EX:
+		case ZEND_JMP_SET:
+			suc[!zend_is_true(op1)] = 1;
+			break;
+		case ZEND_COALESCE:
+			suc[Z_TYPE_P(op1) == IS_NULL] = 1;
+			break;
+		EMPTY_SWITCH_DEFAULT_CASE()
+	}
+	return 1;
 }
 
 static void join_phi_values(zval *a, zval *b) {
@@ -495,50 +585,151 @@ static void join_phi_values(zval *a, zval *b) {
 	}
 }
 
-static void scp_solve(scp_ctx *ctx) {
-	zend_ssa *ssa = ctx->ssa;
-	while (!zend_bitset_empty(ctx->worklist, ctx->worklist_len)) {
-		int i = zend_bitset_pop_first(ctx->worklist, ctx->worklist_len);
-		zend_ssa_var *var = &ssa->vars[i];
+static zend_bool is_edge_feasible(scp_ctx *ctx, int from, int to) {
+	zend_basic_block *block = &ctx->ssa->cfg.blocks[from];
+	int suc;
+	if (block->successors[0] == to) {
+		suc = 0;
+	} else if (block->successors[1] == to) {
+		suc = 1;
+	} else {
+		ZEND_ASSERT(0);
+	}
+	return zend_bitset_in(ctx->feasible_edges, 2 * from + suc);
+}
 
-#if 0
-		int k;
-		for (k = 0; k < ssa->vars_count; ++k) {
-			zval *value = &ctx->values[k];
-			if (Z_TYPE_P(value) == BOT) {
-				php_printf("BOT\n");
-			} else if (Z_TYPE_P(value) == TOP) {
-				php_printf("TOP\n");
+static void handle_phi(scp_ctx *ctx, zend_ssa_phi *phi) {
+	zend_ssa *ssa = ctx->ssa;
+	ZEND_ASSERT(phi->ssa_var >= 0);
+	if (!IS_BOT(&ctx->values[phi->ssa_var])) {
+		zend_basic_block *block = &ssa->cfg.blocks[phi->block];
+		int *predecessors = &ssa->cfg.predecessors[block->predecessor_offset];
+
+		int i;
+		zval value;
+		MAKE_TOP(&value);
+		SCP_DEBUG("Handling PHI(");
+		for (i = 0; i < block->predecessors_count; i++) {
+			if (is_edge_feasible(ctx, predecessors[i], phi->block)) {
+				SCP_DEBUG("val, ");
+				join_phi_values(&value, &ctx->values[phi->sources[i]]);
 			} else {
-				zend_print_zval_r(value, 0);
-				php_printf("\n");
+				SCP_DEBUG("--, ");
 			}
 		}
-		php_printf("--- on %d\n", i);
+		SCP_DEBUG(")\n");
+
+		set_value(ctx, phi->ssa_var, &value);
+		zval_ptr_dtor_nogc(&value);
+	}
+}
+
+static void mark_edge_feasible(scp_ctx *ctx, int from, int to, int suc_num) {
+	int edge = from * 2 + suc_num;
+	if (zend_bitset_in(ctx->feasible_edges, edge)) {
+		/* We already handled this edge */
+		return;
+	}
+
+	SCP_DEBUG("Marking edge %d->%d (successor %d) feasible\n", from, to, suc_num);
+	zend_bitset_incl(ctx->feasible_edges, edge);
+
+	if (!zend_bitset_in(ctx->executable_blocks, to)) {
+		SCP_DEBUG("Marking block %d executable\n", to);
+		zend_bitset_incl(ctx->executable_blocks, to);
+		zend_bitset_incl(ctx->block_worklist, to);
+	} else {
+		/* Block is already executable, only a new edge became feasible.
+		 * Reevaluate phi nodes to account for changed source operands. */
+		zend_ssa_block *ssa_block = &ctx->ssa->blocks[to];
+		zend_ssa_phi *phi;
+		for (phi = ssa_block->phis; phi; phi = phi->next) {
+			handle_phi(ctx, phi);
+		}
+	}
+}
+
+static void handle_instr(scp_ctx *ctx, int block_num, zend_op *opline, zend_ssa_op *ssa_op) {
+	zend_basic_block *block = &ctx->ssa->cfg.blocks[block_num];
+	interp_instr(ctx, opline, ssa_op);
+
+	if (block->end == opline - ctx->op_array->opcodes) {
+		zend_bool suc[2] = {0};
+		if (get_feasible_successors(ctx, block, opline, ssa_op, suc)) {
+			if (suc[0]) {
+				mark_edge_feasible(ctx, block_num, block->successors[0], 0);
+			}
+			if (suc[1]) {
+				mark_edge_feasible(ctx, block_num, block->successors[1], 1);
+			}
+		}
+	}
+}
+
+static void scp_solve(scp_ctx *ctx) {
+	zend_ssa *ssa = ctx->ssa;
+	SCP_DEBUG("Start SCP solve\n");
+	while (!zend_bitset_empty(ctx->var_worklist, ctx->var_worklist_len)
+		|| !zend_bitset_empty(ctx->block_worklist, ctx->block_worklist_len)
+	) {
+		int i;
+		while ((i = zend_bitset_pop_first(ctx->var_worklist, ctx->var_worklist_len)) >= 0) {
+			zend_ssa_var *var = &ssa->vars[i];
+
+#if 0
+			int k;
+			for (k = 0; k < ssa->vars_count; ++k) {
+				zval *value = &ctx->values[k];
+				if (Z_TYPE_P(value) == BOT) {
+					php_printf("BOT\n");
+				} else if (Z_TYPE_P(value) == TOP) {
+					php_printf("TOP\n");
+				} else {
+					zend_print_zval_r(value, 0);
+					php_printf("\n");
+				}
+			}
+			php_printf("--- on %d\n", i);
 #endif
 
-		{
-			int use;
-			FOREACH_USE(var, use) {
-				interp_instr(ctx, &ctx->op_array->opcodes[use], &ssa->ops[use]);
-			} FOREACH_USE_END();
+			{
+				int use;
+				FOREACH_USE(var, use) {
+					int block_num = ssa->cfg.map[use];
+					if (zend_bitset_in(ctx->executable_blocks, block_num)) {
+						handle_instr(ctx, block_num, &ctx->op_array->opcodes[use], &ssa->ops[use]);
+					}
+				} FOREACH_USE_END();
+			}
+
+			{
+				zend_ssa_phi *phi;
+				FOREACH_PHI_USE(var, phi) {
+					handle_phi(ctx, phi);
+				} FOREACH_PHI_USE_END();
+			}
 		}
 
-		{
-			zend_ssa_phi *phi;
-			FOREACH_PHI_USE(var, phi) {
-				ZEND_ASSERT(phi->ssa_var >= 0);
-				if (!IS_BOT(&ctx->values[phi->ssa_var])) {
-					int source;
-					zval value;
-					MAKE_TOP(&value);
-					FOREACH_PHI_SOURCE(phi, source) {
-						join_phi_values(&value, &ctx->values[source]);
-					} FOREACH_PHI_SOURCE_END();
-					set_value(ctx, phi->ssa_var, &value);
-					zval_ptr_dtor_nogc(&value);
+		while ((i = zend_bitset_pop_first(ctx->block_worklist, ctx->block_worklist_len)) >= 0) {
+			/* This block is now live. Interpret phis and instructions in it. */
+			zend_basic_block *block = &ssa->cfg.blocks[i];
+			zend_ssa_block *ssa_block = &ssa->blocks[i];
+
+			SCP_DEBUG("Pop block %d from worklist\n", i);
+
+			{
+				zend_ssa_phi *phi;
+				for (phi = ssa_block->phis; phi; phi = phi->next) {
+					handle_phi(ctx, phi);
 				}
-			} FOREACH_PHI_USE_END();
+			}
+
+			{
+				int j;
+				for (j = block->start; j <= block->end; ++j) {
+					handle_instr(ctx, i, &ctx->op_array->opcodes[j], &ssa->ops[j]);
+				}
+			}
 		}
 	}
 }
@@ -632,12 +823,24 @@ void ssa_optimize_scp(zend_op_array *op_array, zend_ssa *ssa) {
 	ctx.ssa = ssa;
 	ctx.values = alloca(sizeof(zval) * ssa_vars);
 
-	ctx.worklist_len = zend_bitset_len(ssa_vars);
-	ctx.worklist = alloca(sizeof(zend_ulong) * ctx.worklist_len);
-	memset(ctx.worklist, 0, sizeof(zend_ulong) * ctx.worklist_len);
-
 	MAKE_TOP(&ctx.top);
 	MAKE_BOT(&ctx.bot);
+
+	ctx.var_worklist_len = zend_bitset_len(ssa_vars);
+	ctx.var_worklist = alloca(sizeof(zend_ulong) * ctx.var_worklist_len);
+	memset(ctx.var_worklist, 0, sizeof(zend_ulong) * ctx.var_worklist_len);
+
+	ctx.block_worklist_len = zend_bitset_len(ssa->cfg.blocks_count);
+	ctx.block_worklist = alloca(sizeof(zend_ulong) * ctx.block_worklist_len);
+	memset(ctx.block_worklist, 0, sizeof(zend_ulong) * ctx.block_worklist_len);
+
+	ctx.executable_blocks = alloca(sizeof(zend_ulong) * ctx.block_worklist_len);
+	memset(ctx.executable_blocks, 0, sizeof(zend_ulong) * ctx.block_worklist_len);
+	ctx.feasible_edges = alloca(sizeof(zend_ulong) * ctx.block_worklist_len * 2);
+	memset(ctx.feasible_edges, 0, sizeof(zend_ulong) * ctx.block_worklist_len * 2);
+
+	zend_bitset_incl(ctx.block_worklist, 0);
+	zend_bitset_incl(ctx.executable_blocks, 0);
 
 	i = 0;
 	for (; i < op_array->last_var; ++i) {
@@ -646,25 +849,11 @@ void ssa_optimize_scp(zend_op_array *op_array, zend_ssa *ssa) {
 		MAKE_BOT(&ctx.values[i]);
 	}
 	for (; i < ssa_vars; ++i) {
-		/*if (ssa->vars[i].definition < 0 && !ssa->vars[i].definition_phi) {
-			MAKE_BOT(&ctx.values[i]);
-			continue;
-		}*/
 		if (ssa->var_info[i].type & MAY_BE_REF) {
 			MAKE_BOT(&ctx.values[i]);
 			continue;
 		}
 		MAKE_TOP(&ctx.values[i]);
-	}
-
-	for (i = 0; i < ssa_vars; ++i) {
-		zend_ssa_var *var = &ssa->vars[i];
-		if (var->definition >= 0) {
-			zend_op *opline = &op_array->opcodes[var->definition];
-			zend_ssa_op *ssa_op = &ssa->ops[var->definition];
-			interp_instr(&ctx, opline, ssa_op);
-			continue;
-		}
 	}
 
 	scp_solve(&ctx);
