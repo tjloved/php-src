@@ -27,6 +27,20 @@ static void ssa_optimize_peephole(zend_op_array *op_array, zend_ssa *ssa) {
 	}
 }
 
+/* The block map only contains entries for the start and end of a block.
+ * Fill it up to cover all instructions. */
+static void complete_block_map(zend_cfg *cfg, uint32_t num_instr) {
+	uint32_t *map = cfg->map, *end = map + num_instr;
+	uint32_t block = (uint32_t) -1;
+	for (; map < end; map++) {
+		if (*map != (uint32_t) -1) {
+			block = *map;
+		} else {
+			*map = block;
+		}
+	}
+}
+
 /* Certain ops create spurious SSA var defs, which are only of interest for
  * RC1|RCN inference. As we are not interested in it, we drop them up front. */
 static void remove_spurious_ssa_vars(zend_op_array *op_array, zend_ssa *ssa) {
@@ -175,9 +189,14 @@ static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) 
 		return;
 	}
 
+	complete_block_map(&info->ssa.cfg, op_array->last);
 	remove_spurious_ssa_vars(op_array, &info->ssa);
 	remove_trivial_phis(&info->ssa);
 	verify_use_chains(&info->ssa);
+
+	if (ZCG(accel_directives).jit_debug & 2) {
+		zend_dump_op_array(op_array, ZEND_DUMP_SSA | ZEND_DUMP_HIDE_UNUSED_VARS, NULL, &info->ssa);
+	}
 
 	ssa_optimize_scp(op_array, &info->ssa);
 	ssa_optimize_dce(op_array, &info->ssa);
