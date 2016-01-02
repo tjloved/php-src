@@ -77,6 +77,28 @@ void ssa_optimize_type_specialization(zend_op_array *op_array, zend_ssa *ssa) {
 					opline->opcode = ZEND_MUL_DOUBLE;
 				}
 				break;
+			case ZEND_PRE_INC:
+			case ZEND_PRE_DEC:
+				if (!RESULT_UNUSED(opline) || opline->op1_type != IS_CV) {
+					break;
+				}
+				if (MUST_BE(t1, MAY_BE_LONG)) {
+					opline->opcode = opline->opcode == ZEND_PRE_INC ? ZEND_ADD_INT : ZEND_SUB_INT;
+					opline->result_type = IS_CV;
+					opline->result = opline->op1;
+					opline->op2_type = IS_CONST;
+					LITERAL_LONG(opline->op2, 1);
+				} else if (MUST_BE(t1, MAY_BE_DOUBLE)) {
+					zval zv;
+					ZVAL_DOUBLE(&zv, 1.0);
+					opline->opcode = opline->opcode == ZEND_PRE_INC
+						? ZEND_ADD_DOUBLE : ZEND_SUB_DOUBLE;
+					opline->result_type = IS_CV;
+					opline->result = opline->op1;
+					opline->op2_type = IS_CONST;
+					opline->op2.constant = zend_optimizer_add_literal(op_array, &zv);
+				}
+				break;
 		}
 	}
 }
