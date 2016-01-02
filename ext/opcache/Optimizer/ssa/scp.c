@@ -399,7 +399,9 @@ static void interp_instr(scp_ctx *ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 			if (ct_eval_binary(&zv, opline->opcode, op1, op2) == SUCCESS) {
 				SET_RESULT(result, &zv);
 				zval_ptr_dtor_nogc(&zv);
+				break;
 			}
+			SET_RESULT_BOT(result);
 			break;
 		case ZEND_ASSIGN_ADD:
 		case ZEND_ASSIGN_SUB:
@@ -428,7 +430,9 @@ static void interp_instr(scp_ctx *ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 				SET_RESULT(op1, &zv);
 				SET_RESULT(result, &zv);
 				zval_ptr_dtor_nogc(&zv);
+				break;
 			}
+			SET_RESULT_BOT(result);
 			break;
 		case ZEND_PRE_INC:
 		case ZEND_PRE_DEC:
@@ -437,7 +441,10 @@ static void interp_instr(scp_ctx *ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 				SET_RESULT(op1, &zv);
 				SET_RESULT(result, &zv);
 				zval_ptr_dtor_nogc(&zv);
+				break;
 			}
+			SET_RESULT_BOT(op1);
+			SET_RESULT_BOT(result);
 			break;
 		case ZEND_POST_INC:
 		case ZEND_POST_DEC:
@@ -446,7 +453,9 @@ static void interp_instr(scp_ctx *ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 			if (ct_eval_incdec(&zv, opline->opcode, op1) == SUCCESS) {
 				SET_RESULT(op1, &zv);
 				zval_ptr_dtor_nogc(&zv);
+				break;
 			}
+			SET_RESULT_BOT(op1);
 			break;
 		case ZEND_BW_NOT:
 		case ZEND_BOOL_NOT:
@@ -454,21 +463,27 @@ static void interp_instr(scp_ctx *ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 			if (ct_eval_unary(&zv, opline->opcode, op1) == SUCCESS) {
 				SET_RESULT(result, &zv);
 				zval_ptr_dtor_nogc(&zv);
+				break;
 			}
+			SET_RESULT_BOT(result);
 			break;
 		case ZEND_CAST:
 			SKIP_IF_TOP(op1);
 			if (ct_eval_cast(&zv, opline, op1) == SUCCESS) {
 				SET_RESULT(result, &zv);
 				zval_ptr_dtor_nogc(&zv);
+				break;
 			}
+			SET_RESULT_BOT(result);
 			break;
 		case ZEND_STRLEN:
 			SKIP_IF_TOP(op1);
 			if (ct_eval_strlen(&zv, opline, op1) == SUCCESS) {
 				SET_RESULT(result, &zv);
 				zval_ptr_dtor_nogc(&zv);
+				break;
 			}
+			SET_RESULT_BOT(result);
 			break;
 		case ZEND_FETCH_DIM_R:
 			if (IS_TOP(op1) || IS_TOP(op2)) {
@@ -478,7 +493,9 @@ static void interp_instr(scp_ctx *ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 			if (ct_eval_fetch_dim(&zv, opline, op1, op2) == SUCCESS) {
 				SET_RESULT(result, &zv);
 				zval_ptr_dtor_nogc(&zv);
+				break;
 			}
+			SET_RESULT_BOT(result);
 			break;
 		case ZEND_QM_ASSIGN:
 		case ZEND_JMP_SET:

@@ -299,6 +299,10 @@ static inline zend_bool may_have_side_effects(
 		case ZEND_JMPZ:
 		case ZEND_JMPNZ:
 		case ZEND_JMPZNZ:
+		case ZEND_JMPZ_EX:
+		case ZEND_JMPNZ_EX:
+		case ZEND_JMP_SET:
+		case ZEND_COALESCE:
 		case ZEND_ASSERT_CHECK:
 			/* For our purposes a jump is a side effect. */
 			return 1;
@@ -400,18 +404,40 @@ static inline zend_bool is_var_dead(context *ctx, int var_num) {
 
 static void dce_instr(context *ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 	zend_ssa *ssa = ctx->ssa;
-	zend_op_array *op_array = ctx->op_array;
 	int free_var = -1;
 	zend_uchar free_var_type;
 
-	/* Handle a couple of special opcodes */
+	/* We mark FREEs as dead, but they're only really dead if the destroyed var is dead */
+	if (opline->opcode == ZEND_FREE && !is_var_dead(ctx, ssa_op->op1_use)) {
+		return;
+	}
+
+	// TODO Two free vars?
+	if ((opline->op1_type & (IS_VAR|IS_TMP_VAR)) && !is_var_dead(ctx, ssa_op->op1_use)) {
+		free_var = ssa_op->op1_use;
+		free_var_type = opline->op1_type;
+	} else if (opline->op2_type & (IS_VAR|IS_TMP_VAR) && !is_var_dead(ctx, ssa_op->op2_use)) {
+		free_var = ssa_op->op2_use;
+		free_var_type = opline->op2_type;
+	}
+
+	remove_instr_with_defs(ctx->ssa, opline, ssa_op);
+
+	if (free_var >= 0) {
+		// TODO Sometimes we can mark the var as EXT_UNUSED
+		opline->opcode = ZEND_FREE;
+		opline->op1.var = (uintptr_t) ZEND_CALL_VAR_NUM(NULL, ssa->vars[free_var].var);
+		opline->op1_type = free_var_type;
+
+		ssa_op->op1_use = free_var;
+		ssa_op->op1_use_chain = ssa->vars[free_var].use_chain;
+		ssa->vars[free_var].use_chain = ssa_op - ssa->ops;
+	}
+}
+
+#if 0
+static void simplify_jump_and_set(context *ctx) {
 	switch (opline->opcode) {
-		case ZEND_FREE:
-			/* We mark FREEs as dead, but they're only really dead if the destroyed var is dead */
-			if (!is_var_dead(ctx, ssa_op->op1_use)) {
-				return;
-			}
-			break;
 		case ZEND_JMPZ_EX:
 			/* For jump-and-set only the set part is dead */
 			opline->opcode = ZEND_JMPZ;
@@ -441,29 +467,8 @@ static void dce_instr(context *ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 			// TODO
 			return;
 	}
-
-	// TODO Two free vars?
-	if ((opline->op1_type & (IS_VAR|IS_TMP_VAR)) && !is_var_dead(ctx, ssa_op->op1_use)) {
-		free_var = ssa_op->op1_use;
-		free_var_type = opline->op1_type;
-	} else if (opline->op2_type & (IS_VAR|IS_TMP_VAR) && !is_var_dead(ctx, ssa_op->op2_use)) {
-		free_var = ssa_op->op2_use;
-		free_var_type = opline->op2_type;
-	}
-
-	remove_instr_with_defs(ctx->ssa, opline, ssa_op);
-
-	if (free_var >= 0) {
-		// TODO Sometimes we can mark the var as EXT_UNUSED
-		opline->opcode = ZEND_FREE;
-		opline->op1.var = (uintptr_t) ZEND_CALL_VAR_NUM(NULL, ssa->vars[free_var].var);
-		opline->op1_type = free_var_type;
-
-		ssa_op->op1_use = free_var;
-		ssa_op->op1_use_chain = ssa->vars[free_var].use_chain;
-		ssa->vars[free_var].use_chain = ssa_op - ssa->ops;
-	}
 }
+#endif
 
 void ssa_optimize_dce(zend_op_array *op_array, zend_ssa *ssa) {
 	int i;
