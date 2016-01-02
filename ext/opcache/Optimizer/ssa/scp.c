@@ -726,9 +726,25 @@ static void scp_solve(scp_ctx *ctx) {
 
 			{
 				int j;
-				for (j = block->start; j <= block->end; ++j) {
+				for (j = block->start; j <= block->end; j++) {
 					handle_instr(ctx, i, &ctx->op_array->opcodes[j], &ssa->ops[j]);
 				}
+			}
+		}
+	}
+}
+
+/* Removes instructions inside dead blocks. We don't remove the actual blocks, as modifying the
+ * CFG would be overly painful at this point. */
+static void eliminate_dead_blocks(scp_ctx *ctx) {
+	zend_ssa *ssa = ctx->ssa;
+	int i;
+	for (i = 0; i < ssa->cfg.blocks_count; i++) {
+		if (!zend_bitset_in(ctx->executable_blocks, i)) {
+			zend_basic_block *block = &ssa->cfg.blocks[i];
+			int j;
+			for (j = block->start; j <= block->end; j++) {
+				remove_instr_with_defs(ssa, &ctx->op_array->opcodes[j], &ssa->ops[j]);
 			}
 		}
 	}
@@ -771,7 +787,7 @@ static void replace_constant_operands(scp_ctx *ctx) {
  *    and can't be DCEd. This means that it will not be able collect all instructions rendered dead
  *    by SCP, because they may have potentially side-effecting types, but the actual values are
  *    not. As such doing DCE here will allow us to eliminate more dead code in combination. */
-static void basic_dce(scp_ctx *ctx) {
+static void eliminate_dead_instructions(scp_ctx *ctx) {
 	zend_ssa *ssa = ctx->ssa;
 	zend_op_array *op_array = ctx->op_array;
 	int i;
@@ -857,8 +873,9 @@ void ssa_optimize_scp(zend_op_array *op_array, zend_ssa *ssa) {
 	}
 
 	scp_solve(&ctx);
+	eliminate_dead_blocks(&ctx);
 	replace_constant_operands(&ctx);
-	basic_dce(&ctx);
+	eliminate_dead_instructions(&ctx);
 
 	for (i = 0; i < ssa_vars; ++i) {
 		zval_ptr_dtor_nogc(&ctx.values[i]);
