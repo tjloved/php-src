@@ -79,13 +79,13 @@ void ssa_optimize_type_specialization(zend_op_array *op_array, zend_ssa *ssa) {
 				break;
 			case ZEND_PRE_INC:
 			case ZEND_PRE_DEC:
-				if (!RESULT_UNUSED(opline) || opline->op1_type != IS_CV) {
+				if (!RESULT_UNUSED(opline) || opline->op1_type != IS_CV
+						|| !(MUST_BE(t1, MAY_BE_LONG) || MUST_BE(t1, MAY_BE_DOUBLE))) {
 					break;
 				}
+				// TODO Cleanup?
 				if (MUST_BE(t1, MAY_BE_LONG)) {
 					opline->opcode = opline->opcode == ZEND_PRE_INC ? ZEND_ADD_INT : ZEND_SUB_INT;
-					opline->result_type = IS_CV;
-					opline->result = opline->op1;
 					opline->op2_type = IS_CONST;
 					LITERAL_LONG(opline->op2, 1);
 				} else if (MUST_BE(t1, MAY_BE_DOUBLE)) {
@@ -93,11 +93,42 @@ void ssa_optimize_type_specialization(zend_op_array *op_array, zend_ssa *ssa) {
 					ZVAL_DOUBLE(&zv, 1.0);
 					opline->opcode = opline->opcode == ZEND_PRE_INC
 						? ZEND_ADD_DOUBLE : ZEND_SUB_DOUBLE;
-					opline->result_type = IS_CV;
-					opline->result = opline->op1;
 					opline->op2_type = IS_CONST;
 					opline->op2.constant = zend_optimizer_add_literal(op_array, &zv);
 				}
+				COPY_NODE(opline->result, opline->op1);
+				ssa_op->result_def = ssa_op->op1_def;
+				ssa_op->op1_def = -1;
+				break;
+			case ZEND_ASSIGN_ADD:
+				if (!RESULT_UNUSED(opline) || opline->op1_type != IS_CV
+						|| opline->extended_value != 0
+						|| !(MUST_BE(t1, MAY_BE_LONG) || MUST_BE(t1, MAY_BE_DOUBLE))) {
+					break;
+				}
+				if (MUST_BE(t1, MAY_BE_LONG)) {
+					opline->opcode = ZEND_ADD_INT;
+				} else if (MUST_BE(t1, MAY_BE_DOUBLE)) {
+					opline->opcode = ZEND_ADD_DOUBLE;
+				}
+				COPY_NODE(opline->result, opline->op1);
+				ssa_op->result_def = ssa_op->op1_def;
+				ssa_op->op1_def = -1;
+				break;
+			case ZEND_ASSIGN_SUB:
+				if (!RESULT_UNUSED(opline) || opline->op1_type != IS_CV
+						|| opline->extended_value != 0
+						|| !(MUST_BE(t1, MAY_BE_LONG) || MUST_BE(t1, MAY_BE_DOUBLE))) {
+					break;
+				}
+				if (MUST_BE(t1, MAY_BE_LONG)) {
+					opline->opcode = ZEND_SUB_INT;
+				} else if (MUST_BE(t1, MAY_BE_DOUBLE)) {
+					opline->opcode = ZEND_SUB_DOUBLE;
+				}
+				COPY_NODE(opline->result, opline->op1);
+				ssa_op->result_def = ssa_op->op1_def;
+				ssa_op->op1_def = -1;
 				break;
 		}
 	}
