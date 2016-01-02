@@ -419,30 +419,7 @@ static void dce_instr(context *ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 		free_var_type = opline->op2_type;
 	}
 
-	/* We rename use/def pairs in case the def is used as NOVAL in assignment */
-	if (ssa_op->op1_def >= 0) {
-		if (ssa_op->op1_use >= 0) {
-			rename_var_uses(ssa, ssa_op->op1_def, ssa_op->op1_use);
-		}
-		ssa->vars[ssa_op->op1_def].definition = -1;
-		ssa_op->op1_def = -1;
-	}
-	if (ssa_op->op2_def >= 0) {
-		if (ssa_op->op2_use >= 0) {
-			rename_var_uses(ssa, ssa_op->op2_def, ssa_op->op2_use);
-		}
-		ssa->vars[ssa_op->op2_def].definition = -1;
-		ssa_op->op2_def = -1;
-	}
-	if (ssa_op->result_def >= 0) {
-		if (ssa_op->result_use >= 0) {
-			rename_var_uses(ssa, ssa_op->result_def, ssa_op->result_use);
-		}
-		ssa->vars[ssa_op->result_def].definition = -1;
-		ssa_op->result_def = -1;
-	}
-
-	remove_instr(ctx->ssa, opline, ssa_op);
+	remove_instr_with_defs(ctx->ssa, opline, ssa_op);
 
 	if (free_var >= 0) {
 		// TODO Sometimes we can mark the var as EXT_UNUSED

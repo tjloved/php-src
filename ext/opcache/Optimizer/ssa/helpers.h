@@ -99,6 +99,34 @@ static inline void remove_instr(zend_ssa *ssa, zend_op *opline, zend_ssa_op *ssa
 	MAKE_NOP(opline);
 }
 
+static inline void remove_instr_with_defs(zend_ssa *ssa, zend_op *opline, zend_ssa_op *ssa_op) {
+	/* Rename def to use if possible. Mark variable as not defined otherwise. */
+	// TODO Should we mark the uses as -1 (in particular in phis)?
+	if (ssa_op->op1_def >= 0) {
+		if (ssa_op->op1_use >= 0) {
+			rename_var_uses(ssa, ssa_op->op1_def, ssa_op->op1_use);
+		}
+		ssa->vars[ssa_op->op1_def].definition = -1;
+		ssa_op->op1_def = -1;
+	}
+	if (ssa_op->op2_def >= 0) {
+		if (ssa_op->op2_use >= 0) {
+			rename_var_uses(ssa, ssa_op->op2_def, ssa_op->op2_use);
+		}
+		ssa->vars[ssa_op->op2_def].definition = -1;
+		ssa_op->op2_def = -1;
+	}
+	if (ssa_op->result_def >= 0) {
+		if (ssa_op->result_use >= 0) {
+			rename_var_uses(ssa, ssa_op->result_def, ssa_op->result_use);
+		}
+		ssa->vars[ssa_op->result_def].definition = -1;
+		ssa_op->result_def = -1;
+	}
+
+	remove_instr(ssa, opline, ssa_op);
+}
+
 static inline int zend_bitset_pop_first(zend_bitset set, uint32_t len) {
 	int i = zend_bitset_first(set, len);
 	if (i >= 0) {
