@@ -57,10 +57,5 @@ void ssa_optimize_copy(zend_op_array *op_array, zend_ssa *ssa) {
 		ssa_op->op1_use_chain = ssa_op->op2_use_chain;
 		ssa_op->op2_use = -1;
 		ssa_op->op2_use_chain = -1;
-
-		/*if ((opline->result_type & (IS_TMP_VAR|IS_VAR))
-				&& ssa_op->result_ssa_op->op1_def < 0 && ssa_op->op2_def < 0
-		) {
-		}*/
 	}
 }
