@@ -416,6 +416,7 @@ fi
 	Optimizer/ssa/helpers.c \
 	Optimizer/ssa/scp.c \
 	Optimizer/ssa/dce.c \
+	Optimizer/ssa/copy.c \
 	Optimizer/ssa/tmpvar.c \
 	Optimizer/ssa/type_specialization.c,
 	shared,,-DZEND_ENABLE_STATIC_TSRMLS_CACHE=1,,yes)

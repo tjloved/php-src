@@ -7,6 +7,7 @@
 
 void ssa_optimize_scp(zend_op_array *op_array, zend_ssa *ssa);
 void ssa_optimize_dce(zend_op_array *op_array, zend_ssa *ssa);
+void ssa_optimize_copy(zend_op_array *op_array, zend_ssa *ssa);
 void ssa_optimize_cv_to_tmp(zend_op_array *op_array, zend_ssa *ssa);
 void ssa_optimize_type_specialization(zend_op_array *op_array, zend_ssa *ssa);
 
@@ -200,6 +201,7 @@ static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) 
 
 	ssa_optimize_scp(op_array, &info->ssa);
 	ssa_optimize_dce(op_array, &info->ssa);
+	ssa_optimize_copy(op_array, &info->ssa);
 	//ssa_optimize_cv_to_tmp(op_array, &info->ssa);
 	ssa_optimize_type_specialization(op_array, &info->ssa);
 	ssa_optimize_peephole(op_array, &info->ssa);

@@ -8,6 +8,8 @@
 #define CAN_BE(t, types) ((t) & (types))
 #define MUST_BE(t, types) (!((t & MAY_BE_ANY) & ~(types)))
 
+#define MAY_BE_REFCOUNTED (MAY_BE_STRING|MAY_BE_ARRAY|MAY_BE_OBJECT|MAY_BE_RESOURCE)
+
 #define FOREACH_USE(var, use) do { \
 	int _var_num = (var) - ssa->vars; \
 	use = (var)->use_chain; \
