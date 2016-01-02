@@ -52,6 +52,7 @@ static inline zend_bool may_throw(
 		case ZEND_FREE:
 		case ZEND_BEGIN_SILENCE:
 		case ZEND_END_SILENCE:
+		case ZEND_COALESCE:
 			return 0;
 		case ZEND_ADD:
 			if (CAN_BE(t1, MAY_BE_ARRAY) || CAN_BE(t2, MAY_BE_ARRAY)) {
@@ -92,6 +93,7 @@ static inline zend_bool may_throw(
 		case ZEND_JMPZNZ:
 		case ZEND_JMPZ_EX:
 		case ZEND_JMPNZ_EX:
+		case ZEND_JMP_SET:
 			return CAN_BE_OBJECT(t1);
 		case ZEND_BW_NOT:
 			return !MUST_BE(t1, MAY_BE_LONG|MAY_BE_DOUBLE|MAY_BE_STRING);
@@ -257,7 +259,6 @@ static inline zend_bool may_throw(
 #define ZEND_ISSET_ISEMPTY_PROP_OBJ          148
 #define ZEND_HANDLE_EXCEPTION                149
 #define ZEND_USER_OPCODE                     150
-#define ZEND_JMP_SET                         152
 #define ZEND_DECLARE_LAMBDA_FUNCTION         153
 #define ZEND_ADD_TRAIT                       154
 #define ZEND_BIND_TRAITS                     155
@@ -273,7 +274,6 @@ static inline zend_bool may_throw(
 #define ZEND_SEND_UNPACK                     165
 #define ZEND_ASSIGN_POW                      167
 #define ZEND_BIND_GLOBAL                     168
-#define ZEND_COALESCE                        169
 #define ZEND_SPACESHIP                       170
 #define ZEND_DECLARE_ANON_CLASS              171
 #define ZEND_DECLARE_ANON_INHERITED_CLASS    172
@@ -299,8 +299,6 @@ static inline zend_bool may_have_side_effects(
 		case ZEND_JMPZ:
 		case ZEND_JMPNZ:
 		case ZEND_JMPZNZ:
-		case ZEND_JMPZ_EX:
-		case ZEND_JMPNZ_EX:
 		case ZEND_ASSERT_CHECK:
 			/* For our purposes a jump is a side effect. */
 			return 1;
@@ -402,12 +400,46 @@ static inline zend_bool is_var_dead(context *ctx, int var_num) {
 
 static void dce_instr(context *ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 	zend_ssa *ssa = ctx->ssa;
+	zend_op_array *op_array = ctx->op_array;
 	int free_var = -1;
 	zend_uchar free_var_type;
 
-	/* We mark FREEs as dead, but they're only really dead if the var the destroy is dead */
-	if (opline->opcode == ZEND_FREE && !is_var_dead(ctx, ssa_op->op1_use)) {
-		return;
+	/* Handle a couple of special opcodes */
+	switch (opline->opcode) {
+		case ZEND_FREE:
+			/* We mark FREEs as dead, but they're only really dead if the destroyed var is dead */
+			if (!is_var_dead(ctx, ssa_op->op1_use)) {
+				return;
+			}
+			break;
+		case ZEND_JMPZ_EX:
+			/* For jump-and-set only the set part is dead */
+			opline->opcode = ZEND_JMPZ;
+			ssa_op->result_def = -1;
+
+			/* Replace constant branch with JMP, so NOP pass may remove it */
+			if (opline->op1_type == IS_CONST && !zend_is_true(&ZEND_OP1_LITERAL(opline))) {
+				literal_dtor(&ZEND_OP1_LITERAL(opline));
+				opline->opcode = ZEND_JMP;
+				opline->op1_type = IS_UNUSED;
+				opline->op1.num = opline->op2.num;
+			}
+			return;
+		case ZEND_JMPNZ_EX:
+		case ZEND_JMP_SET:
+			opline->opcode = ZEND_JMPNZ;
+			ssa_op->result_def = -1;
+
+			if (opline->op1_type == IS_CONST && zend_is_true(&ZEND_OP1_LITERAL(opline))) {
+				literal_dtor(&ZEND_OP1_LITERAL(opline));
+				opline->opcode = ZEND_JMP;
+				opline->op1_type = IS_UNUSED;
+				opline->op1.num = opline->op2.num;
+			}
+			return;
+		case ZEND_COALESCE:
+			// TODO
+			return;
 	}
 
 	// TODO Two free vars?
