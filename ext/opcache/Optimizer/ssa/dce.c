@@ -435,6 +435,65 @@ static void dce_instr(context *ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 	}
 }
 
+// TODO Move this somewhere else
+static void simplify_jumps(zend_ssa *ssa, zend_op_array *op_array) {
+	int i;
+	for (i = 0; i < op_array->last; i++) {
+		zend_op *opline = &op_array->opcodes[i];
+		zend_ssa_op *ssa_op = &ssa->ops[i];
+		zval *op1;
+
+		/* Convert jump-and-set into jump if result is not used  */
+		switch (opline->opcode) {
+			case ZEND_JMPZ_EX:
+				if (!var_used(&ssa->vars[ssa_op->result_def])) {
+					opline->opcode = ZEND_JMPZ;
+					ssa_op->result_def = -1;
+				}
+				break;
+			case ZEND_JMPNZ_EX:
+			case ZEND_JMP_SET:
+				if (!var_used(&ssa->vars[ssa_op->result_def])) {
+					opline->opcode = ZEND_JMPNZ;
+					ssa_op->result_def = -1;
+				}
+				break;
+			case ZEND_COALESCE:
+				// TODO
+				break;
+		}
+
+		if (opline->op1_type != IS_CONST) {
+			continue;
+		}
+
+		/* Convert constant conditional jump to unconditional jump */
+		op1 = &ZEND_OP1_LITERAL(opline);
+		switch (opline->opcode) {
+			case ZEND_JMPZ:
+				if (!zend_is_true(op1)) {
+					literal_dtor(op1);
+					opline->op1_type = IS_UNUSED;
+					opline->op1.num = opline->op2.num;
+					opline->opcode = ZEND_JMP;
+				} else {
+					MAKE_NOP(opline);
+				}
+				break;
+			case ZEND_JMPNZ:
+				if (zend_is_true(op1)) {
+					literal_dtor(op1);
+					opline->op1_type = IS_UNUSED;
+					opline->op1.num = opline->op2.num;
+					opline->opcode = ZEND_JMP;
+				} else {
+					MAKE_NOP(opline);
+				}
+				break;
+		}
+	}
+}
+
 #if 0
 static void simplify_jump_and_set(context *ctx) {
 	switch (opline->opcode) {
@@ -530,4 +589,6 @@ void ssa_optimize_dce(zend_op_array *op_array, zend_ssa *ssa) {
 			remove_phi(ssa, phi);
 		}
 	} FOREACH_PHI_END();
+
+	simplify_jumps(ssa, op_array);
 }
