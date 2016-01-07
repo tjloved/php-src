@@ -8094,6 +8094,51 @@ ZEND_VM_HANDLER(204, ZEND_MUL_DOUBLE, CONST|TMPVAR|CV, CONST|TMPVAR|CV)
 	ZEND_VM_NEXT_OPCODE();
 }
 
+ZEND_VM_HANDLER(189, ZEND_FETCH_OBJ_R_FIXED, TMPVAR|UNUSED|THIS|CV, CONST, NUM)
+{
+	USE_OPLINE
+	zend_free_op free_op1;
+	zval *retval;
+	zend_object *zobj;
+	uint32_t prop_offset = opline->extended_value;
+	zval *container = GET_OP1_OBJ_ZVAL_PTR_UNDEF(BP_VAR_R);
+
+	if (OP1_TYPE == IS_UNUSED && UNEXPECTED(Z_OBJ_P(container) == NULL)) {
+		SAVE_OPLINE();
+		zend_throw_error(NULL, "Using $this when not in object context");
+		HANDLE_EXCEPTION();
+	}
+
+	ZEND_ASSERT(Z_TYPE_P(container) == IS_OBJECT);
+	zobj = Z_OBJ_P(container);
+
+	retval = OBJ_PROP(zobj, prop_offset);
+	if (EXPECTED(Z_TYPE_P(retval) != IS_UNDEF)) {
+		ZVAL_COPY(EX_VAR(opline->result.var), retval);
+
+		if (OP1_TYPE & (IS_TMP_VAR|IS_VAR)) {
+			SAVE_OPLINE();
+			FREE_OP1();
+			ZEND_VM_NEXT_OPCODE_CHECK_EXCEPTION();
+		} else {
+			ZEND_VM_NEXT_OPCODE();
+		}
+	}
+
+	/* We still have to handle properties that have been unset */
+	SAVE_OPLINE();
+	ZEND_ASSERT(zobj->handlers->read_property);
+	retval = zobj->handlers->read_property(
+			container, EX_CONSTANT(opline->op2), BP_VAR_R,
+			NULL, //((OP2_TYPE == IS_CONST) ? CACHE_ADDR(Z_CACHE_SLOT_P(offset)) : NULL),
+			EX_VAR(opline->result.var));
+	if (retval != EX_VAR(opline->result.var)) {
+		ZVAL_COPY(EX_VAR(opline->result.var), retval);
+	}
+	FREE_OP1();
+	ZEND_VM_NEXT_OPCODE_CHECK_EXCEPTION();
+}
+
 ZEND_VM_TYPE_SPEC_HANDLER(ZEND_ADD, (res_info == MAY_BE_LONG && op1_info == MAY_BE_LONG && op2_info == MAY_BE_LONG), ZEND_ADD_LONG_NO_OVERFLOW, CONST|TMPVARCV, CONST|TMPVARCV, SPEC(NO_CONST_CONST,COMMUTATIVE))
 {
 	USE_OPLINE

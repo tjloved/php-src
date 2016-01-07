@@ -28,7 +28,8 @@ static void normalize_op2_type(
 	}
 }
 
-void ssa_optimize_type_specialization(zend_op_array *op_array, zend_ssa *ssa) {
+void ssa_optimize_type_specialization(
+		zend_optimizer_ctx *opt_ctx, zend_op_array *op_array, zend_ssa *ssa) {
 	int i;
 	for (i = 0; i < op_array->last; i++) {
 		zend_op *opline = &op_array->opcodes[i];

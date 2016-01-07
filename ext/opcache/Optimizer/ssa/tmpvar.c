@@ -565,7 +565,7 @@ static void mark_cv_uses_as_tmp(zend_op_array *op_array) {
 }
 #endif
 
-void ssa_optimize_cv_to_tmp(zend_op_array *op_array, zend_ssa *ssa) {
+void ssa_optimize_cv_to_tmp(zend_optimizer_ctx *ctx, zend_op_array *op_array, zend_ssa *ssa) {
 	foo(op_array, ssa);
 	//mark_cv_uses_as_tmp(op_array);
 }
