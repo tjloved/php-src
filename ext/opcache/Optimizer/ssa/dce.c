@@ -529,7 +529,7 @@ static void simplify_jump_and_set(context *ctx) {
 }
 #endif
 
-void ssa_optimize_dce(zend_op_array *op_array, zend_ssa *ssa) {
+void ssa_optimize_dce(zend_optimizer_ctx *opt_ctx, zend_op_array *op_array, zend_ssa *ssa) {
 	int i;
 	zend_ssa_phi *phi;
 

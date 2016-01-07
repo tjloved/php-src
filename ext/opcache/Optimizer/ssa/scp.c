@@ -847,7 +847,7 @@ static void eliminate_dead_instructions(scp_ctx *ctx) {
 	}
 }
 
-void ssa_optimize_scp(zend_op_array *op_array, zend_ssa *ssa) {
+void ssa_optimize_scp(zend_optimizer_ctx *opt_ctx, zend_op_array *op_array, zend_ssa *ssa) {
 	int i, ssa_vars = ssa->vars_count;
 	
 	scp_ctx ctx;

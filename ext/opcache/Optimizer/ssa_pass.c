@@ -5,13 +5,16 @@
 
 #define CANT_BE(t, name) (!(t & MAY_BE_##name))
 
-void ssa_optimize_scp(zend_op_array *op_array, zend_ssa *ssa);
-void ssa_optimize_dce(zend_op_array *op_array, zend_ssa *ssa);
-void ssa_optimize_copy(zend_op_array *op_array, zend_ssa *ssa);
-void ssa_optimize_cv_to_tmp(zend_op_array *op_array, zend_ssa *ssa);
-void ssa_optimize_type_specialization(zend_op_array *op_array, zend_ssa *ssa);
+void ssa_optimize_scp(zend_optimizer_ctx *ctx, zend_op_array *op_array, zend_ssa *ssa);
+void ssa_optimize_dce(zend_optimizer_ctx *ctx, zend_op_array *op_array, zend_ssa *ssa);
+void ssa_optimize_copy(zend_optimizer_ctx *ctx, zend_op_array *op_array, zend_ssa *ssa);
+void ssa_optimize_cv_to_tmp(zend_optimizer_ctx *ctx, zend_op_array *op_array, zend_ssa *ssa);
+void ssa_optimize_type_specialization(
+		zend_optimizer_ctx *ctx, zend_op_array *op_array, zend_ssa *ssa);
+void ssa_optimize_object_specialization(
+		zend_optimizer_ctx *ctx, zend_op_array *op_array, zend_ssa *ssa);
 
-static void ssa_optimize_peephole(zend_op_array *op_array, zend_ssa *ssa) {
+static void ssa_optimize_peephole(zend_optimizer_ctx *ctx, zend_op_array *op_array, zend_ssa *ssa) {
 	zend_op *opline = op_array->opcodes;
 	zend_op *end = opline + op_array->last;
 	while (opline != end) {
@@ -199,12 +202,13 @@ static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) 
 		zend_dump_op_array(op_array, ZEND_DUMP_SSA | ZEND_DUMP_HIDE_UNUSED_VARS, NULL, &info->ssa);
 	}
 
-	ssa_optimize_scp(op_array, &info->ssa);
-	ssa_optimize_dce(op_array, &info->ssa);
-	ssa_optimize_copy(op_array, &info->ssa);
-	//ssa_optimize_cv_to_tmp(op_array, &info->ssa);
-	ssa_optimize_type_specialization(op_array, &info->ssa);
-	ssa_optimize_peephole(op_array, &info->ssa);
+	ssa_optimize_scp(ctx, op_array, &info->ssa);
+	ssa_optimize_dce(ctx, op_array, &info->ssa);
+	ssa_optimize_copy(ctx, op_array, &info->ssa);
+	//ssa_optimize_cv_to_tmp(ctx, op_array, &info->ssa);
+	ssa_optimize_type_specialization(ctx, op_array, &info->ssa);
+	ssa_optimize_object_specialization(ctx, op_array, &info->ssa);
+	ssa_optimize_peephole(ctx, op_array, &info->ssa);
 
 	if (ZCG(accel_directives).jit_debug & 1) {
 		zend_dump_op_array(op_array, ZEND_DUMP_SSA | ZEND_DUMP_HIDE_UNUSED_VARS, NULL, &info->ssa);

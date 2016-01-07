@@ -2,7 +2,7 @@
 #include "Optimizer/zend_optimizer_internal.h"
 #include "Optimizer/ssa/helpers.h"
 
-void ssa_optimize_copy(zend_op_array *op_array, zend_ssa *ssa) {
+void ssa_optimize_copy(zend_optimizer_ctx *ctx, zend_op_array *op_array, zend_ssa *ssa) {
 	int i;
 	for (i = 0; i < op_array->last; i++) {
 		zend_op *opline = &op_array->opcodes[i];
