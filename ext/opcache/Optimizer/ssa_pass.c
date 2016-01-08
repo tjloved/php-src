@@ -118,6 +118,11 @@ static void verify_use_chains(zend_ssa *ssa) {
 		zend_ssa_var *var = &ssa->vars[i];
 		zend_ssa_phi *phi;
 		int c = 0;
+		/*if (var->definition < 0 && !var->definition_phi) {
+			if (var->use_chain >= 0 || var->phi_use_chain) {
+				php_printf("Var %d without def has uses", i);
+			}
+		}*/
 		FOREACH_PHI_USE(var, phi) {
 			if (++c > 10000) {
 				php_printf("Cycle in phi uses of %d\n", i);
