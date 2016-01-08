@@ -257,11 +257,14 @@ int zend_build_call_graph_ex(zend_arena **arena, zend_script *script, uint32_t b
 		return FAILURE;
 	}
 	for (i = 0; i < call_graph->op_arrays_count; i++) {
-		zend_analyze_calls(arena, script,
-			call_graph->op_arrays[i] == target_op_array ? build_flags : ZEND_RT_CONSTANTS,
-			call_graph->op_arrays[i], call_graph->func_infos + i);
+		if (!target_op_array || call_graph->op_arrays[i] == target_op_array) {
+			zend_analyze_calls(arena, script, build_flags,
+				call_graph->op_arrays[i], call_graph->func_infos + i);
+		}
 	}
-	zend_analyze_recursion(call_graph);
+	if (!target_op_array) {
+		zend_analyze_recursion(call_graph);
+	}
 	zend_sort_op_arrays(call_graph);
 
 	return SUCCESS;
