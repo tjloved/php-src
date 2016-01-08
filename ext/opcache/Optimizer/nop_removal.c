@@ -55,11 +55,15 @@ static inline zend_bool can_smart_branch(zend_op *opline) {
 
 /* Don't skip NOPs if it will result in a smart branch */
 static inline zend_bool can_skip_nop(zend_op_array *op_array, zend_op *opline) {
-	if (opline > op_array->opcodes && opline < op_array->opcodes + op_array->last - 1) {
-		return !can_smart_branch(opline - 1)
-			|| ((opline + 1)->opcode != ZEND_JMPZ && (opline + 1)->opcode != ZEND_JMPNZ);
+	zend_op *end = op_array->opcodes + op_array->last;
+	if (opline == op_array->opcodes || !can_smart_branch(opline -1)) {
+		return 1;
 	}
-	return 1;
+
+	while (opline < end && opline->opcode == ZEND_NOP) {
+		opline++;
+	}
+	return opline->opcode != ZEND_JMPZ && opline->opcode != ZEND_JMPNZ;
 }
 
 void zend_optimizer_nop_removal(zend_op_array *op_array)
