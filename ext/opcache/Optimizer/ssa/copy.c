@@ -37,6 +37,7 @@ void ssa_optimize_copy(zend_optimizer_ctx *ctx, zend_op_array *op_array, zend_ss
 					ssa_op->op1_def = -1;
 					/* NOP out the ASSIGN */
 					remove_instr(ssa, opline, ssa_op);
+					var->definition = -1;
 					continue;
 				}
 			}
