@@ -20,6 +20,13 @@
 #include "Optimizer/zend_optimizer.h"
 #include "Optimizer/zend_optimizer_internal.h"
 
+typedef struct _merge_info {
+	uint32_t tmp_offset;
+	int32_t *shiftlist;
+	/* Map from old live_range offsets to new ones */
+	int32_t *live_range_map;
+} merge_info;
+
 typedef struct _inline_info {
 	struct _inline_info *next;
 	zend_op_array *fbc;
@@ -29,8 +36,7 @@ typedef struct _inline_info {
 	uint32_t num_inlined_opcodes;
 	uint32_t num_args_passed;
 	uint32_t result_var_num;
-	uint32_t tmp_offset;
-	int32_t *shiftlist;
+	merge_info merge;
 } inline_info;
 
 static zend_bool can_inline_opcodes(zend_op_array *op_array, zend_bool rt_constants) {
@@ -244,21 +250,21 @@ static inline_info *find_inlinable_calls(zend_op_array *op_array, zend_optimizer
 
 static void copy_instr(
 		zend_op_array *old_op_array, zend_op *new_opcodes,
-		zend_op *old_opline, zend_op *new_opline,
-		const int32_t *shiftlist, uint32_t tmp_offset) {
+		zend_op *old_opline, zend_op *new_opline, const merge_info *merge) {
 #define TO_NEW(opline) \
-		(opline - old_op_array->opcodes + new_opcodes) + shiftlist[opline - old_op_array->opcodes]
+		(opline - old_op_array->opcodes + new_opcodes) \
+		+ merge->shiftlist[opline - old_op_array->opcodes]
 	*new_opline = *old_opline;
 
 	/* Adjust TMP/VAR offsets */
 	if (new_opline->op1_type & (IS_TMP_VAR|IS_VAR)) {
-		new_opline->op1.var += tmp_offset * sizeof(zval);
+		new_opline->op1.var += merge->tmp_offset * sizeof(zval);
 	}
 	if (new_opline->op2_type & (IS_TMP_VAR|IS_VAR)) {
-		new_opline->op2.var += tmp_offset * sizeof(zval);
+		new_opline->op2.var += merge->tmp_offset * sizeof(zval);
 	}
 	if (new_opline->result_type & (IS_TMP_VAR|IS_VAR)) {
-		new_opline->result.var += tmp_offset * sizeof(zval);
+		new_opline->result.var += merge->tmp_offset * sizeof(zval);
 	}
 
 	/* Adjust JMP offsets */
@@ -299,6 +305,12 @@ static void copy_instr(
 				TO_NEW(ZEND_OFFSET_TO_OPLINE(old_opline, old_opline->extended_value)));
 			break;
 	} 
+
+	/* Adjust live range offsets */
+	if ((new_opline->opcode == ZEND_FREE || new_opline->opcode == ZEND_FE_FREE)
+			&& (new_opline->extended_value & ZEND_FREE_ON_RETURN)) {
+		new_opline->op2.num = merge->live_range_map[new_opline->op2.num];
+	}
 #undef TO_NEW
 }
 
@@ -327,7 +339,7 @@ int32_t *create_shiftlists(zend_optimizer_ctx *ctx, zend_op_array *op_array, inl
 		shift += opline - op_array->opcodes;
 		{
 			zend_op *opline = info->fbc->opcodes, *end = opline + info->fbc->last;
-			int32_t *shiftlist = info->shiftlist =
+			int32_t *shiftlist = info->merge.shiftlist =
 				zend_arena_calloc(&ctx->arena, info->fbc->last, sizeof(int32_t));
 			int i;
 
@@ -365,7 +377,7 @@ int32_t *create_shiftlists(zend_optimizer_ctx *ctx, zend_op_array *op_array, inl
 
 static void merge_opcodes(
 		zend_op_array *op_array, inline_info *info,
-		zend_op *new_opcodes, const int32_t *shiftlist, uint32_t tmp_offset) {
+		zend_op *new_opcodes, const merge_info *merge) {
 	zend_op *opline = op_array->opcodes;
 	zend_op *end = opline + op_array->last;
 	zend_op *new_opline = new_opcodes;
@@ -376,8 +388,7 @@ static void merge_opcodes(
 	while (opline != end) {
 		unsigned level = 0;
 		if (!info || opline != info->init_opline) {
-			copy_instr(op_array, new_opcodes,
-				opline++, new_opline++, shiftlist, tmp_offset);
+			copy_instr(op_array, new_opcodes, opline++, new_opline++, merge);
 			continue;
 		}
 
@@ -391,8 +402,7 @@ static void merge_opcodes(
 				level--;
 			}
 
-			copy_instr(op_array, new_opcodes,
-				opline++, new_opline, shiftlist, tmp_offset);
+			copy_instr(op_array, new_opcodes, opline++, new_opline, merge);
 
 			if ((new_opline->opcode == ZEND_SEND_VAL || new_opline->opcode == ZEND_SEND_VAR)
 					&& level == 0) {
@@ -416,8 +426,7 @@ static void merge_opcodes(
 			opline += info->num_args_passed;
 
 			while (opline != end) {
-				copy_instr(info->fbc, new_opcodes,
-					opline++, new_opline, info->shiftlist, info->tmp_offset);
+				copy_instr(info->fbc, new_opcodes, opline++, new_opline, &info->merge);
 
 				/* Adjust CV and CONST offsets */
 				if (new_opline->op1_type == IS_CV) {
@@ -451,10 +460,12 @@ static void merge_opcodes(
 						/* Convert RETURN into QM_ASSIGN to call result var */
 						new_opline->opcode = ZEND_QM_ASSIGN;
 						new_opline->result_type = IS_VAR;
-						new_opline->result.var = info->result_var_num + tmp_offset * sizeof(zval);
+						new_opline->result.var =
+							info->result_var_num + merge->tmp_offset * sizeof(zval);
 					} else if (new_opline->op1_type & (IS_TMP_VAR|IS_VAR)) {
 						/* Convert RETURN into FREE if return value is unused */
 						new_opline->opcode = ZEND_FREE;
+						new_opline->extended_value = 0;
 					} else {
 						/* Convert RETURN into NOP if return value is unused and does not require
 						 * freeing. We insert a NOP to preserve precise opcode counts. */
@@ -525,43 +536,55 @@ static void merge_cvs(zend_op_array *op_array, inline_info *info, zend_string **
 }
 
 static inline void copy_live_range(
-		zend_live_range *new_live_range, zend_live_range *old_live_range,
-		int32_t *shiftlist, uint32_t tmp_offset) {
+		zend_live_range *new_live_range, const zend_live_range *old_live_range,
+		const zend_live_range *new_live_range_start, const zend_live_range *old_live_range_start,
+		merge_info *merge) {
+	merge->live_range_map[old_live_range - old_live_range_start] =
+		(new_live_range - new_live_range_start);
 	*new_live_range = *old_live_range;
-	new_live_range->var += tmp_offset * sizeof(zval);
-	new_live_range->start += shiftlist[new_live_range->start];
-	new_live_range->end += shiftlist[new_live_range->end];
+	new_live_range->var += merge->tmp_offset * sizeof(zval);
+	new_live_range->start += merge->shiftlist[new_live_range->start];
+	new_live_range->end += merge->shiftlist[new_live_range->end];
 }
 
 static void merge_live_ranges(
-		zend_op_array *op_array, inline_info *info, zend_live_range *new_live_range,
-		int32_t *shiftlist, uint32_t tmp_offset) {
-#define TO_NEW(opnum, shiftlist) (opnum + shiftlist[opnum])
+		zend_optimizer_ctx *ctx, zend_op_array *op_array,
+		inline_info *info, zend_live_range *new_live_range_start, merge_info *merge) {
+#define TO_NEW(opnum, merge) (opnum + (merge)->shiftlist[opnum])
+	zend_live_range *new_live_range = new_live_range_start;
 	zend_live_range *live_range = op_array->live_range;
 	zend_live_range *end = live_range + op_array->last_live_range;
+
+	merge->live_range_map = zend_arena_calloc(
+		&ctx->arena, op_array->last_live_range, sizeof(int32_t));
 	while (info) {
 		if (info->fbc->last_live_range) {
 			/* Live ranges must be sorted by start */
-			uint32_t i, limit = TO_NEW(info->fbc->live_range->start, info->shiftlist);
-			while (live_range != end && TO_NEW(live_range->start, shiftlist) < limit) {
-				copy_live_range(new_live_range++, live_range++, shiftlist, tmp_offset);
+			uint32_t i, limit = TO_NEW(info->fbc->live_range->start, &info->merge);
+			while (live_range != end && TO_NEW(live_range->start, merge) < limit) {
+				copy_live_range(new_live_range++, live_range++,
+					new_live_range_start, op_array->live_range, merge);
 			}
+
+			info->merge.live_range_map = zend_arena_calloc(
+				&ctx->arena, info->fbc->last_live_range, sizeof(int32_t));
 			for (i = 0; i < info->fbc->last_live_range; i++) {
 				copy_live_range(new_live_range++, &info->fbc->live_range[i],
-					info->shiftlist, info->tmp_offset);
+					new_live_range_start, info->fbc->live_range, &info->merge);
 			}
 		}
 		info = info->next;
 	}
 	while (live_range != end) {
-		copy_live_range(new_live_range++, live_range++, shiftlist, tmp_offset);
+		copy_live_range(new_live_range++, live_range++,
+			new_live_range_start, op_array->live_range, merge);
 	}
 #undef TO_NEW
 }
 
 static inline void copy_try_catch(
 		zend_try_catch_element *new_try_catch, zend_try_catch_element *old_try_catch,
-		int32_t *shiftlist) {
+		const int32_t *shiftlist) {
 	*new_try_catch = *old_try_catch;
 	new_try_catch->try_op += shiftlist[new_try_catch->try_op];
 	new_try_catch->catch_op += shiftlist[new_try_catch->catch_op];
@@ -579,12 +602,13 @@ static void merge_try_catch(
 	zend_try_catch_element *end = try_catch + op_array->last_try_catch;
 	while (info) {
 		if (info->fbc->last_try_catch) {
-			uint32_t i, limit = TO_NEW(info->fbc->try_catch_array->try_op, info->shiftlist);
-			while (try_catch != end && TO_NEW(try_catch->catch_op, shiftlist) < limit) {
+			uint32_t i, limit = TO_NEW(info->fbc->try_catch_array->try_op, info->merge.shiftlist);
+			while (try_catch != end && TO_NEW(try_catch->try_op, shiftlist) < limit) {
 				copy_try_catch(new_try_catch++, try_catch++, shiftlist);
 			}
-			for (i = 0; i < info->fbc->last_live_range; i++) {
-				copy_try_catch(new_try_catch++, &info->fbc->try_catch_array[i], info->shiftlist);
+			for (i = 0; i < info->fbc->last_try_catch; i++) {
+				copy_try_catch(new_try_catch++, &info->fbc->try_catch_array[i],
+					info->merge.shiftlist);
 			}
 		}
 		info = info->next;
@@ -604,6 +628,7 @@ void optimize_inlining(zend_op_array *op_array, zend_optimizer_ctx *ctx) {
 		info = find_inlinable_calls(op_array, ctx);
 	}
 	if (info) {
+		merge_info merge;
 		uint32_t new_num_opcodes = op_array->last;
 		uint32_t new_num_literals = op_array->last_literal;
 		uint32_t new_num_cvs = op_array->last_var;
@@ -626,39 +651,43 @@ void optimize_inlining(zend_op_array *op_array, zend_optimizer_ctx *ctx) {
 		}
 
 		/* Compute TMP base offsets */
+		merge.tmp_offset = new_num_cvs - op_array->last_var;
 		tmp_offset = new_num_cvs + op_array->T;
 		for (cur = info; cur; cur = cur->next) {
-			cur->tmp_offset = tmp_offset - cur->fbc->last_var;
+			cur->merge.tmp_offset = tmp_offset - cur->fbc->last_var;
 			tmp_offset += cur->fbc->T;
 		}
-		tmp_offset = new_num_cvs - op_array->last_var;
 
 		{
 			zend_op *new_opcodes = ecalloc(new_num_opcodes, sizeof(zend_op));
 			zend_string **new_vars = ecalloc(new_num_cvs, sizeof(zend_string*));
 			zval *new_literals = ecalloc(new_num_literals, sizeof(zval));
-			int32_t *shiftlist = create_shiftlists(ctx, op_array, info);
 
-			merge_opcodes(op_array, info, new_opcodes, shiftlist, tmp_offset);
+			/* Shiftlists must be created first */
+			merge.shiftlist = create_shiftlists(ctx, op_array, info);
+
+			/* Live ranges have to be merged before merging opcodes,
+			 * because it also computes the live range map. */
+			if (new_num_live_ranges) {
+				zend_live_range *new_live_ranges =
+					ecalloc(new_num_live_ranges, sizeof(zend_live_range));
+				merge_live_ranges(ctx, op_array, info, new_live_ranges, &merge);
+				efree(op_array->live_range);
+				op_array->live_range = new_live_ranges;
+				op_array->last_live_range = new_num_live_ranges;
+			}
+
+			merge_opcodes(op_array, info, new_opcodes, &merge);
 			merge_cvs(op_array, info, new_vars);
 			merge_literals(op_array, info, new_literals);
 
 			if (new_num_try_catch) {
 				zend_try_catch_element *new_try_catch =
 					ecalloc(new_num_try_catch, sizeof(zend_try_catch_element));
-				merge_try_catch(op_array, info, new_try_catch, shiftlist);
+				merge_try_catch(op_array, info, new_try_catch, merge.shiftlist);
 				efree(op_array->try_catch_array);
 				op_array->try_catch_array = new_try_catch;
 				op_array->last_try_catch = new_num_try_catch;
-			}
-
-			if (new_num_live_ranges) {
-				zend_live_range *new_live_ranges =
-					ecalloc(new_num_live_ranges, sizeof(zend_live_range));
-				merge_live_ranges(op_array, info, new_live_ranges, shiftlist, tmp_offset);
-				efree(op_array->live_range);
-				op_array->live_range = new_live_ranges;
-				op_array->last_live_range = new_num_live_ranges;
 			}
 
 			efree(op_array->opcodes);
