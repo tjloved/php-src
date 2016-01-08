@@ -5,6 +5,7 @@ Smart branches 1
 
 function test(int $a, int $b) {
     $result = $a < $b;
+    $x = 1;
     if ($result) {
         return $result;
     }
