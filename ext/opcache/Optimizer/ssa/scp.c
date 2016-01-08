@@ -133,7 +133,7 @@ static zend_bool can_replace_op1(zend_op *opline, zend_ssa_op *ssa_op) {
 		case ZEND_ISSET_ISEMPTY_VAR:
 			/* CV has special meaning here - cannot simply be replaced */
 			// TODO We should be marking non-quick-set as TOO_DYNAMIC
-			return (opline->extended_value & ZEND_QUICK_SET) != 0;
+			return (opline->extended_value & ZEND_QUICK_SET) == 0;
 		case ZEND_INIT_ARRAY:
 		case ZEND_ADD_ARRAY_ELEMENT:
 			return !(opline->extended_value & ZEND_ARRAY_ELEMENT_REF);
@@ -332,6 +332,20 @@ static inline int ct_eval_incdec(zval *result, zend_uchar opcode, zval *op1) {
 	return SUCCESS;
 }
 
+static inline int ct_eval_isset_isempty(zval *result, uint32_t extended_value, zval *op1) {
+	if (!(extended_value & ZEND_QUICK_SET)) {
+		return FAILURE;
+	}
+
+	if (extended_value & ZEND_ISSET) {
+		ZVAL_BOOL(result, Z_TYPE_P(op1) != IS_NULL);
+	} else {
+		ZEND_ASSERT(extended_value & ZEND_ISEMPTY);
+		ZVAL_BOOL(result, !zend_is_true(op1));
+	}
+	return SUCCESS;
+}
+
 #define SET_RESULT(op, zv) do { \
 	if (ssa_op->op##_def >= 0) { \
 		set_value(ctx, ssa_op->op##_def, zv); \
@@ -508,6 +522,14 @@ static void interp_instr(scp_ctx *ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 			SKIP_IF_TOP(op1);
 			ZVAL_BOOL(&zv, zend_is_true(op1));
 			SET_RESULT(result, &zv);
+			break;
+		case ZEND_ISSET_ISEMPTY_VAR:
+			if (ct_eval_isset_isempty(&zv, opline->extended_value, op1) == SUCCESS) {
+				SET_RESULT(result, &zv);
+				zval_ptr_dtor_nogc(&zv);
+				break;
+			}
+			SET_RESULT_BOT(result);
 			break;
 		default:
 		{
