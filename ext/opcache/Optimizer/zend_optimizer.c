@@ -624,8 +624,15 @@ static void zend_optimize(zend_op_array      *op_array,
 		return;
 	}
 
-	if (ctx->debug_level & ZEND_DUMP_BEFORE_OPTIMIZER) {
-		zend_dump_op_array(op_array, 0, "before optimizer", NULL);
+	/* pass 8: Function inlining
+	 * This pass should run before all other optimizations in a pass set, to
+	 * make sure the subsequent passes are applied to inlined function segments.
+	 */
+	if (ZEND_OPTIMIZER_PASS_8 & ctx->optimization_level) {
+		optimize_inlining(op_array, ctx);
+		if (ctx->debug_level & ZEND_DUMP_AFTER_PASS_8) {
+			zend_dump_op_array(op_array, 0, "after pass 8", NULL);
+		}
 	}
 
 	/* pass 1
@@ -662,26 +669,6 @@ static void zend_optimize(zend_op_array      *op_array,
 		zend_optimizer_pass3(op_array);
 		if (ctx->debug_level & ZEND_DUMP_AFTER_PASS_3) {
 			zend_dump_op_array(op_array, 0, "after pass 1", NULL);
-		}
-	}
-
-	/* pass 4:
-	 * - INIT_FCALL_BY_NAME -> DO_FCALL
-	 */
-	if (ZEND_OPTIMIZER_PASS_4 & ctx->optimization_level) {
-		zend_optimize_func_calls(op_array, ctx);
-		if (ctx->debug_level & ZEND_DUMP_AFTER_PASS_4) {
-			zend_dump_op_array(op_array, 0, "after pass 1", NULL);
-		}
-	}
-
-	/* pass 8:
-	 * - Inline functions
-	 */
-	if (ZEND_OPTIMIZER_PASS_8 & ctx->optimization_level) {
-		optimize_inlining(op_array, ctx);
-		if (ctx->debug_level & ZEND_DUMP_AFTER_PASS_8) {
-			zend_dump_op_array(op_array, 0, "after pass 8", NULL);
 		}
 	}
 
@@ -808,7 +795,31 @@ static void zend_redo_pass_two_ex(zend_op_array *op_array, zend_ssa *ssa)
 }
 #endif
 
-static void zend_optimize_op_array(zend_op_array      *op_array,
+/* First pass set only does call optimization, because it must run before inlining and
+ * should be applied to all op arrays. */
+static void zend_optimize_pass_set_1(zend_op_array *op_array, zend_optimizer_ctx *ctx) {
+	if (op_array->type == ZEND_EVAL_CODE) {
+		return;
+	}
+
+	zend_revert_pass_two(op_array);
+
+	if (ctx->debug_level & ZEND_DUMP_BEFORE_OPTIMIZER) {
+		zend_dump_op_array(op_array, 0, "before optimizer", NULL);
+	}
+
+	/* Pass 4: INIT_FCALL_BY_NAME -> DO_FCALL, etc */
+	if (ZEND_OPTIMIZER_PASS_4 & ctx->optimization_level) {
+		zend_optimize_func_calls(op_array, ctx);
+		if (ctx->debug_level & ZEND_DUMP_AFTER_PASS_4) {
+			zend_dump_op_array(op_array, 0, "after pass 1", NULL);
+		}
+	}
+
+	zend_redo_pass_two(op_array);
+}
+
+static void zend_optimize_pass_set_2(zend_op_array      *op_array,
                                    zend_optimizer_ctx *ctx)
 {
 	/* Revert pass_two() */
@@ -904,7 +915,8 @@ int zend_optimize_script(zend_script *script, zend_long optimization_level, zend
 	ctx.optimization_level = optimization_level;
 	ctx.debug_level = debug_level;
 
-	foreach_op_array(&ctx, zend_optimize_op_array);
+	foreach_op_array(&ctx, zend_optimize_pass_set_1);
+	foreach_op_array(&ctx, zend_optimize_pass_set_2);
 
 #if HAVE_DFA_PASS
 	if ((ZEND_OPTIMIZER_PASS_6 & optimization_level) &&
