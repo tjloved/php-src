@@ -2,6 +2,7 @@
 #include "Optimizer/zend_optimizer_internal.h"
 #include "Optimizer/ssa/helpers.h"
 #include "Optimizer/ssa/instructions.h"
+#include "Optimizer/statistics.h"
 
 #if 0
 #define SCP_DEBUG(...) php_printf(__VA_ARGS__)
@@ -782,6 +783,7 @@ static void eliminate_dead_blocks(scp_ctx *ctx) {
 		if (!zend_bitset_in(ctx->executable_blocks, i)) {
 			zend_basic_block *block = &ssa->cfg.blocks[i];
 			int j;
+			OPT_STAT(scp_dead_blocks)++;
 			for (j = block->start; j <= block->end; j++) {
 				remove_instr_with_defs(ssa, &ctx->op_array->opcodes[j], &ssa->ops[j]);
 			}
@@ -794,11 +796,12 @@ static void replace_constant_operands(scp_ctx *ctx) {
 	zend_ssa *ssa = ctx->ssa;
 	for (i = 0; i < ssa->vars_count; ++i) {
 		zend_ssa_var *var = &ssa->vars[i];
+		int use;
 		if (!value_known(&ctx->values[i])) {
 			continue;
 		}
+		OPT_STAT(scp_const_vars)++;
 
-		int use;
 		FOREACH_USE(var, use) {
 			zend_op *opline = &ctx->op_array->opcodes[use];
 			zend_ssa_op *ssa_op = &ssa->ops[use];
@@ -839,12 +842,14 @@ static void eliminate_dead_instructions(scp_ctx *ctx) {
 			if (ssa_op->result_def >= 0 && ssa_op->op1_def < 0 && ssa_op->op2_def < 0
 					&& !var_used(&ssa->vars[ssa_op->result_def])) {
 				/* Ordinary computational instruction -> remove it */
+				OPT_STAT(scp_dead_instrs)++;
 				remove_result_def(ssa, ssa_op);
 				remove_instr(ssa, opline, ssa_op);
 			} else if (opline->opcode != ZEND_ASSIGN && ssa_op->op1_def >= 0) {
 				/* Compound assign or incdec -> convert to direct ASSIGN */
 				zval *val = &ctx->values[ssa_op->op1_def];
 				ZEND_ASSERT(value_known(val));
+				OPT_STAT(scp_semi_dead_instrs)++;
 
 				/* Destroy previous op2 */
 				if (opline->op2_type == IS_CONST) {

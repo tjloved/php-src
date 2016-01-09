@@ -1,6 +1,7 @@
 #include "ZendAccelerator.h"
 #include "Optimizer/zend_optimizer_internal.h"
 #include "Optimizer/ssa/helpers.h"
+#include "Optimizer/statistics.h"
 
 void ssa_optimize_copy(zend_optimizer_ctx *ctx, zend_op_array *op_array, zend_ssa *ssa) {
 	int i;
@@ -30,6 +31,7 @@ void ssa_optimize_copy(zend_optimizer_ctx *ctx, zend_op_array *op_array, zend_ss
 				zend_op *def_opline = &op_array->opcodes[var->definition];
 				/* Check that it's an "ordinary" result */
 				if (def_ssa_op->result_use < 0 && def_ssa_op->result_def == ssa_op->op2_use) {
+					OPT_STAT(copy_contracted_assign)++;
 					/* Move CV into result of instruction */
 					COPY_NODE(def_opline->result, opline->op1);
 					def_ssa_op->result_def = ssa_op->op1_def;
@@ -43,6 +45,7 @@ void ssa_optimize_copy(zend_optimizer_ctx *ctx, zend_op_array *op_array, zend_ss
 			}
 		}
 
+		OPT_STAT(copy_qm_assign)++;
 		/* Replace ASSIGN by QM_ASSIGN */
 		opline->opcode = ZEND_QM_ASSIGN;
 		COPY_NODE(opline->result, opline->op1);

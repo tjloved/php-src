@@ -18,6 +18,8 @@ void ssa_optimize_object_specialization(
 static void collect_ssa_stats(zend_op_array *op_array, zend_ssa *ssa) {
 	int i;
 
+	OPT_STAT(instrs) += op_array->last;
+	OPT_STAT(cfg_blocks) += ssa->cfg.blocks_count;
 	OPT_STAT(ssa_vars) += ssa->vars_count;
 
 	for (i = 0; i < ssa->vars_count; i++) {

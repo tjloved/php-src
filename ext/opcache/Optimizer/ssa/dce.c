@@ -1,6 +1,7 @@
 #include "ZendAccelerator.h"
 #include "Optimizer/zend_optimizer_internal.h"
 #include "Optimizer/ssa/helpers.h"
+#include "Optimizer/statistics.h"
 
 typedef struct {
 	zend_ssa *ssa;
@@ -411,6 +412,8 @@ static void dce_instr(context *ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 	if (opline->opcode == ZEND_FREE && !is_var_dead(ctx, ssa_op->op1_use)) {
 		return;
 	}
+
+	OPT_STAT(dce_dead_instr)++;
 
 	// TODO Two free vars?
 	if ((opline->op1_type & (IS_VAR|IS_TMP_VAR)) && !is_var_dead(ctx, ssa_op->op1_use)) {
