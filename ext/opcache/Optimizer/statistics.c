@@ -1,7 +1,6 @@
 #include "php.h"
+#include "ZendAccelerator.h"
 #include "Optimizer/statistics.h"
-
-static const int stats_enabled = 1;
 
 zend_optimizer_statistics optimizer_statistics;
 
@@ -9,7 +8,7 @@ zend_optimizer_statistics optimizer_statistics;
 
 void zend_optimizer_statistics_startup() {}
 void zend_optimizer_statistics_shutdown() {
-	if (!stats_enabled) {
+	if (!ZCG(accel_directives).opt_statistics) {
 		return;
 	}
 
