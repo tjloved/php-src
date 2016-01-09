@@ -13,6 +13,8 @@ void zend_optimizer_statistics_shutdown() {
 		return;
 	}
 
+	PRINT_STAT(instrs);
+	PRINT_STAT(cfg_blocks);
 	PRINT_STAT(ssa_vars);
 	PRINT_STAT(ssa_may_be_ref);
 	PRINT_STAT(ssa_may_be_any);
@@ -22,4 +24,11 @@ void zend_optimizer_statistics_shutdown() {
 	PRINT_STAT(cv_ssa_may_be_any);
 	PRINT_STAT(cv_ssa_may_be_refcounted);
 	PRINT_STAT(cv_ssa_may_be_undef);
+	PRINT_STAT(scp_const_vars);
+	PRINT_STAT(scp_dead_blocks);
+	PRINT_STAT(scp_dead_instrs);
+	PRINT_STAT(scp_semi_dead_instrs);
+	PRINT_STAT(dce_dead_instr);
+	PRINT_STAT(copy_contracted_assign);
+	PRINT_STAT(copy_qm_assign);
 }
