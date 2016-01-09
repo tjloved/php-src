@@ -347,6 +347,14 @@ static inline int ct_eval_isset_isempty(zval *result, uint32_t extended_value, z
 	return SUCCESS;
 }
 
+static inline void ct_eval_type_check(zval *result, uint32_t type, zval *op1) {
+	if (type == _IS_BOOL) {
+		ZVAL_BOOL(result, Z_TYPE_P(op1) == IS_TRUE || Z_TYPE_P(op1) == IS_FALSE);
+	} else {
+		ZVAL_BOOL(result, Z_TYPE_P(op1) == type);
+	}
+}
+
 #define SET_RESULT(op, zv) do { \
 	if (ssa_op->op##_def >= 0) { \
 		set_value(ctx, ssa_op->op##_def, zv); \
@@ -375,6 +383,26 @@ static void interp_instr(scp_ctx *ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 
 			SET_RESULT(result, op2);
 			return;
+		case ZEND_TYPE_CHECK:
+			/* We may be able to evaluate TYPE_CHECK based on type inference info,
+			 * even if we don't know the precise value. */
+			if (!value_known(op1)) {
+				uint32_t type = ctx->ssa->var_info[ssa_op->op1_use].type;
+				uint32_t expected_type = opline->extended_value == _IS_BOOL
+					? (MAY_BE_TRUE|MAY_BE_FALSE) : (1 << opline->extended_value);
+				if (!CAN_BE(type, expected_type)) {
+					ZVAL_FALSE(&zv);
+					SET_RESULT(result, &zv);
+					return;
+				} else if (MUST_BE(type, expected_type)
+						   && opline->extended_value != IS_OBJECT
+						   && opline->extended_value != IS_RESOURCE) {
+					ZVAL_TRUE(&zv);
+					SET_RESULT(result, &zv);
+					return;
+				}
+			}
+			break;
 	}
 
 	if (IS_BOT(op1) || IS_BOT(op2)) {
@@ -531,6 +559,12 @@ static void interp_instr(scp_ctx *ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 				break;
 			}
 			SET_RESULT_BOT(result);
+			break;
+		case ZEND_TYPE_CHECK:
+			SKIP_IF_TOP(op1);
+			ct_eval_type_check(&zv, opline->extended_value, op1);
+			SET_RESULT(result, &zv);
+			zval_ptr_dtor_nogc(&zv);
 			break;
 		default:
 		{
