@@ -22,6 +22,7 @@
 #include "php.h"
 #include "Optimizer/zend_optimizer.h"
 #include "Optimizer/zend_optimizer_internal.h"
+#include "Optimizer/statistics.h"
 #include "zend_API.h"
 #include "zend_constants.h"
 #include "zend_execute.h"
@@ -1079,11 +1080,13 @@ int zend_optimize_script(zend_script *script, zend_long optimization_level, zend
 
 int zend_optimizer_startup(void)
 {
+	zend_optimizer_statistics_startup();
 	return zend_func_info_startup();
 }
 
 int zend_optimizer_shutdown(void)
 {
+	zend_optimizer_statistics_shutdown();
 	return zend_func_info_shutdown();
 }
 

@@ -412,6 +412,7 @@ fi
 	Optimizer/zend_func_info.c \
 	Optimizer/zend_call_graph.c \
 	Optimizer/zend_dump.c \
+    Optimizer/statistics.c \
 	Optimizer/ssa_pass.c \
 	Optimizer/ssa/helpers.c \
 	Optimizer/ssa/scp.c \

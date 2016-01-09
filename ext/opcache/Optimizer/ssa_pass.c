@@ -2,6 +2,7 @@
 #include "Optimizer/zend_optimizer_internal.h"
 #include "Optimizer/zend_dump.h"
 #include "Optimizer/ssa/helpers.h"
+#include "Optimizer/statistics.h"
 
 #define CANT_BE(t, name) (!(t & MAY_BE_##name))
 
@@ -13,6 +14,42 @@ void ssa_optimize_type_specialization(
 		zend_optimizer_ctx *ctx, zend_op_array *op_array, zend_ssa *ssa);
 void ssa_optimize_object_specialization(
 		zend_optimizer_ctx *ctx, zend_op_array *op_array, zend_ssa *ssa);
+
+static void collect_ssa_stats(zend_op_array *op_array, zend_ssa *ssa) {
+	int i;
+
+	OPT_STAT(ssa_vars) += ssa->vars_count;
+
+	for (i = 0; i < ssa->vars_count; i++) {
+		zend_ssa_var_info *info = &ssa->var_info[i];
+		zend_ssa_var *var = &ssa->vars[i];
+		zend_bool is_cv = var->var < op_array->last_var;
+		if (is_cv) {
+			OPT_STAT(cv_ssa_vars)++;
+			if (info->type & MAY_BE_UNDEF) {
+				OPT_STAT(cv_ssa_may_be_undef)++;
+			}
+		}
+		if (info->type & MAY_BE_REF) {
+			OPT_STAT(ssa_may_be_ref)++;
+			if (is_cv) {
+				OPT_STAT(cv_ssa_may_be_ref)++;
+			}
+		}
+		if ((info->type & MAY_BE_ANY) == MAY_BE_ANY) {
+			OPT_STAT(ssa_may_be_any)++;
+			if (is_cv) {
+				OPT_STAT(cv_ssa_may_be_any)++;
+			}
+		}
+		if (info->type & MAY_BE_REFCOUNTED) {
+			OPT_STAT(ssa_may_be_refcounted)++;
+			if (is_cv) {
+				OPT_STAT(cv_ssa_may_be_refcounted)++;
+			}
+		}
+	}
+}
 
 static void ssa_optimize_peephole(zend_optimizer_ctx *ctx, zend_op_array *op_array, zend_ssa *ssa) {
 	zend_op *opline = op_array->opcodes;
@@ -197,6 +234,8 @@ static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) 
 	if (zend_ssa_inference(&ctx->arena, op_array, ctx->script, &info->ssa) != SUCCESS) {
 		return;
 	}
+
+	collect_ssa_stats(op_array, &info->ssa);
 
 	complete_block_map(&info->ssa.cfg, op_array->last);
 	remove_spurious_ssa_vars(op_array, &info->ssa);
