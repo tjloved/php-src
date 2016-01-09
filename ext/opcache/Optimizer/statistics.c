@@ -1,7 +1,7 @@
 #include "php.h"
 #include "Optimizer/statistics.h"
 
-static const int stats_enabled = 1;
+static const int stats_enabled = 0;
 
 zend_optimizer_statistics optimizer_statistics;
 
