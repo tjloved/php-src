@@ -96,6 +96,26 @@ static inline HashTable *spl_array_get_hash_table(spl_array_object* intern) { /*
 	}
 } /* }}} */
 
+static inline void spl_array_replace_hash_table(spl_array_object* intern, HashTable *ht) { /* {{{ */
+	if (intern->ar_flags & SPL_ARRAY_IS_SELF) {
+		if (intern->std.properties) {
+			zend_array_destroy(intern->std.properties);
+		}
+		intern->std.properties = ht;
+	} else if (intern->ar_flags & SPL_ARRAY_USE_OTHER) {
+		spl_array_object *other = Z_SPLARRAY_P(&intern->array);
+		spl_array_replace_hash_table(other, ht);
+	} else if (Z_TYPE(intern->array) == IS_ARRAY) {
+		Z_ARRVAL(intern->array) = ht;
+	} else {
+		zend_object *obj = Z_OBJ(intern->array);
+		if (obj->properties) {
+			zend_array_destroy(obj->properties);
+		}
+		obj->properties = ht;
+	}
+} /* }}} */
+
 static inline zend_bool spl_array_is_object(spl_array_object *intern) /* {{{ */
 {
 	while (intern->ar_flags & SPL_ARRAY_USE_OTHER) {
@@ -1435,14 +1455,9 @@ static void spl_array_method(INTERNAL_FUNCTION_PARAMETERS, char *fname, int fnam
 	spl_array_object *intern = Z_SPLARRAY_P(getThis());
 	HashTable *aht = spl_array_get_hash_table(intern);
 	zval function_name, params[2], *arg = NULL;
-	uint32_t old_refcount;
 
 	ZVAL_STRINGL(&function_name, fname, fname_len);
 
-	/* A tricky way to pass "aht" by reference, reset refcount */
-	//??? It may be not safe, if user comparison handler accesses "aht"
-	old_refcount = GC_REFCOUNT(aht);
-	GC_REFCOUNT(aht) = 1;
 	ZVAL_NEW_EMPTY_REF(&params[0]);
 	ZVAL_ARR(Z_REFVAL(params[0]), aht);
 
@@ -1473,10 +1488,15 @@ static void spl_array_method(INTERNAL_FUNCTION_PARAMETERS, char *fname, int fnam
 	}
 
 exit:
-	/* A tricky way to pass "aht" by reference, copy back and cleanup */
-	GC_REFCOUNT(aht) = old_refcount;
-	efree(Z_REF(params[0]));
-	zend_string_free(Z_STR(function_name));
+	{
+		HashTable *new_ht = Z_ARRVAL_P(Z_REFVAL(params[0]));
+		if (aht != new_ht) {
+			new_ht->u.v.nApplyCount--;
+			spl_array_replace_hash_table(intern, new_ht);
+		}
+		efree(Z_REF(params[0]));
+		zend_string_free(Z_STR(function_name));
+	}
 } /* }}} */
 
 #define SPL_ARRAY_METHOD(cname, fname, use_arg) \
