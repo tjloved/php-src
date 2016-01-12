@@ -1,3 +1,4 @@
+#include "php.h"
 #include "ZendAccelerator.h"
 #include "Optimizer/zend_optimizer_internal.h"
 #include "Optimizer/ssa/helpers.h"
@@ -67,7 +68,7 @@ static zval *get_op1_value(scp_ctx *ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 	} else if (ssa_op->op1_use != -1) {
 		return &ctx->values[ssa_op->op1_use];
 	} else {
-		return &ctx->top;
+		return NULL;
 	}
 }
 static zval *get_op2_value(scp_ctx *ctx, zend_op *opline, zend_ssa_op *ssa_op) {
@@ -76,7 +77,7 @@ static zval *get_op2_value(scp_ctx *ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 	} else if (ssa_op->op2_use != -1) {
 		return &ctx->values[ssa_op->op2_use];
 	} else {
-		return &ctx->top;
+		return NULL;
 	}
 }
 
@@ -130,6 +131,8 @@ static zend_bool can_replace_op1(zend_op *opline, zend_ssa_op *ssa_op) {
 		case ZEND_ADD_INTERFACE:
 		case ZEND_ADD_TRAIT:
 		case ZEND_BIND_TRAITS:
+		case ZEND_ROPE_ADD:
+		case ZEND_ROPE_END:
 			return 0;
 		case ZEND_ISSET_ISEMPTY_VAR:
 			/* CV has special meaning here - cannot simply be replaced */
@@ -228,9 +231,9 @@ static inline int ct_eval_unary(zval *result, zend_uchar opcode, zval *op1) {
 	return retval;
 }
 
-static inline int ct_eval_cast(zval *result, zend_op *opline, zval *op1) {
+static inline int ct_eval_cast(zval *result, uint32_t extended_value, zval *op1) {
 	ZVAL_COPY(result, op1);
-	switch (opline->extended_value) {
+	switch (extended_value) {
 		case IS_NULL:
 			convert_to_null(result);
 			return SUCCESS;
@@ -273,52 +276,154 @@ static inline int ct_eval_strlen(zval *result, zend_op *opline, zval *op1) {
 	return SUCCESS;
 }
 
+static inline int zval_to_string_offset(zend_long *result, zval *op) {
+	switch (Z_TYPE_P(op)) {
+		case IS_LONG:
+			*result = Z_LVAL_P(op);
+			return SUCCESS;
+		case IS_STRING:
+			if (IS_LONG == is_numeric_string(
+					Z_STRVAL_P(op), Z_STRLEN_P(op), result, NULL, 0)) {
+				return SUCCESS;
+			}
+			return FAILURE;
+		default:
+			return FAILURE;
+	}
+}
+
+static inline int fetch_array_elem(zval **result, zval *op1, zval *op2) {
+	switch (Z_TYPE_P(op2)) {
+		case IS_NULL:
+			*result = zend_hash_find(Z_ARR_P(op1), ZSTR_EMPTY_ALLOC());
+			return SUCCESS;
+		case IS_FALSE:
+			*result = zend_hash_index_find(Z_ARR_P(op1), 0);
+			return SUCCESS;
+		case IS_TRUE:
+			*result = zend_hash_index_find(Z_ARR_P(op1), 1);
+			return SUCCESS;
+		case IS_LONG:
+			*result = zend_hash_index_find(Z_ARR_P(op1), Z_LVAL_P(op2));
+			return SUCCESS;
+		case IS_DOUBLE:
+			*result = zend_hash_index_find(Z_ARR_P(op1), zend_dval_to_lval(Z_DVAL_P(op2)));
+			return SUCCESS;
+		case IS_STRING:
+			*result = zend_symtable_find(Z_ARR_P(op1), Z_STR_P(op2));
+			return SUCCESS;
+		default:
+			return FAILURE;
+	}
+}
+
 static inline int ct_eval_fetch_dim(zval *result, zend_op *opline, zval *op1, zval *op2) {
 	if (Z_TYPE_P(op1) == IS_ARRAY) {
-		zval *value = NULL;
-		switch (Z_TYPE_P(op2)) {
-			case IS_NULL:
-				value = zend_hash_find(Z_ARR_P(op1), ZSTR_EMPTY_ALLOC());
-				break;
-			case IS_FALSE:
-				value = zend_hash_index_find(Z_ARR_P(op1), 0);
-				break;
-			case IS_TRUE:
-				value = zend_hash_index_find(Z_ARR_P(op1), 1);
-				break;
-			case IS_LONG:
-				value = zend_hash_index_find(Z_ARR_P(op1), Z_LVAL_P(op2));
-				break;
-			case IS_DOUBLE:
-				value = zend_hash_index_find(Z_ARR_P(op1), zend_dval_to_lval(Z_DVAL_P(op2)));
-				break;
-			case IS_STRING:
-				value = zend_symtable_find(Z_ARR_P(op1), Z_STR_P(op2));
-				break;
-		}
-		if (value) {
+		zval *value;
+		if (fetch_array_elem(&value, op1, op2) == SUCCESS && value) {
 			ZVAL_COPY(result, value);
 			return SUCCESS;
 		}
 	} else if (Z_TYPE_P(op1) == IS_STRING) {
 		zend_long index;
-		switch (Z_TYPE_P(op2)) {
-			case IS_LONG:
-				index = Z_LVAL_P(op2);
-				break;
-			case IS_STRING:
-				if (IS_LONG != is_numeric_string(
-						Z_STRVAL_P(op2), Z_STRLEN_P(op2), &index, NULL, 0)) {
-					return FAILURE;
-				}
-				break;
-			default:
-				return FAILURE;
+		if (zval_to_string_offset(&index, op2) == FAILURE) {
+			return FAILURE;
 		}
 		if (index >= 0 && index < Z_STRLEN_P(op1)) {
 			ZVAL_STR(result, zend_string_init(&Z_STRVAL_P(op1)[index], 1, 0));
 			return SUCCESS;
 		}
+	}
+	return FAILURE;
+}
+
+static inline int ct_eval_isset_dim(zval *result, uint32_t extended_value, zval *op1, zval *op2) {
+	if (Z_TYPE_P(op1) == IS_ARRAY) {
+		zval *value;
+		if (fetch_array_elem(&value, op1, op2) == FAILURE) {
+			return FAILURE;
+		}
+		if (extended_value & ZEND_ISSET) {
+			ZVAL_BOOL(result, value && Z_TYPE_P(value) != IS_NULL);
+		} else {
+			ZEND_ASSERT(extended_value & ZEND_ISEMPTY);
+			ZVAL_BOOL(result, !value || !zend_is_true(value));
+		}
+		return SUCCESS;
+	} else if (Z_TYPE_P(op1) == IS_STRING) {
+		// TODO
+		return FAILURE;
+	} else {
+		ZVAL_BOOL(result, extended_value != ZEND_ISSET);
+		return SUCCESS;
+	}
+}
+
+// TODO Avoid the copy_ctor
+static inline int ct_eval_add_array_elem(zval *result, zval *value, zval *key) {
+	if (!key) {
+		if ((value = zend_hash_next_index_insert(Z_ARR_P(result), value))) {
+			zval_copy_ctor(value);
+			return SUCCESS;
+		}
+		return FAILURE;
+	}
+
+	switch (Z_TYPE_P(key)) {
+		case IS_NULL:
+			value = zend_hash_update(Z_ARR_P(result), ZSTR_EMPTY_ALLOC(), value);
+			break;
+		case IS_FALSE:
+			value = zend_hash_index_update(Z_ARR_P(result), 0, value);
+			break;
+		case IS_TRUE:
+			value = zend_hash_index_update(Z_ARR_P(result), 1, value);
+			break;
+		case IS_LONG:
+			value = zend_hash_index_update(Z_ARR_P(result), Z_LVAL_P(key), value);
+			break;
+		case IS_DOUBLE:
+			value = zend_hash_index_update(
+				Z_ARR_P(result), zend_dval_to_lval(Z_DVAL_P(key)), value);
+			break;
+		case IS_STRING:
+			value = zend_symtable_update(Z_ARR_P(result), Z_STR_P(key), value);
+			break;
+		default:
+			return FAILURE;
+	}
+
+	zval_copy_ctor(value);
+	return SUCCESS;
+}
+
+static inline int ct_eval_assign_dim(zval *result, zval *value, zval *key) {
+	if (Z_TYPE_P(result) == IS_ARRAY) {
+		return ct_eval_add_array_elem(result, value, key);
+	} else if (Z_TYPE_P(result) == IS_STRING) {
+		// TODO Before enabling this case, make sure ARRAY_DIM result op is correct
+#if 0
+		zend_long index;
+		zend_string *new_str, *value_str;
+		if (!key || Z_TYPE_P(value) == IS_ARRAY
+				|| zval_to_string_offset(&index, key) == FAILURE || index < 0) {
+			return FAILURE;
+		}
+
+		if (index >= Z_STRLEN_P(result)) {
+			new_str = zend_string_alloc(index + 1, 0);
+			memcpy(ZSTR_VAL(new_str), Z_STRVAL_P(result), Z_STRLEN_P(result));
+			memset(ZSTR_VAL(new_str) + Z_STRLEN_P(result), ' ', index - Z_STRLEN_P(result));
+			ZSTR_VAL(new_str)[index + 1] = 0;
+		} else {
+			new_str = zend_string_init(Z_STRVAL_P(result), Z_STRLEN_P(result), 0);
+		}
+
+		value_str = zval_get_string(value);
+		ZVAL_STR(result, new_str);
+		Z_STRVAL_P(result)[index] = ZSTR_VAL(value_str)[0];
+		zend_string_release(value_str);
+#endif
 	}
 	return FAILURE;
 }
@@ -366,9 +471,15 @@ static inline void ct_eval_type_check(zval *result, uint32_t type, zval *op1) {
 #define SKIP_IF_TOP(op) if (IS_TOP(op)) break;
 
 static void interp_instr(scp_ctx *ctx, zend_op *opline, zend_ssa_op *ssa_op) {
-	zval *op1 = get_op1_value(ctx, opline, ssa_op);
-	zval *op2 = get_op2_value(ctx, opline, ssa_op);
-	zval zv; /* Declare one zval to hold result values */
+	zval *op1, *op2, zv; /* zv is a temporary to hold result values */
+
+	if (opline->opcode == ZEND_OP_DATA) {
+		opline--;
+		ssa_op--;
+	}
+
+	op1 = get_op1_value(ctx, opline, ssa_op);
+	op2 = get_op2_value(ctx, opline, ssa_op);
 
 	switch (opline->opcode) {
 		case ZEND_ASSIGN:
@@ -405,9 +516,9 @@ static void interp_instr(scp_ctx *ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 			break;
 	}
 
-	if (IS_BOT(op1) || IS_BOT(op2)) {
-		/* If any operand is BOT, mark the result as BOT right away. */
-		// TODO: There are special cases where we can get a result even if one operand is BOT
+	if ((op1 && IS_BOT(op1)) || (op2 && IS_BOT(op2))) {
+		/* If any operand is BOT, mark the result as BOT right away.
+		 * Exceptions to this rule are handled above. */
 		SET_RESULT_BOT(result);
 		SET_RESULT_BOT(op1);
 		SET_RESULT_BOT(op2);
@@ -475,6 +586,7 @@ static void interp_instr(scp_ctx *ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 				zval_ptr_dtor_nogc(&zv);
 				break;
 			}
+			SET_RESULT_BOT(op1);
 			SET_RESULT_BOT(result);
 			break;
 		case ZEND_PRE_INC:
@@ -512,12 +624,17 @@ static void interp_instr(scp_ctx *ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 			break;
 		case ZEND_CAST:
 			SKIP_IF_TOP(op1);
-			if (ct_eval_cast(&zv, opline, op1) == SUCCESS) {
+			if (ct_eval_cast(&zv, opline->extended_value, op1) == SUCCESS) {
 				SET_RESULT(result, &zv);
 				zval_ptr_dtor_nogc(&zv);
 				break;
 			}
 			SET_RESULT_BOT(result);
+			break;
+		case ZEND_BOOL:
+			SKIP_IF_TOP(op1);
+			ZVAL_BOOL(&zv, zend_is_true(op1));
+			SET_RESULT(result, &zv);
 			break;
 		case ZEND_STRLEN:
 			SKIP_IF_TOP(op1);
@@ -529,11 +646,21 @@ static void interp_instr(scp_ctx *ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 			SET_RESULT_BOT(result);
 			break;
 		case ZEND_FETCH_DIM_R:
-			if (IS_TOP(op1) || IS_TOP(op2)) {
-				break;
-			}
+			SKIP_IF_TOP(op1);
+			SKIP_IF_TOP(op2);
 
 			if (ct_eval_fetch_dim(&zv, opline, op1, op2) == SUCCESS) {
+				SET_RESULT(result, &zv);
+				zval_ptr_dtor_nogc(&zv);
+				break;
+			}
+			SET_RESULT_BOT(result);
+			break;
+		case ZEND_ISSET_ISEMPTY_DIM_OBJ:
+			SKIP_IF_TOP(op1);
+			SKIP_IF_TOP(op2);
+
+			if (ct_eval_isset_dim(&zv, opline->extended_value, op1, op2) == SUCCESS) {
 				SET_RESULT(result, &zv);
 				zval_ptr_dtor_nogc(&zv);
 				break;
@@ -543,7 +670,13 @@ static void interp_instr(scp_ctx *ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 		case ZEND_QM_ASSIGN:
 		case ZEND_JMP_SET:
 		case ZEND_COALESCE:
+			SET_RESULT(result, op1);
+			break;
 		case ZEND_FETCH_CLASS:
+			if (!op1) {
+				SET_RESULT_BOT(result);
+				break;
+			}
 			SET_RESULT(result, op1);
 			break;
 		case ZEND_JMPZ_EX:
@@ -566,6 +699,90 @@ static void interp_instr(scp_ctx *ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 			SET_RESULT(result, &zv);
 			zval_ptr_dtor_nogc(&zv);
 			break;
+		case ZEND_INSTANCEOF:
+			SKIP_IF_TOP(op1);
+			ZVAL_FALSE(&zv);
+			SET_RESULT(result, &zv);
+			break;
+		case ZEND_ROPE_INIT:
+			SKIP_IF_TOP(op2);
+			if (ct_eval_cast(&zv, IS_STRING, op2) == SUCCESS) {
+				SET_RESULT(result, &zv);
+				zval_ptr_dtor_nogc(&zv);
+				break;
+			}
+			SET_RESULT_BOT(result);
+			break;
+		case ZEND_ROPE_ADD:
+		case ZEND_ROPE_END:
+			SKIP_IF_TOP(op1);
+			SKIP_IF_TOP(op2);
+			if (ct_eval_binary(&zv, ZEND_CONCAT, op1, op2) == SUCCESS) {
+				SET_RESULT(result, &zv);
+				zval_ptr_dtor_nogc(&zv);
+				break;
+			}
+			SET_RESULT_BOT(result);
+			break;
+		case ZEND_INIT_ARRAY:
+		case ZEND_ADD_ARRAY_ELEMENT:
+			if (opline->extended_value & ZEND_ARRAY_ELEMENT_REF) {
+				SET_RESULT_BOT(result);
+				break;
+			}
+
+			SKIP_IF_TOP(op1);
+			if (op2) {
+				SKIP_IF_TOP(op2);
+			}
+
+			if (opline->opcode == ZEND_INIT_ARRAY) {
+				array_init(&zv);
+			} else {
+				zval *result = &ctx->values[ssa_op->result_use];
+				if (IS_BOT(result)) {
+					SET_RESULT_BOT(result);
+					break;
+				}
+				SKIP_IF_TOP(result);
+				ZVAL_DUP(&zv, result);
+			}
+
+			if (ct_eval_add_array_elem(&zv, op1, op2) == SUCCESS) {
+				SET_RESULT(result, &zv);
+				zval_ptr_dtor_nogc(&zv);
+				break;
+			}
+			SET_RESULT_BOT(result);
+			zval_ptr_dtor_nogc(&zv);
+			break;
+		case ZEND_ASSIGN_DIM:
+		{
+			zval *data = get_op1_value(ctx, opline+1, ssa_op+1);
+			if (IS_BOT(data)) {
+				SET_RESULT_BOT(op1);
+				SET_RESULT_BOT(result);
+				break;
+			}
+
+			SKIP_IF_TOP(data);
+			SKIP_IF_TOP(op1);
+			if (op2) {
+				SKIP_IF_TOP(op2);
+			}
+
+			ZVAL_DUP(&zv, op1);
+			if (ct_eval_assign_dim(&zv, data, op2) == SUCCESS) {
+				SET_RESULT(result, data);
+				SET_RESULT(op1, &zv);
+				zval_ptr_dtor_nogc(&zv);
+				break;
+			}
+			SET_RESULT_BOT(result);
+			SET_RESULT_BOT(op1);
+			zval_ptr_dtor_nogc(&zv);
+			break;
+		}
 		default:
 		{
 			/* If we have no explicit implementation return BOT */
@@ -680,21 +897,21 @@ static void handle_phi(scp_ctx *ctx, zend_ssa_phi *phi) {
 		int *predecessors = &ssa->cfg.predecessors[block->predecessor_offset];
 
 		int i;
-		zval value;
-		MAKE_TOP(&value);
+		zval result;
+		MAKE_TOP(&result);
 		SCP_DEBUG("Handling PHI(");
 		for (i = 0; i < block->predecessors_count; i++) {
 			if (is_edge_feasible(ctx, predecessors[i], phi->block)) {
 				SCP_DEBUG("val, ");
-				join_phi_values(&value, &ctx->values[phi->sources[i]]);
+				join_phi_values(&result, &ctx->values[phi->sources[i]]);
 			} else {
 				SCP_DEBUG("--, ");
 			}
 		}
 		SCP_DEBUG(")\n");
 
-		set_value(ctx, phi->ssa_var, &value);
-		zval_ptr_dtor_nogc(&value);
+		set_value(ctx, phi->ssa_var, &result);
+		zval_ptr_dtor_nogc(&result);
 	}
 }
 
@@ -868,7 +1085,9 @@ static void eliminate_dead_instructions(scp_ctx *ctx) {
 	zend_op_array *op_array = ctx->op_array;
 	int i;
 
-	for (i = 0; i < ssa->vars_count; ++i) {
+	/* We iterate the variables backwards, so we can eliminate sequences like INIT_ROPE
+	 * and INIT_ARRAY. */
+	for (i = ssa->vars_count - 1; i >= 0; i--) {
 		zend_ssa_var *var = &ssa->vars[i];
 		if (value_known(&ctx->values[i]) && var->definition >= 0) {
 			zend_op *opline = &op_array->opcodes[var->definition];
@@ -896,6 +1115,11 @@ static void eliminate_dead_instructions(scp_ctx *ctx) {
 				if (ssa_op->result_def >= 0 && !var_used(&ssa->vars[ssa_op->result_def])) {
 					remove_result_def(ssa, ssa_op);
 					opline->result_type = IS_VAR | EXT_TYPE_UNUSED;
+				}
+
+				/* Remove OP_DATA opcode */
+				if (opline->opcode == ZEND_ASSIGN_DIM) {
+					remove_instr(ssa, opline + 1, ssa_op + 1);
 				}
 
 				/* Convert to ASSIGN */
