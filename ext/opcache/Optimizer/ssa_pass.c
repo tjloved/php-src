@@ -244,7 +244,7 @@ static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) 
 	remove_trivial_phis(&info->ssa);
 	verify_use_chains(&info->ssa);
 
-	if (ZCG(accel_directives).jit_debug & 2) {
+	if (ZCG(accel_directives).ssa_debug_level & 2) {
 		zend_dump_op_array(op_array, ZEND_DUMP_SSA | ZEND_DUMP_HIDE_UNUSED_VARS, NULL, &info->ssa);
 	}
 
@@ -256,7 +256,7 @@ static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) 
 	ssa_optimize_object_specialization(ctx, op_array, &info->ssa);
 	ssa_optimize_peephole(ctx, op_array, &info->ssa);
 
-	if (ZCG(accel_directives).jit_debug & 1) {
+	if (ZCG(accel_directives).ssa_debug_level & 1) {
 		zend_dump_op_array(op_array, ZEND_DUMP_SSA | ZEND_DUMP_HIDE_UNUSED_VARS, NULL, &info->ssa);
 	}
 }
