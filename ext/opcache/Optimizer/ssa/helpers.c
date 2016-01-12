@@ -1,7 +1,4 @@
 #include "ZendAccelerator.h"
-#include "jit/zend_jit_config.h"
-#include "jit/zend_jit.h"
-#include "jit/zend_jit_context.h"
 #include "Optimizer/ssa/helpers.h"
 
 void rename_var_uses(zend_ssa *ssa, int old, int new) {
