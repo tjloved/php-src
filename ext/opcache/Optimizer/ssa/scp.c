@@ -398,34 +398,41 @@ static inline int ct_eval_add_array_elem(zval *result, zval *value, zval *key) {
 }
 
 static inline int ct_eval_assign_dim(zval *result, zval *value, zval *key) {
-	if (Z_TYPE_P(result) == IS_ARRAY) {
-		return ct_eval_add_array_elem(result, value, key);
-	} else if (Z_TYPE_P(result) == IS_STRING) {
-		// TODO Before enabling this case, make sure ARRAY_DIM result op is correct
+	switch (Z_TYPE_P(result)) {
+		case IS_NULL:
+		case IS_FALSE:
+			array_init(result);
+			/* break missing intentionally */
+		case IS_ARRAY:
+			return ct_eval_add_array_elem(result, value, key);
+		case IS_STRING:
+			// TODO Before enabling this case, make sure ARRAY_DIM result op is correct
 #if 0
-		zend_long index;
-		zend_string *new_str, *value_str;
-		if (!key || Z_TYPE_P(value) == IS_ARRAY
-				|| zval_to_string_offset(&index, key) == FAILURE || index < 0) {
-			return FAILURE;
-		}
+			zend_long index;
+			zend_string *new_str, *value_str;
+			if (!key || Z_TYPE_P(value) == IS_ARRAY
+					|| zval_to_string_offset(&index, key) == FAILURE || index < 0) {
+				return FAILURE;
+			}
 
-		if (index >= Z_STRLEN_P(result)) {
-			new_str = zend_string_alloc(index + 1, 0);
-			memcpy(ZSTR_VAL(new_str), Z_STRVAL_P(result), Z_STRLEN_P(result));
-			memset(ZSTR_VAL(new_str) + Z_STRLEN_P(result), ' ', index - Z_STRLEN_P(result));
-			ZSTR_VAL(new_str)[index + 1] = 0;
-		} else {
-			new_str = zend_string_init(Z_STRVAL_P(result), Z_STRLEN_P(result), 0);
-		}
+			if (index >= Z_STRLEN_P(result)) {
+				new_str = zend_string_alloc(index + 1, 0);
+				memcpy(ZSTR_VAL(new_str), Z_STRVAL_P(result), Z_STRLEN_P(result));
+				memset(ZSTR_VAL(new_str) + Z_STRLEN_P(result), ' ', index - Z_STRLEN_P(result));
+				ZSTR_VAL(new_str)[index + 1] = 0;
+			} else {
+				new_str = zend_string_init(Z_STRVAL_P(result), Z_STRLEN_P(result), 0);
+			}
 
-		value_str = zval_get_string(value);
-		ZVAL_STR(result, new_str);
-		Z_STRVAL_P(result)[index] = ZSTR_VAL(value_str)[0];
-		zend_string_release(value_str);
+			value_str = zval_get_string(value);
+			ZVAL_STR(result, new_str);
+			Z_STRVAL_P(result)[index] = ZSTR_VAL(value_str)[0];
+			zend_string_release(value_str);
 #endif
+			return FAILURE;
+		default:
+			return FAILURE;
 	}
-	return FAILURE;
 }
 
 static inline int ct_eval_incdec(zval *result, zend_uchar opcode, zval *op1) {
@@ -512,6 +519,12 @@ static void interp_instr(scp_ctx *ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 					SET_RESULT(result, &zv);
 					return;
 				}
+			}
+			break;
+		case ZEND_ASSIGN_DIM:
+			/* If $a in $a[$b]=$c is UNDEF, treat it like NULL. There is no warning. */
+			if ((ctx->ssa->var_info[ssa_op->op1_use].type & MAY_BE_ANY) == 0) {
+				op1 = &EG(uninitialized_zval);
 			}
 			break;
 	}
