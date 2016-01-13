@@ -20,6 +20,7 @@ typedef struct _zend_optimizer_statistics {
 	uint32_t dce_dead_instr;
 	uint32_t copy_contracted_assign;
 	uint32_t copy_qm_assign;
+	uint32_t type_spec_arithm;
 } zend_optimizer_statistics;
 
 extern zend_optimizer_statistics optimizer_statistics;
