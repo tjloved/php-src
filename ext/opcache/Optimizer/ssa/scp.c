@@ -118,7 +118,6 @@ static zend_bool can_replace_op1(zend_op *opline, zend_ssa_op *ssa_op) {
 		case ZEND_UNSET_VAR:
 		case ZEND_UNSET_DIM:
 		case ZEND_UNSET_OBJ:
-		// TODO are the following correct?
 		case ZEND_SEND_REF:
 		case ZEND_SEND_VAR_EX:
 		case ZEND_SEND_UNPACK:

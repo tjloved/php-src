@@ -30,4 +30,5 @@ void zend_optimizer_statistics_shutdown() {
 	PRINT_STAT(dce_dead_instr);
 	PRINT_STAT(copy_contracted_assign);
 	PRINT_STAT(copy_qm_assign);
+	PRINT_STAT(type_spec_arithm);
 }
