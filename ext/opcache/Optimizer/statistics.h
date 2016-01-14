@@ -13,6 +13,7 @@ typedef struct _zend_optimizer_statistics {
 	uint32_t cv_ssa_may_be_any;
 	uint32_t cv_ssa_may_be_refcounted;
 	uint32_t cv_ssa_may_be_undef;
+	uint32_t cv_ssa_must_be_undef;
 	uint32_t scp_const_vars;
 	uint32_t scp_dead_blocks;
 	uint32_t scp_dead_instrs;

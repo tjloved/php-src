@@ -29,6 +29,7 @@ void zend_optimizer_statistics_shutdown() {
 	PRINT_NORM_STAT(cv_ssa_may_be_any, cv_ssa_vars);
 	PRINT_NORM_STAT(cv_ssa_may_be_refcounted, cv_ssa_vars);
 	PRINT_NORM_STAT(cv_ssa_may_be_undef, cv_ssa_vars);
+	PRINT_NORM_STAT(cv_ssa_must_be_undef, cv_ssa_vars);
 
 	PRINT_NORM_STAT(scp_const_vars, ssa_vars);
 	PRINT_NORM_STAT(scp_dead_blocks, cfg_blocks);
