@@ -88,6 +88,14 @@ static zend_bool can_inline_opcodes(zend_op_array *op_array, zend_bool rt_consta
 	return 1;
 }
 
+/* Inlining heuristic */
+static inline zend_bool should_inline(zend_op_array *op_array) {
+	if (op_array->last > 1000) {
+		return 0;
+	}
+	return 1;
+}
+
 static zend_bool can_inline(
 		zend_op_array *op_array, uint32_t num_args_passed, zend_bool rt_constants) {
 	int i;
@@ -210,7 +218,7 @@ static inline_info *find_inlinable_calls(zend_op_array *op_array, zend_optimizer
 			zend_string *name = Z_STR(ZEND_OP2_LITERAL(opline));
 			zend_op_array *fbc = zend_hash_find_ptr(&ctx->script->function_table, name);
 			uint32_t num_args_passed = opline->extended_value;
-			if (fbc && can_inline(fbc, num_args_passed, fbc != op_array)) {
+			if (fbc && should_inline(fbc) && can_inline(fbc, num_args_passed, fbc != op_array)) {
 				inline_info *info;
 				zend_op *call_opline = find_call_opline(opline);
 				if (!call_opline) {
@@ -619,95 +627,105 @@ static void merge_try_catch(
 #undef TO_NEW
 }
 
+static void inline_calls(zend_optimizer_ctx *ctx, zend_op_array *op_array, inline_info *info) {
+	merge_info merge;
+	uint32_t new_num_opcodes = op_array->last;
+	uint32_t new_num_literals = op_array->last_literal;
+	uint32_t new_num_cvs = op_array->last_var;
+	uint32_t new_num_tmps = op_array->T;
+	uint32_t new_num_cache_slots = op_array->cache_size;
+	uint32_t new_num_live_ranges = op_array->last_live_range;
+	uint32_t new_num_try_catch = op_array->last_try_catch;
+	uint32_t tmp_offset;
+
+	/* Compute new sizes for op_array structures */
+	inline_info *cur;
+	for (cur = info; cur; cur = cur->next) {
+		new_num_opcodes += cur->opnum_diff;
+		new_num_literals += cur->fbc->last_literal;
+		new_num_cvs += cur->fbc->last_var;
+		new_num_tmps += cur->fbc->T;
+		new_num_cache_slots += cur->fbc->cache_size;
+		new_num_live_ranges += cur->fbc->last_live_range;
+		new_num_try_catch += cur->fbc->last_try_catch;
+	}
+
+	/* Compute TMP base offsets */
+	merge.tmp_offset = new_num_cvs - op_array->last_var;
+	tmp_offset = new_num_cvs + op_array->T;
+	for (cur = info; cur; cur = cur->next) {
+		cur->merge.tmp_offset = tmp_offset - cur->fbc->last_var;
+		tmp_offset += cur->fbc->T;
+	}
+
+	{
+		zend_op *new_opcodes = ecalloc(new_num_opcodes, sizeof(zend_op));
+		zend_string **new_vars = ecalloc(new_num_cvs, sizeof(zend_string*));
+		zval *new_literals = ecalloc(new_num_literals, sizeof(zval));
+
+		/* Shiftlists must be created first */
+		merge.shiftlist = create_shiftlists(ctx, op_array, info);
+
+		/* Live ranges have to be merged before merging opcodes,
+		 * because it also computes the live range map. */
+		if (new_num_live_ranges) {
+			zend_live_range *new_live_ranges =
+				ecalloc(new_num_live_ranges, sizeof(zend_live_range));
+			merge_live_ranges(ctx, op_array, info, new_live_ranges, &merge);
+			efree(op_array->live_range);
+			op_array->live_range = new_live_ranges;
+			op_array->last_live_range = new_num_live_ranges;
+		}
+
+		merge_opcodes(op_array, info, new_opcodes, &merge);
+		merge_cvs(op_array, info, new_vars);
+		merge_literals(op_array, info, new_literals);
+
+		if (new_num_try_catch) {
+			zend_try_catch_element *new_try_catch =
+				ecalloc(new_num_try_catch, sizeof(zend_try_catch_element));
+			merge_try_catch(op_array, info, new_try_catch, merge.shiftlist);
+			efree(op_array->try_catch_array);
+			op_array->try_catch_array = new_try_catch;
+			op_array->last_try_catch = new_num_try_catch;
+		}
+
+		efree(op_array->opcodes);
+		op_array->opcodes = new_opcodes;
+		op_array->last = new_num_opcodes;
+
+		efree(op_array->vars);
+		op_array->vars = new_vars;
+		op_array->last_var = new_num_cvs;
+
+		efree(op_array->literals);
+		op_array->literals = new_literals;
+		op_array->last_literal = new_num_literals;
+
+		op_array->T = new_num_tmps;
+		op_array->cache_size = new_num_cache_slots;
+	}
+	// TODO add/extend live range for return temporary
+	// TODO merge early binding
+}
+
 void optimize_inlining(zend_op_array *op_array, zend_optimizer_ctx *ctx) {
-	void *checkpoint = zend_arena_checkpoint(ctx->arena);
-	inline_info *info = NULL;
+	void *checkpoint;
+	inline_info *info;
+	int i;
 
 	/* Don't inline into main script -- $GLOBALS is too volatile */
-	if (op_array != &ctx->script->main_op_array) {
+	if (op_array == &ctx->script->main_op_array) {
+		return;
+	}
+
+	checkpoint = zend_arena_checkpoint(ctx->arena);
+	//for (i = 0; i < 2; i++) {
 		info = find_inlinable_calls(op_array, ctx);
-	}
-	if (info) {
-		merge_info merge;
-		uint32_t new_num_opcodes = op_array->last;
-		uint32_t new_num_literals = op_array->last_literal;
-		uint32_t new_num_cvs = op_array->last_var;
-		uint32_t new_num_tmps = op_array->T;
-		uint32_t new_num_cache_slots = op_array->cache_size;
-		uint32_t new_num_live_ranges = op_array->last_live_range;
-		uint32_t new_num_try_catch = op_array->last_try_catch;
-		uint32_t tmp_offset;
-
-		/* Compute new sizes for op_array structures */
-		inline_info *cur;
-		for (cur = info; cur; cur = cur->next) {
-			new_num_opcodes += cur->opnum_diff;
-			new_num_literals += cur->fbc->last_literal;
-			new_num_cvs += cur->fbc->last_var;
-			new_num_tmps += cur->fbc->T;
-			new_num_cache_slots += cur->fbc->cache_size;
-			new_num_live_ranges += cur->fbc->last_live_range;
-			new_num_try_catch += cur->fbc->last_try_catch;
+		if (info) {
+			inline_calls(ctx, op_array, info);
 		}
-
-		/* Compute TMP base offsets */
-		merge.tmp_offset = new_num_cvs - op_array->last_var;
-		tmp_offset = new_num_cvs + op_array->T;
-		for (cur = info; cur; cur = cur->next) {
-			cur->merge.tmp_offset = tmp_offset - cur->fbc->last_var;
-			tmp_offset += cur->fbc->T;
-		}
-
-		{
-			zend_op *new_opcodes = ecalloc(new_num_opcodes, sizeof(zend_op));
-			zend_string **new_vars = ecalloc(new_num_cvs, sizeof(zend_string*));
-			zval *new_literals = ecalloc(new_num_literals, sizeof(zval));
-
-			/* Shiftlists must be created first */
-			merge.shiftlist = create_shiftlists(ctx, op_array, info);
-
-			/* Live ranges have to be merged before merging opcodes,
-			 * because it also computes the live range map. */
-			if (new_num_live_ranges) {
-				zend_live_range *new_live_ranges =
-					ecalloc(new_num_live_ranges, sizeof(zend_live_range));
-				merge_live_ranges(ctx, op_array, info, new_live_ranges, &merge);
-				efree(op_array->live_range);
-				op_array->live_range = new_live_ranges;
-				op_array->last_live_range = new_num_live_ranges;
-			}
-
-			merge_opcodes(op_array, info, new_opcodes, &merge);
-			merge_cvs(op_array, info, new_vars);
-			merge_literals(op_array, info, new_literals);
-
-			if (new_num_try_catch) {
-				zend_try_catch_element *new_try_catch =
-					ecalloc(new_num_try_catch, sizeof(zend_try_catch_element));
-				merge_try_catch(op_array, info, new_try_catch, merge.shiftlist);
-				efree(op_array->try_catch_array);
-				op_array->try_catch_array = new_try_catch;
-				op_array->last_try_catch = new_num_try_catch;
-			}
-
-			efree(op_array->opcodes);
-			op_array->opcodes = new_opcodes;
-			op_array->last = new_num_opcodes;
-
-			efree(op_array->vars);
-			op_array->vars = new_vars;
-			op_array->last_var = new_num_cvs;
-
-			efree(op_array->literals);
-			op_array->literals = new_literals;
-			op_array->last_literal = new_num_literals;
-
-			op_array->T = new_num_tmps;
-			op_array->cache_size = new_num_cache_slots;
-		}
-		// TODO add/extend live range for return temporary
-		// TODO merge early binding
-	}
+	//}
 
 	zend_arena_release(&ctx->arena, checkpoint);
 }
