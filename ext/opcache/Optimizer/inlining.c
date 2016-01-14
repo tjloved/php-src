@@ -35,6 +35,7 @@ typedef struct _inline_info {
 	int32_t opnum_diff;
 	uint32_t num_inlined_opcodes;
 	uint32_t num_args_passed;
+	uint8_t result_var_type;
 	uint32_t result_var_num;
 	merge_info merge;
 } inline_info;
@@ -237,8 +238,10 @@ static inline_info *find_inlinable_calls(zend_op_array *op_array, zend_optimizer
 
 				if (call_opline->result_type & EXT_TYPE_UNUSED) {
 					info->result_var_num = (uint32_t) -1;
+					info->result_var_type = IS_UNUSED;
 				} else {
 					info->result_var_num = call_opline->result.var;
+					info->result_var_type = call_opline->result_type;
 				}
 
 				info->next = NULL;
@@ -467,9 +470,14 @@ static void merge_opcodes(
 					if (info->result_var_num != (uint32_t) -1) {
 						/* Convert RETURN into QM_ASSIGN to call result var */
 						new_opline->opcode = ZEND_QM_ASSIGN;
-						new_opline->result_type = IS_VAR;
-						new_opline->result.var =
-							info->result_var_num + merge->tmp_offset * sizeof(zval);
+						new_opline->result_type = info->result_var_type;
+						if (info->result_var_type == IS_CV) {
+							new_opline->result.var =
+								info->result_var_num + cv_offset * sizeof(zval);
+						} else {
+							new_opline->result.var =
+								info->result_var_num + merge->tmp_offset * sizeof(zval);
+						}
 					} else if (new_opline->op1_type & (IS_TMP_VAR|IS_VAR)) {
 						/* Convert RETURN into FREE if return value is unused */
 						new_opline->opcode = ZEND_FREE;
@@ -720,12 +728,12 @@ void optimize_inlining(zend_op_array *op_array, zend_optimizer_ctx *ctx) {
 	}
 
 	checkpoint = zend_arena_checkpoint(ctx->arena);
-	//for (i = 0; i < 2; i++) {
+	for (i = 0; i < 1; i++) {
 		info = find_inlinable_calls(op_array, ctx);
 		if (info) {
 			inline_calls(ctx, op_array, info);
 		}
-	//}
+	}
 
 	zend_arena_release(&ctx->arena, checkpoint);
 }
