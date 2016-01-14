@@ -29,7 +29,11 @@ static void collect_ssa_stats(zend_op_array *op_array, zend_ssa *ssa) {
 		if (is_cv) {
 			OPT_STAT(cv_ssa_vars)++;
 			if (info->type & MAY_BE_UNDEF) {
-				OPT_STAT(cv_ssa_may_be_undef)++;
+				if ((info->type & MAY_BE_ANY) == 0) {
+					OPT_STAT(cv_ssa_must_be_undef)++;
+				} else {
+					OPT_STAT(cv_ssa_may_be_undef)++;
+				}
 			}
 		}
 		if (info->type & MAY_BE_REF) {
@@ -237,7 +241,9 @@ static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) 
 		return;
 	}
 
-	collect_ssa_stats(op_array, &info->ssa);
+	if (ZCG(accel_directives).opt_statistics) {
+		collect_ssa_stats(op_array, &info->ssa);
+	}
 
 	complete_block_map(&info->ssa.cfg, op_array->last);
 	remove_spurious_ssa_vars(op_array, &info->ssa);
