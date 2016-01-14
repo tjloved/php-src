@@ -90,8 +90,8 @@ static zend_bool can_inline_opcodes(zend_op_array *op_array, zend_bool rt_consta
 }
 
 /* Inlining heuristic */
-static inline zend_bool should_inline(zend_op_array *op_array) {
-	if (op_array->last > 1000) {
+static inline zend_bool should_inline(zend_op_array *target, zend_op_array *source) {
+	if (source->last > 500) {
 		return 0;
 	}
 	return 1;
@@ -219,7 +219,8 @@ static inline_info *find_inlinable_calls(zend_op_array *op_array, zend_optimizer
 			zend_string *name = Z_STR(ZEND_OP2_LITERAL(opline));
 			zend_op_array *fbc = zend_hash_find_ptr(&ctx->script->function_table, name);
 			uint32_t num_args_passed = opline->extended_value;
-			if (fbc && should_inline(fbc) && can_inline(fbc, num_args_passed, fbc != op_array)) {
+			if (fbc && should_inline(op_array, fbc)
+					&& can_inline(fbc, num_args_passed, fbc != op_array)) {
 				inline_info *info;
 				zend_op *call_opline = find_call_opline(opline);
 				if (!call_opline) {
@@ -728,7 +729,7 @@ void optimize_inlining(zend_op_array *op_array, zend_optimizer_ctx *ctx) {
 	}
 
 	checkpoint = zend_arena_checkpoint(ctx->arena);
-	for (i = 0; i < 1; i++) {
+	for (i = 0; i < 3; i++) {
 		info = find_inlinable_calls(op_array, ctx);
 		if (info) {
 			inline_calls(ctx, op_array, info);
