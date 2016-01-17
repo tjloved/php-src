@@ -35,6 +35,7 @@ void zend_optimizer_statistics_shutdown() {
 	PRINT_NORM_STAT(scp_dead_blocks, cfg_blocks);
 	PRINT_NORM_STAT(scp_dead_instrs, instrs);
 	PRINT_NORM_STAT(scp_semi_dead_instrs, instrs);
+	PRINT_STAT(scp_dead_phis);
 	PRINT_NORM_STAT(scp_dead_blocks_instrs, instrs);
 	PRINT_STAT(scp_dead_blocks_phis);
 

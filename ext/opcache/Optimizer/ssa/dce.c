@@ -55,6 +55,7 @@ static inline zend_bool may_throw(
 		case ZEND_END_SILENCE:
 		case ZEND_COALESCE:
 		case ZEND_TYPE_CHECK:
+		case ZEND_DEFINED:
 			return 0;
 		case ZEND_ADD:
 			if (CAN_BE(t1, MAY_BE_ARRAY) || CAN_BE(t2, MAY_BE_ARRAY)) {
@@ -159,6 +160,7 @@ static inline zend_bool may_throw(
 		case ZEND_ASSIGN_BW_OR:
 		case ZEND_ASSIGN_BW_AND:
 		case ZEND_ASSIGN_BW_XOR:
+		case ZEND_ASSIGN_POW:
 			// TODO Reduce these to their primitives
 			return 1;
 		case ZEND_ECHO:
@@ -235,7 +237,6 @@ static inline zend_bool may_throw(
 #define ZEND_SEND_ARRAY                      119
 #define ZEND_SEND_USER                       120
 #define ZEND_STRLEN                          121
-#define ZEND_DEFINED                         122
 #define ZEND_VERIFY_RETURN_TYPE              124
 #define ZEND_FE_RESET_RW                     125
 #define ZEND_FE_FETCH_RW                     126
@@ -273,7 +274,6 @@ static inline zend_bool may_throw(
 #define ZEND_FAST_RET                        163
 #define ZEND_RECV_VARIADIC                   164
 #define ZEND_SEND_UNPACK                     165
-#define ZEND_ASSIGN_POW                      167
 #define ZEND_BIND_GLOBAL                     168
 #define ZEND_SPACESHIP                       170
 #define ZEND_DECLARE_ANON_CLASS              171
