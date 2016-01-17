@@ -22,6 +22,13 @@ typedef struct _zend_optimizer_statistics {
 	uint32_t copy_contracted_assign;
 	uint32_t copy_qm_assign;
 	uint32_t type_spec_arithm;
+	uint32_t type_spec_must_be_array;
+	uint32_t type_spec_not_known_to_be_array;
+	uint32_t type_spec_must_be_int_key;
+	uint32_t type_spec_must_be_string_key;
+	uint32_t type_spec_must_be_matching_int_key;
+	uint32_t type_spec_must_be_append_int_key;
+	uint32_t type_spec_must_be_notref_array_values;
 } zend_optimizer_statistics;
 
 extern zend_optimizer_statistics optimizer_statistics;

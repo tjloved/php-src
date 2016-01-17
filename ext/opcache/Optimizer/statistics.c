@@ -39,4 +39,11 @@ void zend_optimizer_statistics_shutdown() {
 	PRINT_STAT(copy_contracted_assign);
 	PRINT_STAT(copy_qm_assign);
 	PRINT_STAT(type_spec_arithm);
+	PRINT_STAT(type_spec_must_be_array);
+	PRINT_STAT(type_spec_not_known_to_be_array);
+	PRINT_STAT(type_spec_must_be_int_key);
+	PRINT_STAT(type_spec_must_be_string_key);
+	PRINT_STAT(type_spec_must_be_matching_int_key);
+	PRINT_STAT(type_spec_must_be_append_int_key);
+	PRINT_STAT(type_spec_must_be_notref_array_values);
 }

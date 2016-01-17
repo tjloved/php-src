@@ -140,6 +140,27 @@ void ssa_optimize_type_specialization(
 				ssa_op->op1_def = -1;
 				OPT_STAT(type_spec_arithm)++;
 				break;
+			//case ZEND_FETCH_DIM_R:
+			case ZEND_ASSIGN_DIM:
+				if (MUST_BE(t1, MAY_BE_ARRAY)) {
+					OPT_STAT(type_spec_must_be_array)++;
+					if ((t1 & MAY_BE_ARRAY_KEY_LONG) == MAY_BE_ARRAY_KEY_LONG) {
+						OPT_STAT(type_spec_must_be_int_key)++;
+						if (opline->op2_type == IS_UNUSED) {
+							OPT_STAT(type_spec_must_be_append_int_key)++;
+						} else if (MUST_BE(t2, MAY_BE_LONG)) {
+							OPT_STAT(type_spec_must_be_matching_int_key)++;
+						}
+					} else if ((t1 & MAY_BE_ARRAY_KEY_STRING) == MAY_BE_ARRAY_KEY_STRING) {
+						OPT_STAT(type_spec_must_be_string_key)++;
+					}
+					if (((t1 & MAY_BE_ARRAY_OF_ANY) & (MAY_BE_ARRAY_OF_STRING|MAY_BE_ARRAY_OF_ARRAY|MAY_BE_ARRAY_OF_RESOURCE|MAY_BE_ARRAY_OF_OBJECT)) == 0) {
+						OPT_STAT(type_spec_must_be_notref_array_values)++;
+					}
+				} else {
+					OPT_STAT(type_spec_not_known_to_be_array)++;
+				}
+				break;
 		}
 	}
 }
