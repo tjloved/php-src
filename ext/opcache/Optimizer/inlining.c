@@ -19,6 +19,7 @@
 #include "php.h"
 #include "Optimizer/zend_optimizer.h"
 #include "Optimizer/zend_optimizer_internal.h"
+#include "Optimizer/statistics.h"
 
 typedef struct _merge_info {
 	uint32_t tmp_offset;
@@ -664,6 +665,9 @@ static void inline_calls(zend_optimizer_ctx *ctx, zend_op_array *op_array, inlin
 		new_num_cache_slots += cur->fbc->cache_size;
 		new_num_live_ranges += cur->fbc->last_live_range;
 		new_num_try_catch += cur->fbc->last_try_catch;
+
+		OPT_STAT(inlining_funcs)++;
+		OPT_STAT(inlining_instrs) += cur->fbc->last;
 	}
 
 	/* Compute TMP base offsets */
