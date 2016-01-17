@@ -79,11 +79,18 @@ static zend_bool can_inline_opcodes(zend_op_array *op_array, zend_bool rt_consta
 						) {
 							/* Could theoretically be supported, but not worth patching them up */
 							return 0;
+						} else if (zend_string_equals_literal(Z_STR_P(zv), "debug_backtrace") ||
+								   zend_string_equals_literal(Z_STR_P(zv), "debug_print_backtrace")) {
+							return 0;
 						}
 					}
 				}
 				break;
 			}
+			case ZEND_THROW:
+				/* If inlining is in use, there can be no expectation of keeping consistent
+				 * backtraces. However, there's no need to be too blatant with it. */
+				return 0;
 		}
 	}
 	return 1;
