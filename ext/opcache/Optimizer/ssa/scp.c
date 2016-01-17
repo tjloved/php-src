@@ -132,6 +132,7 @@ static zend_bool can_replace_op1(zend_op *opline, zend_ssa_op *ssa_op) {
 		case ZEND_BIND_TRAITS:
 		case ZEND_ROPE_ADD:
 		case ZEND_ROPE_END:
+		case ZEND_BIND_STATIC:
 			return 0;
 		case ZEND_ISSET_ISEMPTY_VAR:
 			/* CV has special meaning here - cannot simply be replaced */
