@@ -29,6 +29,9 @@ typedef struct _zend_optimizer_statistics {
 	uint32_t type_spec_must_be_matching_int_key;
 	uint32_t type_spec_must_be_append_int_key;
 	uint32_t type_spec_must_be_notref_array_values;
+	uint32_t scp_dead_blocks_instrs;
+	uint32_t scp_dead_blocks_phis;
+	uint32_t dce_dead_phis;
 } zend_optimizer_statistics;
 
 extern zend_optimizer_statistics optimizer_statistics;

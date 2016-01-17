@@ -54,6 +54,7 @@ static inline zend_bool may_throw(
 		case ZEND_BEGIN_SILENCE:
 		case ZEND_END_SILENCE:
 		case ZEND_COALESCE:
+		case ZEND_TYPE_CHECK:
 			return 0;
 		case ZEND_ADD:
 			if (CAN_BE(t1, MAY_BE_ARRAY) || CAN_BE(t2, MAY_BE_ARRAY)) {
@@ -235,7 +236,6 @@ static inline zend_bool may_throw(
 #define ZEND_SEND_USER                       120
 #define ZEND_STRLEN                          121
 #define ZEND_DEFINED                         122
-#define ZEND_TYPE_CHECK                      123
 #define ZEND_VERIFY_RETURN_TYPE              124
 #define ZEND_FE_RESET_RW                     125
 #define ZEND_FE_FETCH_RW                     126
@@ -407,6 +407,10 @@ static void dce_instr(context *ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 	zend_ssa *ssa = ctx->ssa;
 	int free_var = -1;
 	zend_uchar free_var_type;
+
+	if (opline->opcode == ZEND_NOP) {
+		return;
+	}
 
 	/* We mark FREEs as dead, but they're only really dead if the destroyed var is dead */
 	if (opline->opcode == ZEND_FREE && !is_var_dead(ctx, ssa_op->op1_use)) {
@@ -589,6 +593,7 @@ void ssa_optimize_dce(zend_optimizer_ctx *opt_ctx, zend_op_array *op_array, zend
 
 	FOREACH_PHI(phi) {
 		if (zend_bitset_in(ctx.phi_dead, phi->ssa_var)) {
+			OPT_STAT(dce_dead_phis)++;
 			remove_phi(ssa, phi);
 		}
 	} FOREACH_PHI_END();

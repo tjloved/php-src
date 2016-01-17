@@ -1045,10 +1045,18 @@ static void eliminate_dead_blocks(scp_ctx *ctx) {
 	for (i = 0; i < ssa->cfg.blocks_count; i++) {
 		if (!zend_bitset_in(ctx->executable_blocks, i)) {
 			zend_basic_block *block = &ssa->cfg.blocks[i];
+			zend_ssa_block *ssa_block = &ssa->blocks[i];
+			zend_ssa_phi *phi;
 			int j;
+
 			OPT_STAT(scp_dead_blocks)++;
+			for (phi = ssa_block->phis; phi; phi = phi->next) {
+				remove_phi(ssa, phi);
+				OPT_STAT(scp_dead_blocks_phis)++;
+			}
 			for (j = block->start; j <= block->end; j++) {
 				remove_instr_with_defs(ssa, &ctx->op_array->opcodes[j], &ssa->ops[j]);
+				OPT_STAT(scp_dead_blocks_instrs)++;
 			}
 		}
 	}
