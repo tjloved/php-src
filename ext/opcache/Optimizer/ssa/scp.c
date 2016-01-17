@@ -1050,6 +1050,7 @@ static void eliminate_dead_blocks(scp_ctx *ctx) {
 			int j;
 
 			OPT_STAT(scp_dead_blocks)++;
+			block->flags &= ~ZEND_BB_REACHABLE;
 			for (phi = ssa_block->phis; phi; phi = phi->next) {
 				remove_phi(ssa, phi);
 				OPT_STAT(scp_dead_blocks_phis)++;
@@ -1149,6 +1150,10 @@ static void eliminate_dead_instructions(scp_ctx *ctx) {
 				Z_TRY_ADDREF_P(val);
 			}
 		}
+		/*if (var->definition_phi && !var_used(var)) {
+			OPT_STAT(scp_dead_phis)++;
+			remove_phi(ssa, var->definition_phi);
+		}*/
 	}
 }
 
