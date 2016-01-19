@@ -663,3 +663,5 @@ document lookup_root
 	lookup a refcounted in root
 	usage: lookup_root [ptr].
 end
+
+source gdb.py
