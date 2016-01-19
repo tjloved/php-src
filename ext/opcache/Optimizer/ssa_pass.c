@@ -189,6 +189,11 @@ static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) 
 	zend_call_graph call_graph;
 	zend_func_info *info;
 
+	/* We can't currently perform data-flow analysis for code using try/catch */
+	if (op_array->last_try_catch) {
+		return;
+	}
+
 	/* We're rebuilding the call graph for every op array, as op arrays may be changed and
 	 * even reallocated during optimizations. */
 	if (zend_build_call_graph_ex(&ctx->arena, ctx->script, 0, &call_graph, op_array) != SUCCESS) {
@@ -200,16 +205,16 @@ static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) 
 		return;
 	}
 
-	if (info->flags & ZEND_FUNC_TOO_DYNAMIC) {
-		return;
-	}
-
-	if (zend_cfg_build_predecessors(&ctx->arena, &info->ssa.cfg) != SUCCESS) {
+	if (info->flags & ZEND_FUNC_INDIRECT_VAR_ACCESS) {
 		return;
 	}
 
 	if (is_php_errormsg_used(op_array)) {
 		// TODO Move this into construction phases?
+		return;
+	}
+
+	if (zend_cfg_build_predecessors(&ctx->arena, &info->ssa.cfg) != SUCCESS) {
 		return;
 	}
 
