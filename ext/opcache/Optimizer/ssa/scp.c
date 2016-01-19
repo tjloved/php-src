@@ -833,9 +833,6 @@ static zend_bool get_feasible_successors(
 		case ZEND_FE_FETCH_R:
 		case ZEND_FE_FETCH_RW:
 		case ZEND_NEW:
-		// TODO For these two we could consider empty arrays
-		case ZEND_FE_RESET_R:
-		case ZEND_FE_RESET_RW:
 			suc[0] = 1;
 			suc[1] = 1;
 			return 1;
@@ -868,6 +865,15 @@ static zend_bool get_feasible_successors(
 			break;
 		case ZEND_COALESCE:
 			suc[Z_TYPE_P(op1) == IS_NULL] = 1;
+			break;
+		case ZEND_FE_RESET_R:
+		case ZEND_FE_RESET_RW:
+			if (Z_TYPE_P(op1) == IS_ARRAY) {
+				suc[zend_hash_num_elements(Z_ARR_P(op1)) != 0] = 1;
+			} else {
+				suc[0] = 1;
+				suc[1] = 1;
+			}
 			break;
 		EMPTY_SWITCH_DEFAULT_CASE()
 	}
