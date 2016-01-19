@@ -705,17 +705,6 @@ static void zend_optimize(zend_op_array      *op_array,
 		return;
 	}
 
-	/* pass 8: Function inlining
-	 * This pass should run before all other optimizations in a pass set, to
-	 * make sure the subsequent passes are applied to inlined function segments.
-	 */
-	if (ZEND_OPTIMIZER_PASS_8 & ctx->optimization_level) {
-		optimize_inlining(op_array, ctx);
-		if (ctx->debug_level & ZEND_DUMP_AFTER_PASS_8) {
-			zend_dump_op_array(op_array, 0, "after pass 8", NULL);
-		}
-	}
-
 	/* pass 1
 	 * - substitute persistent constants (true, false, null, etc)
 	 * - perform compile-time evaluation of constant binary and unary operations
@@ -900,7 +889,28 @@ static void zend_optimize_pass_set_1(zend_op_array *op_array, zend_optimizer_ctx
 	zend_redo_pass_two(op_array);
 }
 
-static void zend_optimize_pass_set_2(zend_op_array      *op_array,
+/* Second pass set performs inlining. This must happen for all op_arrays at the same time,
+ * otherwise we may inline already-optimized op_arrays, which no longer satisfy initial
+ * invariants (e.g. no literal sharing) */
+static void zend_optimize_pass_set_2(zend_op_array *op_array, zend_optimizer_ctx *ctx) {
+	if (op_array->type == ZEND_EVAL_CODE) {
+		return;
+	}
+
+	zend_revert_pass_two(op_array);
+
+	/* pass 8: Function inlining */
+	if (ZEND_OPTIMIZER_PASS_8 & ctx->optimization_level) {
+		optimize_inlining(op_array, ctx);
+		if (ctx->debug_level & ZEND_DUMP_AFTER_PASS_8) {
+			zend_dump_op_array(op_array, 0, "after pass 8", NULL);
+		}
+	}
+
+	zend_redo_pass_two(op_array);
+}
+
+static void zend_optimize_pass_set_3(zend_op_array      *op_array,
                                    zend_optimizer_ctx *ctx)
 {
 	/* Revert pass_two() */
@@ -998,6 +1008,7 @@ int zend_optimize_script(zend_script *script, zend_long optimization_level, zend
 
 	foreach_op_array(&ctx, zend_optimize_pass_set_1);
 	foreach_op_array(&ctx, zend_optimize_pass_set_2);
+	foreach_op_array(&ctx, zend_optimize_pass_set_3);
 
 #if HAVE_DFA_PASS
 	if ((ZEND_OPTIMIZER_PASS_6 & optimization_level) &&
