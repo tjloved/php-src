@@ -99,6 +99,10 @@ static zend_bool can_inline_opcodes(zend_op_array *op_array, zend_bool rt_consta
 
 /* Inlining heuristic */
 static inline zend_bool should_inline(zend_op_array *target, zend_op_array *source) {
+	if (source->last_try_catch) {
+		/* The DFA optimizations don't support op_arrays with try/catch, so don't inline them. */
+		return 0;
+	}
 	if (source->last > 500) {
 		return 0;
 	}
@@ -110,8 +114,6 @@ static zend_bool can_inline(
 	int i;
 	uint32_t forbidden_flags = ZEND_ACC_GENERATOR | ZEND_ACC_VARIADIC | ZEND_ACC_RETURN_REFERENCE
 	                         | ZEND_ACC_HAS_TYPE_HINTS | ZEND_ACC_HAS_RETURN_TYPE
-							 /* Finally pessimizes various optimization passes, don't inline it
-							  * for now*/
 							 | ZEND_ACC_HAS_FINALLY_BLOCK;
 
 	// TODO Collect variadics into array
