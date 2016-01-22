@@ -81,7 +81,7 @@ static zval *get_op2_value(scp_ctx *ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 	}
 }
 
-static zend_bool can_replace_op1(zend_op *opline, zend_ssa_op *ssa_op) {
+static zend_bool can_replace_op1(zend_op_array *op_array, zend_op *opline, zend_ssa_op *ssa_op) {
 	switch (opline->opcode) {
 		case ZEND_PRE_INC:
 		case ZEND_PRE_DEC:
@@ -141,6 +141,8 @@ static zend_bool can_replace_op1(zend_op *opline, zend_ssa_op *ssa_op) {
 		case ZEND_INIT_ARRAY:
 		case ZEND_ADD_ARRAY_ELEMENT:
 			return !(opline->extended_value & ZEND_ARRAY_ELEMENT_REF);
+		case ZEND_YIELD:
+			return !(op_array->fn_flags & ZEND_ACC_RETURN_REFERENCE);
 		default:
 			if (ssa_op->op1_def != -1) {
 				ZEND_ASSERT(0);
@@ -151,7 +153,7 @@ static zend_bool can_replace_op1(zend_op *opline, zend_ssa_op *ssa_op) {
 	return 1;
 }
 
-static zend_bool can_replace_op2(zend_op *opline, zend_ssa_op *ssa_op) {
+static zend_bool can_replace_op2(zend_op_array *op_array, zend_op *opline, zend_ssa_op *ssa_op) {
 	switch (opline->opcode) {
 		/* Do not accept CONST */
 		case ZEND_DECLARE_INHERITED_CLASS:
@@ -164,7 +166,7 @@ static zend_bool can_replace_op2(zend_op *opline, zend_ssa_op *ssa_op) {
 }
 
 static zend_bool try_replace_op1(scp_ctx *ctx, int var, zend_op *opline, zend_ssa_op *ssa_op) {
-	if (ssa_op->op1_use == var && can_replace_op1(opline, ssa_op)) {
+	if (ssa_op->op1_use == var && can_replace_op1(ctx->op_array, opline, ssa_op)) {
 		zval value;
 		ZVAL_DUP(&value, &ctx->values[var]); // TODO
 		if (zend_optimizer_update_op1_const(ctx->op_array, opline, &value)) {
@@ -174,7 +176,7 @@ static zend_bool try_replace_op1(scp_ctx *ctx, int var, zend_op *opline, zend_ss
 	return 0;
 }
 static zend_bool try_replace_op2(scp_ctx *ctx, int var, zend_op *opline, zend_ssa_op *ssa_op) {
-	if (ssa_op->op2_use == var && can_replace_op2(opline, ssa_op)) {
+	if (ssa_op->op2_use == var && can_replace_op2(ctx->op_array, opline, ssa_op)) {
 		zval value;
 		ZVAL_DUP(&value, &ctx->values[var]); // TODO
 		if (zend_optimizer_update_op2_const(ctx->op_array, opline, &value)) {
