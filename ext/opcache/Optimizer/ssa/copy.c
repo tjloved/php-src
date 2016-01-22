@@ -22,9 +22,9 @@ void ssa_optimize_copy(zend_optimizer_ctx *ctx, zend_op_array *op_array, zend_ss
 
 		if (opline->op2_type & (IS_TMP_VAR|IS_VAR)) {
 			zend_ssa_var *var = &ssa->vars[ssa_op->op2_use];
-			/* Check that var is result of instruction, used only in this assignment
-			 * and not a reference */
-			if (var->definition >= 0
+			/* Check that var is result of immediately preceding instruction,
+			 * used only in this assignment and not a reference */
+			if (var->definition >= 0 && var->definition+1 == i
 					&& var->use_chain == i && ssa_op->op2_use_chain < 0 && !var->phi_use_chain
 					&& !(ssa->var_info[ssa_op->op2_use].type & MAY_BE_REF)) {
 				zend_ssa_op *def_ssa_op = &ssa->ops[var->definition];
