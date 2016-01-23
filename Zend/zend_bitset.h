@@ -245,6 +245,22 @@ static inline int zend_bitset_last(zend_bitset set, uint32_t len)
 	} \
 } while (0)
 
+static inline int zend_bitset_next(zend_bitset set, uint32_t len, uint32_t start)
+{
+	uint32_t start_elm = start / (ZEND_BITSET_ELM_SIZE * 8);
+	if (start & (ZEND_BITSET_ELM_SIZE * 8 - 1)) {
+		zend_ulong x = set[start_elm];
+		if (x) {
+			while ((x & Z_UL(1)) == 0) {
+				x = x >> Z_UL(1);
+				start++;
+			}
+			return start;
+		}
+	}
+	return zend_bitset_first(set + start_elm, len - start_elm);
+}
+
 #endif /* _ZEND_BITSET_H_ */
 
 /*

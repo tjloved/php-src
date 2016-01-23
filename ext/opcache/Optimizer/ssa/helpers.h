@@ -11,12 +11,11 @@
 #define MAY_BE_REFCOUNTED (MAY_BE_STRING|MAY_BE_ARRAY|MAY_BE_OBJECT|MAY_BE_RESOURCE)
 
 #define FOREACH_USE(var, use) do { \
-	int _var_num = (var) - ssa->vars; \
+	int _var_num = (var) - ssa->vars, next; \
 	use = (var)->use_chain; \
-	while (use >= 0) { \
-		int next = zend_ssa_next_use(ssa->ops, _var_num, use);
+	for (; use >= 0; use = next) { \
+		next = zend_ssa_next_use(ssa->ops, _var_num, use);
 #define FOREACH_USE_END() \
-		use = next; \
 	} \
 } while (0)
 

@@ -2,6 +2,7 @@
 #include "Optimizer/zend_optimizer_internal.h"
 #include "Optimizer/zend_dump.h"
 #include "Optimizer/ssa/helpers.h"
+#include "Optimizer/ssa/liveness.h"
 #include "Optimizer/statistics.h"
 
 #define CANT_BE(t, name) (!(t & MAY_BE_##name))
@@ -193,6 +194,7 @@ static zend_bool is_php_errormsg_used(zend_op_array *op_array) {
 static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) {
 	zend_call_graph call_graph;
 	zend_func_info *info;
+	ssa_liveness liveness;
 
 	/* We can't currently perform data-flow analysis for code using try/catch */
 	if (op_array->last_try_catch) {
@@ -259,6 +261,7 @@ static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) 
 	remove_spurious_ssa_vars(op_array, &info->ssa);
 	remove_trivial_phis(&info->ssa);
 	verify_use_chains(&info->ssa);
+	ssa_liveness_precompute(ctx, &liveness, &info->ssa);
 
 	if (ZCG(accel_directives).ssa_debug_level & 2) {
 		zend_dump_op_array(op_array, ZEND_DUMP_SSA | ZEND_DUMP_HIDE_UNUSED_VARS, NULL, &info->ssa);
