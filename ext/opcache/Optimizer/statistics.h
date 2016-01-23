@@ -35,6 +35,8 @@ typedef struct _zend_optimizer_statistics {
 	uint32_t scp_dead_phis;
 	uint32_t inlining_funcs;
 	uint32_t inlining_instrs;
+	uint32_t phis;
+	uint32_t trivial_phis;
 } zend_optimizer_statistics;
 
 extern zend_optimizer_statistics optimizer_statistics;
