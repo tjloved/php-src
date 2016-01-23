@@ -41,20 +41,21 @@ typedef struct _inline_info {
 	merge_info merge;
 } inline_info;
 
-static zend_bool can_inline_opcodes(zend_op_array *op_array, zend_bool rt_constants) {
+static zend_bool can_inline_opcodes(
+		zend_op_array *op_array, zend_bool rt_constants, zend_bool from) {
 	zend_op *opline = op_array->opcodes, *end = opline + op_array->last;
 	for (; opline != end; opline++) {
 		switch (opline->opcode) {
 			case ZEND_RECV_INIT:
-			{
-				zval *zv = CRT_CONSTANT_EX(op_array, opline->op2, rt_constants);
-				if (Z_CONSTANT_P(zv)) {
-					/* If initializer is constant or AST we cannot convert it into
-					 * a simple assignment (as these don't update constants) */
-					return 0;
+				if (from) {
+					zval *zv = CRT_CONSTANT_EX(op_array, opline->op2, rt_constants);
+					if (Z_CONSTANT_P(zv)) {
+						/* If initializer is constant or AST we cannot convert it into
+						 * a simple assignment (as these don't update constants) */
+						return 0;
+					}
 				}
 				break;
-			}
 			case ZEND_INIT_FCALL:
 			case ZEND_INIT_NS_FCALL_BY_NAME:
 			{
@@ -74,15 +75,19 @@ static zend_bool can_inline_opcodes(zend_op_array *op_array, zend_bool rt_consta
 						) {
 							/* Functions observing the symbol table */
 							return 0;
-						} else if (zend_string_equals_literal(Z_STR_P(zv), "func_num_args") ||
-						           zend_string_equals_literal(Z_STR_P(zv), "func_get_arg") ||
-						           zend_string_equals_literal(Z_STR_P(zv), "func_get_args")
-						) {
-							/* Could theoretically be supported, but not worth patching them up */
-							return 0;
 						} else if (zend_string_equals_literal(Z_STR_P(zv), "debug_backtrace") ||
 								   zend_string_equals_literal(Z_STR_P(zv), "debug_print_backtrace")) {
 							return 0;
+						}
+						if (from) {
+							if (zend_string_equals_literal(Z_STR_P(zv), "func_num_args") ||
+								zend_string_equals_literal(Z_STR_P(zv), "func_get_arg") ||
+								zend_string_equals_literal(Z_STR_P(zv), "func_get_args")
+							) {
+								/* Could theoretically be supported, but not worth patching
+								 * them up */
+								return 0;
+							}
 						}
 					}
 				}
@@ -97,6 +102,10 @@ static zend_bool can_inline_opcodes(zend_op_array *op_array, zend_bool rt_consta
 	return 1;
 }
 
+static inline zend_bool can_inline_into(zend_op_array *op_array) {
+	return can_inline_opcodes(op_array, 0, 0);
+}
+
 /* Inlining heuristic */
 static inline zend_bool should_inline(zend_op_array *target, zend_op_array *source) {
 	if (source->last_try_catch) {
@@ -109,7 +118,7 @@ static inline zend_bool should_inline(zend_op_array *target, zend_op_array *sour
 	return 1;
 }
 
-static zend_bool can_inline(
+static zend_bool can_inline_from(
 		zend_op_array *op_array, uint32_t num_args_passed, zend_bool rt_constants) {
 	int i;
 	uint32_t forbidden_flags = ZEND_ACC_GENERATOR | ZEND_ACC_VARIADIC | ZEND_ACC_RETURN_REFERENCE
@@ -138,7 +147,7 @@ static zend_bool can_inline(
 			return 0;
 		}
 	}
-	return can_inline_opcodes(op_array, rt_constants);
+	return can_inline_opcodes(op_array, rt_constants, 1);
 }
 
 static uint32_t num_returns(zend_op_array *op_array) {
@@ -230,7 +239,7 @@ static inline_info *find_inlinable_calls(zend_op_array *op_array, zend_optimizer
 			zend_op_array *fbc = zend_hash_find_ptr(&ctx->script->function_table, name);
 			uint32_t num_args_passed = opline->extended_value;
 			if (fbc && should_inline(op_array, fbc)
-					&& can_inline(fbc, num_args_passed, fbc != op_array)) {
+					&& can_inline_from(fbc, num_args_passed, fbc != op_array)) {
 				inline_info *info;
 				zend_op *call_opline = find_call_opline(opline);
 				if (!call_opline) {
@@ -738,6 +747,10 @@ void optimize_inlining(zend_op_array *op_array, zend_optimizer_ctx *ctx) {
 
 	/* Don't inline into main script -- $GLOBALS is too volatile */
 	if (op_array == &ctx->script->main_op_array) {
+		return;
+	}
+
+	if (!can_inline_into(op_array)) {
 		return;
 	}
 
