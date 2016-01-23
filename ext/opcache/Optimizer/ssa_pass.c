@@ -54,6 +54,9 @@ static void collect_ssa_stats(zend_op_array *op_array, zend_ssa *ssa) {
 				OPT_STAT(cv_ssa_may_be_refcounted)++;
 			}
 		}
+		if (var->definition_phi) {
+			OPT_STAT(phis)++;
+		}
 	}
 }
 
@@ -148,9 +151,11 @@ static void remove_trivial_phis(zend_ssa *ssa) {
 		int common_source = get_common_phi_source(ssa, phi);
 		if (!var_used(var)) {
 			remove_phi(ssa, phi);
+			OPT_STAT(trivial_phis)++;
 		} else if (phi->pi < 0 && common_source >= 0) {
 			rename_var_uses(ssa, phi->ssa_var, common_source);
 			remove_phi(ssa, phi);
+			OPT_STAT(trivial_phis)++;
 		}
 	} FOREACH_PHI_END();
 }
