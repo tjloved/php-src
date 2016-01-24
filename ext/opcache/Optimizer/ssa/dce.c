@@ -1,6 +1,6 @@
 #include "ZendAccelerator.h"
 #include "Optimizer/zend_optimizer_internal.h"
-#include "Optimizer/ssa/helpers.h"
+#include "Optimizer/ssa_pass.h"
 #include "Optimizer/statistics.h"
 
 typedef struct {
@@ -536,7 +536,9 @@ static void simplify_jump_and_set(context *ctx) {
 }
 #endif
 
-void ssa_optimize_dce(zend_optimizer_ctx *opt_ctx, zend_op_array *op_array, zend_ssa *ssa) {
+void ssa_optimize_dce(ssa_opt_ctx *ssa_ctx) {
+	zend_op_array *op_array = ssa_ctx->op_array;
+	zend_ssa *ssa = ssa_ctx->ssa;
 	int i;
 	zend_ssa_phi *phi;
 

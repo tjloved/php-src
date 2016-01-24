@@ -1,20 +1,9 @@
 #include "ZendAccelerator.h"
 #include "Optimizer/zend_optimizer_internal.h"
 #include "Optimizer/zend_dump.h"
-#include "Optimizer/ssa/helpers.h"
+#include "Optimizer/ssa_pass.h"
 #include "Optimizer/ssa/liveness.h"
 #include "Optimizer/statistics.h"
-
-#define CANT_BE(t, name) (!(t & MAY_BE_##name))
-
-void ssa_optimize_scp(zend_optimizer_ctx *ctx, zend_op_array *op_array, zend_ssa *ssa);
-void ssa_optimize_dce(zend_optimizer_ctx *ctx, zend_op_array *op_array, zend_ssa *ssa);
-void ssa_optimize_copy(zend_optimizer_ctx *ctx, zend_op_array *op_array, zend_ssa *ssa);
-void ssa_optimize_cv_to_tmp(zend_optimizer_ctx *ctx, zend_op_array *op_array, zend_ssa *ssa);
-void ssa_optimize_type_specialization(
-		zend_optimizer_ctx *ctx, zend_op_array *op_array, zend_ssa *ssa);
-void ssa_optimize_object_specialization(
-		zend_optimizer_ctx *ctx, zend_op_array *op_array, zend_ssa *ssa);
 
 static void collect_ssa_stats(zend_op_array *op_array, zend_ssa *ssa) {
 	int i;
@@ -61,7 +50,9 @@ static void collect_ssa_stats(zend_op_array *op_array, zend_ssa *ssa) {
 	}
 }
 
-static void ssa_optimize_peephole(zend_optimizer_ctx *ctx, zend_op_array *op_array, zend_ssa *ssa) {
+static void ssa_optimize_peephole(ssa_opt_ctx *ctx) {
+	zend_op_array *op_array = ctx->op_array;
+	zend_ssa *ssa = ctx->ssa;
 	zend_op *opline = op_array->opcodes;
 	zend_op *end = opline + op_array->last;
 	while (opline != end) {
@@ -69,7 +60,7 @@ static void ssa_optimize_peephole(zend_optimizer_ctx *ctx, zend_op_array *op_arr
 		uint32_t t2 = OP2_INFO();
 		switch (opline->opcode) {
 			case ZEND_CONCAT:
-				if (CANT_BE(t1, OBJECT) && CANT_BE(t2, OBJECT)) {
+				if (!CAN_BE(t1, MAY_BE_OBJECT) && !CAN_BE(t2, MAY_BE_OBJECT)) {
 					opline->opcode = ZEND_FAST_CONCAT;
 				}
 				break;
@@ -195,6 +186,7 @@ static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) 
 	zend_call_graph call_graph;
 	zend_func_info *info;
 	ssa_liveness liveness;
+	ssa_opt_ctx ssa_ctx;
 
 	/* We can't currently perform data-flow analysis for code using try/catch */
 	if (op_array->last_try_catch) {
@@ -261,19 +253,24 @@ static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) 
 	remove_spurious_ssa_vars(op_array, &info->ssa);
 	remove_trivial_phis(&info->ssa);
 	verify_use_chains(&info->ssa);
+
 	ssa_liveness_precompute(ctx, &liveness, &info->ssa);
+	ssa_ctx.opt_ctx = ctx;
+	ssa_ctx.op_array = op_array;
+	ssa_ctx.ssa = &info->ssa;
+	ssa_ctx.liveness = &liveness;
 
 	if (ZCG(accel_directives).ssa_debug_level & 2) {
 		zend_dump_op_array(op_array, ZEND_DUMP_SSA | ZEND_DUMP_HIDE_UNUSED_VARS, NULL, &info->ssa);
 	}
 
-	ssa_optimize_scp(ctx, op_array, &info->ssa);
-	ssa_optimize_dce(ctx, op_array, &info->ssa);
-	ssa_optimize_copy(ctx, op_array, &info->ssa);
-	//ssa_optimize_cv_to_tmp(ctx, op_array, &info->ssa);
-	ssa_optimize_type_specialization(ctx, op_array, &info->ssa);
-	ssa_optimize_object_specialization(ctx, op_array, &info->ssa);
-	ssa_optimize_peephole(ctx, op_array, &info->ssa);
+	ssa_optimize_scp(&ssa_ctx);
+	ssa_optimize_dce(&ssa_ctx);
+	ssa_optimize_copy(&ssa_ctx);
+	//ssa_optimize_cv_to_tmp(&ssa_ctx);
+	ssa_optimize_type_specialization(&ssa_ctx);
+	ssa_optimize_object_specialization(&ssa_ctx);
+	ssa_optimize_peephole(&ssa_ctx);
 
 	if (ZCG(accel_directives).ssa_debug_level & 1) {
 		zend_dump_op_array(op_array, ZEND_DUMP_SSA | ZEND_DUMP_HIDE_UNUSED_VARS, NULL, &info->ssa);

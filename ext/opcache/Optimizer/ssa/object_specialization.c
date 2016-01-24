@@ -1,6 +1,6 @@
 #include "ZendAccelerator.h"
 #include "Optimizer/zend_optimizer_internal.h"
-#include "Optimizer/ssa/helpers.h"
+#include "Optimizer/ssa_pass.h"
 #include "Optimizer/ssa/instructions.h"
 
 static inline zend_bool is_property_accessible(
@@ -87,8 +87,9 @@ static zend_bool has_finalized_property_offsets(zend_script *script, zend_string
 	return 0;
 }
 
-void ssa_optimize_object_specialization(
-		zend_optimizer_ctx *opt_ctx, zend_op_array *op_array, zend_ssa *ssa) {
+void ssa_optimize_object_specialization(ssa_opt_ctx *ctx) {
+	zend_op_array *op_array = ctx->op_array;
+	zend_ssa *ssa = ctx->ssa;
 	int i;
 	for (i = 0; i < op_array->last; i++) {
 		zend_op *opline = &op_array->opcodes[i];
@@ -126,7 +127,7 @@ void ssa_optimize_object_specialization(
 					}
 
 					lcname = zend_string_tolower(ce->name);
-					if (!has_finalized_property_offsets(opt_ctx->script, lcname)) {
+					if (!has_finalized_property_offsets(ctx->opt_ctx->script, lcname)) {
 						zend_string_release(lcname);
 						break;
 					}
