@@ -53,6 +53,7 @@ static void compute_graphinfo(graphinfo *info, zend_optimizer_ctx *opt_ctx, cons
 	uint32_t block_set_len = zend_bitset_len(cfg->blocks_count);
 	graphinfo_state state;
 	state.visited = ZEND_BITSET_ALLOCA(block_set_len, use_heap);
+	memset(state.visited, 0, block_set_len * sizeof(zend_ulong));
 	info->preorder = state.preorder = zend_arena_calloc(
 		&opt_ctx->arena, cfg->blocks_count, sizeof(uint32_t));
 	info->postorder = state.postorder = zend_arena_calloc(
@@ -70,17 +71,18 @@ static void compute_graphinfo(graphinfo *info, zend_optimizer_ctx *opt_ctx, cons
 static void compute_reduced_reachable(
 		zend_optimizer_ctx *opt_ctx, ssa_liveness *liveness,
 		const zend_cfg *cfg, const graphinfo *info) {
-	uint32_t *cur = info->postorder + cfg->blocks_count;
 	/* Traverse CFG in reverse postorder and build
-	 * R_v = union { R_v' | v' in succ(v) } */
-	for (; cur >= info->postorder; cur--) {
-		zend_basic_block *block = &cfg->blocks[*cur];
-		zend_bitset_incl(REDUCED_REACHABLE(*cur), *cur);
+	 * R_v = {v} union unionall_{v' in succ(v)} R_v' */
+	int i;
+	for (i = cfg->blocks_count - 1; i >= 0; i--) {
+		uint32_t n = info->postorder[i];
+		zend_basic_block *block = &cfg->blocks[n];
+		zend_bitset_incl(REDUCED_REACHABLE(n), n);
 		if (block->successors[0] >= 0) {
-			zend_bitset_union(REDUCED_REACHABLE(*cur),
+			zend_bitset_union(REDUCED_REACHABLE(n),
 				REDUCED_REACHABLE(block->successors[0]), liveness->block_set_len);
 			if (block->successors[1] >= 0) {
-				zend_bitset_union(REDUCED_REACHABLE(*cur),
+				zend_bitset_union(REDUCED_REACHABLE(n),
 					REDUCED_REACHABLE(block->successors[1]), liveness->block_set_len);
 			}
 		}
@@ -108,7 +110,8 @@ static void compute_targets(
 				int s;
 				for (s = 0; s < 2; s++) {
 					if (zend_bitset_in(info->backedges, 2 * source + s)) {
-						uint32_t target = cfg->blocks[source].successors[s];
+						int target = cfg->blocks[source].successors[s];
+						ZEND_ASSERT(target >= 0);
 						if (!zend_bitset_in(REDUCED_REACHABLE(n), target)) {
 							zend_bitset_union(TARGETS(n), TARGETS(target), liveness->block_set_len);
 						}
