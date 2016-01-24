@@ -10,7 +10,7 @@ int try_copy_propagation(ssa_opt_ctx *ctx, zend_op *opline, zend_ssa_op *ssa_op)
 	int lhs_var_num, rhs_var_num, old_lhs_var_num;
 	zend_ssa_var *lhs_var, *rhs_var;
 	int use;
-	//zend_ssa_phi *phi;
+	zend_ssa_phi *phi;
 
 	if (opline->opcode == ZEND_ASSIGN) {
 		lhs_var_num = ssa_op->op1_def;
@@ -28,7 +28,7 @@ int try_copy_propagation(ssa_opt_ctx *ctx, zend_op *opline, zend_ssa_op *ssa_op)
 		return FAILURE;
 	}
 
-	if (lhs_var->phi_use_chain || rhs_var->phi_use_chain) {
+	if (lhs_var->phi_use_chain) {
 		// TODO
 		return FAILURE;
 	}
@@ -47,7 +47,6 @@ int try_copy_propagation(ssa_opt_ctx *ctx, zend_op *opline, zend_ssa_op *ssa_op)
 		if ((use_op->op1_use == lhs_var_num && use_op->op1_def >= 0)
 				|| (use_op->op2_use == lhs_var_num && use_op->op2_def >= 0)
 				|| (use_op->result_use == lhs_var_num && use_op->result_def >= 0)) {
-			// TODO Actually, can't we handle this via liveness as well?
 			return FAILURE;
 		}
 	} FOREACH_USE_END();
@@ -63,6 +62,13 @@ int try_copy_propagation(ssa_opt_ctx *ctx, zend_op *opline, zend_ssa_op *ssa_op)
 			}
 		}
 	} FOREACH_USE_END();
+
+	/* Use in phi *might* lead to an assignment, pessimistically assume it does */
+	FOREACH_PHI_USE(rhs_var, phi) {
+		if (ssa_is_live_in_at_block(ctx->liveness, lhs_var_num, phi->block)) {
+			return FAILURE;
+		}
+	} FOREACH_PHI_USE_END();
 
 	/* Rename CV operands in uses */
 	FOREACH_USE(lhs_var, use) {
