@@ -1,6 +1,6 @@
 #include "ZendAccelerator.h"
 #include "Optimizer/zend_optimizer_internal.h"
-#include "Optimizer/ssa/helpers.h"
+#include "Optimizer/ssa_pass.h"
 #include "Optimizer/ssa/instructions.h"
 #include "Optimizer/statistics.h"
 
@@ -29,8 +29,9 @@ static void normalize_op2_type(
 	}
 }
 
-void ssa_optimize_type_specialization(
-		zend_optimizer_ctx *opt_ctx, zend_op_array *op_array, zend_ssa *ssa) {
+void ssa_optimize_type_specialization(ssa_opt_ctx *ctx) {
+	zend_op_array *op_array = ctx->op_array;
+	zend_ssa *ssa = ctx->ssa;
 	int i;
 	for (i = 0; i < op_array->last; i++) {
 		zend_op *opline = &op_array->opcodes[i];

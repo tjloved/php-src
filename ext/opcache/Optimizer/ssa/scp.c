@@ -1,7 +1,7 @@
 #include "php.h"
 #include "ZendAccelerator.h"
 #include "Optimizer/zend_optimizer_internal.h"
-#include "Optimizer/ssa/helpers.h"
+#include "Optimizer/ssa_pass.h"
 #include "Optimizer/ssa/instructions.h"
 #include "Optimizer/statistics.h"
 
@@ -1166,7 +1166,9 @@ static void eliminate_dead_instructions(scp_ctx *ctx) {
 	}
 }
 
-void ssa_optimize_scp(zend_optimizer_ctx *opt_ctx, zend_op_array *op_array, zend_ssa *ssa) {
+void ssa_optimize_scp(ssa_opt_ctx *ssa_ctx) {
+	zend_op_array *op_array = ssa_ctx->op_array;
+	zend_ssa *ssa = ssa_ctx->ssa;
 	int i, ssa_vars = ssa->vars_count;
 	
 	scp_ctx ctx;

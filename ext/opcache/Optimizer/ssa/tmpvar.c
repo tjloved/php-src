@@ -1,6 +1,6 @@
 #include "ZendAccelerator.h"
 #include "Optimizer/zend_optimizer_internal.h"
-#include "Optimizer/ssa/helpers.h"
+#include "Optimizer/ssa_pass.h"
 #include "Optimizer/ssa/instructions.h"
 
 /* A "simple" type is a type that never uses refcounting */
@@ -565,7 +565,7 @@ static void mark_cv_uses_as_tmp(zend_op_array *op_array) {
 }
 #endif
 
-void ssa_optimize_cv_to_tmp(zend_optimizer_ctx *ctx, zend_op_array *op_array, zend_ssa *ssa) {
-	foo(op_array, ssa);
-	//mark_cv_uses_as_tmp(op_array);
+void ssa_optimize_cv_to_tmp(ssa_opt_ctx *ctx) {
+	foo(ctx->op_array, ctx->ssa);
+	//mark_cv_uses_as_tmp(ctx->op_array);
 }
