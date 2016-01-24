@@ -54,6 +54,24 @@ void remove_op1_use(zend_ssa *ssa, zend_ssa_op *ssa_op);
 void remove_op2_use(zend_ssa *ssa, zend_ssa_op *ssa_op);
 void remove_phi(zend_ssa *ssa, zend_ssa_phi *phi);
 
+static inline void set_op1_use(zend_ssa *ssa, zend_ssa_op *ssa_op, int var_num) {
+	zend_ssa_var *var = &ssa->vars[var_num];
+	if (ssa_op->op1_use >= 0) {
+		remove_op1_use(ssa, ssa_op);
+	}
+	ssa_op->op1_use = var_num;
+	if (ssa_op->result_use == var_num) {
+		return;
+	}
+	if (ssa_op->op2_use == var_num) {
+		ssa_op->op1_use_chain = ssa_op->op2_use_chain;
+		ssa_op->op2_use_chain = -1;
+		return;
+	}
+	ssa_op->op1_use_chain = var->use_chain;
+	var->use_chain = ssa_op - ssa->ops;
+}
+
 static inline void _remove_def(zend_ssa_var *var) {
 	ZEND_ASSERT(var->definition >= 0);
 	ZEND_ASSERT(var->use_chain < 0);
