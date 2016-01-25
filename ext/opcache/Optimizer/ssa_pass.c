@@ -199,38 +199,47 @@ static inline zend_bool is_in_phi_sources(zend_ssa *ssa, zend_ssa_phi *phi, int 
 	return 0;
 }
 
-static void ssa_verify_integrity(zend_ssa *ssa) {
-	int i;
+#define FAIL(...) do { \
+	if (status == SUCCESS) { \
+		fprintf(stderr, "\nIn function %s (%s):\n", \
+			op_array->function_name ? ZSTR_VAL(op_array->function_name) : "{main}", extra); \
+	} \
+	fprintf(stderr, __VA_ARGS__); \
+	status = FAILURE; \
+} while (0)
+
+static int ssa_verify_integrity(zend_ssa *ssa, const char *extra) {
 	zend_op_array *op_array = ssa->op_array;
 	zend_ssa_phi *phi;
+	int i, status = SUCCESS;
 	for (i = 0; i < ssa->vars_count; i++) {
 		zend_ssa_var *var = &ssa->vars[i];
 		int use, c;
 
 		if (var->definition < 0 && !var->definition_phi && i > op_array->last_var) {
 			if (var->use_chain >= 0 || var->phi_use_chain) {
-				fprintf(stderr, "var %d without def has uses\n", i);
+				FAIL("var %d without def has uses\n", i);
 			}
 		}
 		if (var->definition >= 0 && var->definition_phi) {
-			fprintf(stderr, "var %d has both def and def_phi\n", i);
+			FAIL("var %d has both def and def_phi\n", i);
 		}
 		if (var->definition >= 0) {
 			if (!is_defined_by_op(ssa, var->definition, i)) {
-				fprintf(stderr, "var %d not definde by op %d\n", i, var->definition);
+				FAIL("var %d not defined by op %d\n", i, var->definition);
 			}
 		}
 		if (var->definition_phi) {
 			if (var->definition_phi->ssa_var != i) {
-				fprintf(stderr, "var %d not defined by given phi\n", i);
+				FAIL("var %d not defined by given phi\n", i);
 			}
 		}
 
 		c = 0;
 		FOREACH_USE(var, use) {
 			if (++c > 10000) {
-				fprintf(stderr, "cycle in uses of %d\n", i);
-				return;
+				FAIL("cycle in uses of %d\n", i);
+				return status;
 			}
 			if (!is_used_by_op(ssa, use, i)) {
 				fprintf(stderr, "var %d not in uses of op %d\n", i, use);
@@ -240,11 +249,11 @@ static void ssa_verify_integrity(zend_ssa *ssa) {
 		c = 0;
 		FOREACH_PHI_USE(var, phi) {
 			if (++c > 10000) {
-				fprintf(stderr, "cycle in phi uses of %d\n", i);
-				return;
+				FAIL("cycle in phi uses of %d\n", i);
+				return status;
 			}
 			if (!is_in_phi_sources(ssa, phi, i)) {
-				fprintf(stderr, "var %d not in phi sources of %d\n", i, phi->ssa_var);
+				FAIL("var %d not in phi sources of %d\n", i, phi->ssa_var);
 			}
 		} FOREACH_PHI_USE_END();
 	}
@@ -252,17 +261,17 @@ static void ssa_verify_integrity(zend_ssa *ssa) {
 		zend_ssa_op *ssa_op = &ssa->ops[i];
 		if (ssa_op->op1_use >= 0) {
 			if (!is_in_use_chain(ssa, ssa_op->op1_use, i)) {
-				fprintf(stderr, "op1 use of %d in %d not in use chain\n", ssa_op->op1_use, i);
+				FAIL("op1 use of %d in %d not in use chain\n", ssa_op->op1_use, i);
 			}
 		}
 		if (ssa_op->op2_use >= 0) {
 			if (!is_in_use_chain(ssa, ssa_op->op2_use, i)) {
-				fprintf(stderr, "op1 use of %d in %d not in use chain\n", ssa_op->op2_use, i);
+				FAIL("op1 use of %d in %d not in use chain\n", ssa_op->op2_use, i);
 			}
 		}
 		if (ssa_op->result_use >= 0) {
 			if (!is_in_use_chain(ssa, ssa_op->result_use, i)) {
-				fprintf(stderr, "result use of %d in %d not in use chain\n", ssa_op->result_use, i);
+				FAIL("result use of %d in %d not in use chain\n", ssa_op->result_use, i);
 			}
 		}
 	}
@@ -270,10 +279,11 @@ static void ssa_verify_integrity(zend_ssa *ssa) {
 		int source;
 		FOREACH_PHI_SOURCE(phi, source) {
 			if (!is_in_phi_use_chain(ssa, source, phi)) {
-				fprintf(stderr, "%d not in phi use chain of %d\n", phi->ssa_var, source);
+				FAIL("%d not in phi use chain of %d\n", phi->ssa_var, source);
 			}
 		} FOREACH_PHI_SOURCE_END();
 	} FOREACH_PHI_END();
+	return status;
 }
 #endif
 
@@ -292,7 +302,7 @@ static void run_pass(
 		const char *name, uint32_t debug_level) {
 	optimize_fn(ctx);
 #if SSA_VERIFY_INTEGRITY
-	ssa_verify_integrity(ctx->ssa);
+	ssa_verify_integrity(ctx->ssa, name);
 #endif
 
 	if (ZCG(accel_directives).ssa_debug_level & debug_level) {
@@ -371,7 +381,7 @@ static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) 
 	complete_block_map(&info->ssa.cfg, op_array->last);
 	remove_spurious_ssa_vars(op_array, &info->ssa);
 	remove_trivial_phis(&info->ssa);
-	ssa_verify_integrity(&info->ssa);
+	ssa_verify_integrity(&info->ssa, "before SSA pass");
 
 	ssa_liveness_precompute(ctx, &liveness, &info->ssa);
 	ssa_ctx.opt_ctx = ctx;
@@ -384,15 +394,15 @@ static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) 
 			"before ssa pass", &info->ssa);
 	}
 
-	run_pass(&ssa_ctx, ssa_optimize_scp, "SCP", 4);
-	run_pass(&ssa_ctx, ssa_optimize_dce, "DCE", 8);
-	run_pass(&ssa_ctx, ssa_optimize_copy, "copy propagation", 16);
+	run_pass(&ssa_ctx, ssa_optimize_scp, "after SCP", 4);
+	run_pass(&ssa_ctx, ssa_optimize_dce, "after DCE", 8);
+	run_pass(&ssa_ctx, ssa_optimize_copy, "after copy propagation", 16);
 
 	//ssa_optimize_cv_to_tmp(&ssa_ctx);
 	ssa_optimize_type_specialization(&ssa_ctx);
 	ssa_optimize_object_specialization(&ssa_ctx);
 	ssa_optimize_peephole(&ssa_ctx);
-	ssa_verify_integrity(&info->ssa);
+	ssa_verify_integrity(&info->ssa, "after SSA pass");
 
 	if (ZCG(accel_directives).ssa_debug_level & 1) {
 		zend_dump_op_array(op_array, ZEND_DUMP_SSA | ZEND_DUMP_HIDE_UNUSED_VARS,
