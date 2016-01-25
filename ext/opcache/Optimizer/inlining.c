@@ -438,6 +438,7 @@ static void merge_opcodes(
 			if ((new_opline->opcode == ZEND_SEND_VAL || new_opline->opcode == ZEND_SEND_VAR)
 					&& level == 0) {
 				/* Replace SEND with QM_ASSIGN to argument variable. */
+				OPT_STAT(inlining_arg_assigns)++;
 				new_opline->opcode = ZEND_QM_ASSIGN;
 				new_opline->result_type = IS_CV;
 				new_opline->result.var =
@@ -482,6 +483,7 @@ static void merge_opcodes(
 
 				if (new_opline->opcode == ZEND_RECV_INIT) {
 					/* Convert RECV_INIT into QM_ASSIGN */
+					OPT_STAT(inlining_arg_assigns)++;
 					new_opline->opcode = ZEND_QM_ASSIGN;
 					new_opline->op1_type = new_opline->op2_type;
 					new_opline->op1 = new_opline->op2;
