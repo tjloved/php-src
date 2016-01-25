@@ -152,11 +152,32 @@ static void remove_trivial_phis(zend_ssa *ssa) {
 	} FOREACH_PHI_END();
 }
 
-static void verify_use_chains(zend_ssa *ssa) {
+static inline zend_bool is_in_use_chain(zend_ssa *ssa, int var, int check) {
+	int use;
+	FOREACH_USE(&ssa->vars[var], use) {
+		if (use == check) {
+			return 1;
+		}
+	} FOREACH_USE_END();
+	return 0;
+}
+
+static inline zend_bool is_in_phi_use_chain(zend_ssa *ssa, int var, zend_ssa_phi *check) {
+	zend_ssa_phi *phi;
+	FOREACH_PHI_USE(&ssa->vars[var], phi) {
+		if (phi == check) {
+			return 1;
+		}
+	} FOREACH_PHI_USE_END();
+	return 0;
+}
+
+static void verify_ssa_integrity(zend_ssa *ssa) {
 	int i;
+	zend_op_array *op_array = ssa->op_array;
+	zend_ssa_phi *phi;
 	for (i = 0; i < ssa->vars_count; i++) {
 		zend_ssa_var *var = &ssa->vars[i];
-		zend_ssa_phi *phi;
 		int c = 0;
 		/*if (var->definition < 0 && !var->definition_phi) {
 			if (var->use_chain >= 0 || var->phi_use_chain) {
@@ -165,11 +186,37 @@ static void verify_use_chains(zend_ssa *ssa) {
 		}*/
 		FOREACH_PHI_USE(var, phi) {
 			if (++c > 10000) {
-				php_printf("Cycle in phi uses of %d\n", i);
+				fprintf(stderr, "Cycle in phi uses of %d\n", i);
 				break;
 			}
 		} FOREACH_PHI_USE_END();
 	}
+	for (i = 0; i < op_array->last; i++) {
+		zend_ssa_op *ssa_op = &ssa->ops[i];
+		if (ssa_op->op1_use >= 0) {
+			if (!is_in_use_chain(ssa, ssa_op->op1_use, i)) {
+				fprintf(stderr, "op1 use of %d in %d not in use chain\n", ssa_op->op1_use, i);
+			}
+		}
+		if (ssa_op->op2_use >= 0) {
+			if (!is_in_use_chain(ssa, ssa_op->op2_use, i)) {
+				fprintf(stderr, "op1 use of %d in %d not in use chain\n", ssa_op->op2_use, i);
+			}
+		}
+		if (ssa_op->result_use >= 0) {
+			if (!is_in_use_chain(ssa, ssa_op->result_use, i)) {
+				fprintf(stderr, "result use of %d in %d not in use chain\n", ssa_op->result_use, i);
+			}
+		}
+	}
+	FOREACH_PHI(phi) {
+		int source;
+		FOREACH_PHI_SOURCE(phi, source) {
+			if (!is_in_phi_use_chain(ssa, source, phi)) {
+				fprintf(stderr, "%d not in phi use chain\n", source);
+			}
+		} FOREACH_PHI_SOURCE_END();
+	} FOREACH_PHI_END();
 }
 
 static zend_bool is_php_errormsg_used(zend_op_array *op_array) {
@@ -252,7 +299,7 @@ static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) 
 	complete_block_map(&info->ssa.cfg, op_array->last);
 	remove_spurious_ssa_vars(op_array, &info->ssa);
 	remove_trivial_phis(&info->ssa);
-	verify_use_chains(&info->ssa);
+	verify_ssa_integrity(&info->ssa);
 
 	ssa_liveness_precompute(ctx, &liveness, &info->ssa);
 	ssa_ctx.opt_ctx = ctx;
@@ -261,19 +308,35 @@ static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) 
 	ssa_ctx.liveness = &liveness;
 
 	if (ZCG(accel_directives).ssa_debug_level & 2) {
-		zend_dump_op_array(op_array, ZEND_DUMP_SSA | ZEND_DUMP_HIDE_UNUSED_VARS, NULL, &info->ssa);
+		zend_dump_op_array(op_array, ZEND_DUMP_SSA | ZEND_DUMP_HIDE_UNUSED_VARS,
+			"before ssa pass", &info->ssa);
 	}
 
 	ssa_optimize_scp(&ssa_ctx);
+
+	if (ZCG(accel_directives).ssa_debug_level & 4) {
+		zend_dump_op_array(op_array, ZEND_DUMP_SSA | ZEND_DUMP_HIDE_UNUSED_VARS,
+			"after scp", &info->ssa);
+	}
+
 	ssa_optimize_dce(&ssa_ctx);
+	verify_ssa_integrity(&info->ssa);
+
+	if (ZCG(accel_directives).ssa_debug_level & 8) {
+		zend_dump_op_array(op_array, ZEND_DUMP_SSA | ZEND_DUMP_HIDE_UNUSED_VARS,
+			"after dce", &info->ssa);
+	}
+
 	ssa_optimize_copy(&ssa_ctx);
 	//ssa_optimize_cv_to_tmp(&ssa_ctx);
 	ssa_optimize_type_specialization(&ssa_ctx);
 	ssa_optimize_object_specialization(&ssa_ctx);
 	ssa_optimize_peephole(&ssa_ctx);
+	verify_ssa_integrity(&info->ssa);
 
 	if (ZCG(accel_directives).ssa_debug_level & 1) {
-		zend_dump_op_array(op_array, ZEND_DUMP_SSA | ZEND_DUMP_HIDE_UNUSED_VARS, NULL, &info->ssa);
+		zend_dump_op_array(op_array, ZEND_DUMP_SSA | ZEND_DUMP_HIDE_UNUSED_VARS,
+			"after ssa pass", &info->ssa);
 	}
 }
 
