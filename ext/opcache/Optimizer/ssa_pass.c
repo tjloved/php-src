@@ -216,11 +216,14 @@ static int ssa_verify_integrity(zend_ssa *ssa, const char *extra) {
 		zend_ssa_var *var = &ssa->vars[i];
 		int use, c;
 
-		/*if (var->definition < 0 && !var->definition_phi && i > op_array->last_var) {
-			if (var->use_chain >= 0 || var->phi_use_chain) {
-				FAIL("var %d without def has uses\n", i);
+		if (var->definition < 0 && !var->definition_phi && i > op_array->last_var) {
+			if (var->use_chain >= 0) {
+				FAIL("var %d without def has op uses\n", i);
 			}
-		}*/
+			/*if (var->phi_use_chain) {
+				FAIL("var %d without def has phi uses\n", i);
+			}*/
+		}
 		if (var->definition >= 0 && var->definition_phi) {
 			FAIL("var %d has both def and def_phi\n", i);
 		}

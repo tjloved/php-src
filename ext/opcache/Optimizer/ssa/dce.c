@@ -344,6 +344,11 @@ static inline zend_bool may_have_side_effects(
 			}
 			return 0;
 		}
+		case ZEND_QM_ASSIGN:
+			/* DCE might result in dtor firing too early. Usually this wouldn't matter as
+			 * QM_ASSIGN is shortlived. However we also use it for CV assignments after some
+			 * optimizations. */
+			return (OP1_INFO() & MAY_HAVE_DTOR) != 0;
 		case ZEND_UNSET_VAR:
 			return (OP1_INFO() & (MAY_BE_REF|MAY_HAVE_DTOR)) != 0;
 		case ZEND_PRE_INC:
@@ -434,7 +439,7 @@ static void dce_instr(context *ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 	if ((opline->op1_type & (IS_VAR|IS_TMP_VAR)) && !is_var_dead(ctx, ssa_op->op1_use)) {
 		free_var = ssa_op->op1_use;
 		free_var_type = opline->op1_type;
-	} else if (opline->op2_type & (IS_VAR|IS_TMP_VAR) && !is_var_dead(ctx, ssa_op->op2_use)) {
+	} else if ((opline->op2_type & (IS_VAR|IS_TMP_VAR)) && !is_var_dead(ctx, ssa_op->op2_use)) {
 		free_var = ssa_op->op2_use;
 		free_var_type = opline->op2_type;
 	}
@@ -443,6 +448,7 @@ static void dce_instr(context *ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 
 	if (free_var >= 0) {
 		// TODO Sometimes we can mark the var as EXT_UNUSED
+		OPT_STAT(dce_frees)++;
 		opline->opcode = ZEND_FREE;
 		opline->op1.var = (uintptr_t) ZEND_CALL_VAR_NUM(NULL, ssa->vars[free_var].var);
 		opline->op1_type = free_var_type;
