@@ -216,17 +216,18 @@ static int ssa_verify_integrity(zend_ssa *ssa, const char *extra) {
 		zend_ssa_var *var = &ssa->vars[i];
 		int use, c;
 
-		if (var->definition < 0 && !var->definition_phi && i > op_array->last_var) {
+		/*if (var->definition < 0 && !var->definition_phi && i > op_array->last_var) {
 			if (var->use_chain >= 0 || var->phi_use_chain) {
 				FAIL("var %d without def has uses\n", i);
 			}
-		}
+		}*/
 		if (var->definition >= 0 && var->definition_phi) {
 			FAIL("var %d has both def and def_phi\n", i);
 		}
 		if (var->definition >= 0) {
 			if (!is_defined_by_op(ssa, var->definition, i)) {
-				FAIL("var %d not defined by op %d\n", i, var->definition);
+				zend_bool is_nop = op_array->opcodes[var->definition].opcode == ZEND_NOP;
+				FAIL("var %d not defined by %sop %d\n", i, is_nop ? "NOP " : "", var->definition);
 			}
 		}
 		if (var->definition_phi) {
