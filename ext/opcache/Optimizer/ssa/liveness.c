@@ -6,6 +6,8 @@
 
 /* This implements "Fast Liveness Checking for SSA-Form Programs" by Boissinot et al. */
 
+#define LIVENESS_DEBUG 0
+
 #define REDUCED_REACHABLE(block) (liveness->reduced_reachable + (block) * liveness->block_set_len)
 #define TARGETS(block) (liveness->targets + (block) * liveness->block_set_len)
 #define SDOM(block) (liveness->sdom + (block) * liveness->block_set_len)
@@ -71,10 +73,10 @@ static void compute_graphinfo(graphinfo *info, zend_optimizer_ctx *opt_ctx, cons
 static void compute_reduced_reachable(
 		zend_optimizer_ctx *opt_ctx, ssa_liveness *liveness,
 		const zend_cfg *cfg, const graphinfo *info) {
-	/* Traverse CFG in reverse postorder and build
+	/* Traverse CFG in postorder and build
 	 * R_v = {v} union unionall_{v' in succ(v)} R_v' */
 	int i;
-	for (i = cfg->blocks_count - 1; i >= 0; i--) {
+	for (i = 0; i < cfg->blocks_count; i++) {
 		uint32_t n = info->postorder[i];
 		zend_basic_block *block = &cfg->blocks[n];
 		zend_bitset_incl(REDUCED_REACHABLE(n), n);
@@ -164,6 +166,21 @@ static void compute_sdom_recursive(ssa_liveness *liveness, const zend_cfg *cfg, 
 	}
 }
 
+#ifdef LIVENESS_DEBUG
+static void zend_bitset_dump(zend_bitset bitset, uint32_t len, uint32_t count) {
+	int i, j;
+	for (i = 0; i < count; i++) {
+		fprintf(stderr, "%d: ", i);
+		j = 0;
+		while ((j = zend_bitset_next(bitset + len * i, len, j)) >= 0) {
+			fprintf(stderr, "%d ", j);
+			j++;
+		}
+		fprintf(stderr, "\n");
+	}
+}
+#endif
+
 void ssa_liveness_precompute(zend_optimizer_ctx *opt_ctx, ssa_liveness *liveness, zend_ssa *ssa) {
 	zend_cfg *cfg = &ssa->cfg;
 	graphinfo info;
@@ -183,6 +200,22 @@ void ssa_liveness_precompute(zend_optimizer_ctx *opt_ctx, ssa_liveness *liveness
 	compute_sdom_recursive(liveness, cfg, 0);
 	liveness->backedge_targets = info.backedge_targets;
 	// TODO We're leaking graphinfo here
+	
+#ifdef LIVENESS_DEBUG
+	int i;
+	if (ssa->op_array->function_name) {
+		fprintf(stderr, "Function %s:\n", ZSTR_VAL(ssa->op_array->function_name));
+	}
+	fprintf(stderr, "Postorder numbering:\n");
+	for (i = 0; i < cfg->blocks_count; i++) {
+		fprintf(stderr, "%d ", info.postorder[i]);
+	}
+	fprintf(stderr, "\n");
+	fprintf(stderr, "Reduced reachability:\n");
+	zend_bitset_dump(liveness->reduced_reachable, liveness->block_set_len, cfg->blocks_count);
+	fprintf(stderr, "Targets:\n");
+	zend_bitset_dump(liveness->targets, liveness->block_set_len, cfg->blocks_count);
+#endif
 }
 
 static uint32_t get_def_block(const zend_ssa *ssa, const zend_ssa_var *var) {
