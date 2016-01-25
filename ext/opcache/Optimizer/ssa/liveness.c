@@ -166,7 +166,7 @@ static void compute_sdom_recursive(ssa_liveness *liveness, const zend_cfg *cfg, 
 	}
 }
 
-#ifdef LIVENESS_DEBUG
+#if LIVENESS_DEBUG
 static void zend_bitset_dump(zend_bitset bitset, uint32_t len, uint32_t count) {
 	int i, j;
 	for (i = 0; i < count; i++) {
@@ -201,7 +201,7 @@ void ssa_liveness_precompute(zend_optimizer_ctx *opt_ctx, ssa_liveness *liveness
 	liveness->backedge_targets = info.backedge_targets;
 	// TODO We're leaking graphinfo here
 	
-#ifdef LIVENESS_DEBUG
+#if LIVENESS_DEBUG
 	int i;
 	if (ssa->op_array->function_name) {
 		fprintf(stderr, "Function %s:\n", ZSTR_VAL(ssa->op_array->function_name));
@@ -215,6 +215,8 @@ void ssa_liveness_precompute(zend_optimizer_ctx *opt_ctx, ssa_liveness *liveness
 	zend_bitset_dump(liveness->reduced_reachable, liveness->block_set_len, cfg->blocks_count);
 	fprintf(stderr, "Targets:\n");
 	zend_bitset_dump(liveness->targets, liveness->block_set_len, cfg->blocks_count);
+	fprintf(stderr, "Strictly dominated:\n");
+	zend_bitset_dump(liveness->sdom, liveness->block_set_len, cfg->blocks_count);
 #endif
 }
 
@@ -234,6 +236,10 @@ zend_bool ssa_is_live_in_at_block(const ssa_liveness *liveness, int var_num, int
 	zend_ssa_var *var = &ssa->vars[var_num];
 	int def_block = get_def_block(ssa, var);
 	int i = 0;
+#if LIVENESS_DEBUG
+	fprintf(stderr, "Live-in query for var %d (def block %d) at block %d\n",
+		var_num, def_block, block);
+#endif
 	while ((i = zend_bitset_next(TARGETS(block), liveness->block_set_len, i)) >= 0) {
 		if (zend_bitset_in(SDOM(def_block), i)) {
 			int use;
@@ -258,6 +264,10 @@ zend_bool ssa_is_live_in_at_op(const ssa_liveness *liveness, int var_num, int op
 	zend_ssa_var *var = &ssa->vars[var_num];
 	int def_block = get_def_block(ssa, var);
 	int block = ssa->cfg.map[op];
+#if LIVENESS_DEBUG
+	fprintf(stderr, "Live-in query for var %d (def block %d) at op %d in block %d\n",
+		var_num, def_block, op, block);
+#endif
 	if (block == def_block) {
 		int use;
 		if (var->definition >= op) {
