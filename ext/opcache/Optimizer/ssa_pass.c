@@ -213,7 +213,7 @@ static void verify_ssa_integrity(zend_ssa *ssa) {
 		int source;
 		FOREACH_PHI_SOURCE(phi, source) {
 			if (!is_in_phi_use_chain(ssa, source, phi)) {
-				fprintf(stderr, "%d not in phi use chain\n", source);
+				fprintf(stderr, "%d not in phi use chain of %d\n", phi->ssa_var, source);
 			}
 		} FOREACH_PHI_SOURCE_END();
 	} FOREACH_PHI_END();

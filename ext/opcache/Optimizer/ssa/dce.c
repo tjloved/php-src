@@ -369,6 +369,13 @@ static inline void add_to_worklists(context *ctx, int var_num) {
 	}
 }
 
+static inline void add_to_phi_worklist_only(context *ctx, int var_num) {
+	zend_ssa_var *var = &ctx->ssa->vars[var_num];
+	if (var->definition_phi && zend_bitset_in(ctx->phi_dead, var_num)) {
+		zend_bitset_incl(ctx->phi_worklist, var_num);
+	}
+}
+
 static inline void add_operands_to_worklists(context *ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 	if (ssa_op->result_use >= 0) {
 		add_to_worklists(ctx, ssa_op->result_use);
@@ -586,13 +593,34 @@ void ssa_optimize_dce(ssa_opt_ctx *ssa_ctx) {
 		}
 	}
 
-	/* Eliminate dead instructions and phis */
+	/* Eliminate dead instructions */
 	for (i = 0; i < op_array->last; ++i) {
 		if (zend_bitset_in(ctx.instr_dead, i)) {
 			dce_instr(&ctx, &op_array->opcodes[i], &ssa->ops[i]);
 		}
 	}
 
+	/* Assignment targets don't count as "uses" for the purpose of instruction elimination,
+	 * but we have to retain phis defining them. Push those phis to the worklist. */
+	for (i = 0; i < op_array->last; i++) {
+		if (op_array->opcodes[i].opcode == ZEND_ASSIGN) {
+			ZEND_ASSERT(ssa->ops[i].op1_use >= 0);
+			add_to_phi_worklist_only(&ctx, ssa->ops[i].op1_use);
+		}
+	}
+
+	/* Propagate this information backwards, marking everything required by an assignment
+	 * target as non-dead. */
+	while ((i = zend_bitset_pop_first(ctx.phi_worklist, ctx.phi_worklist_len)) >= 0) {
+		zend_ssa_phi *phi = ssa->vars[i].definition_phi;
+		int source;
+		zend_bitset_excl(ctx.phi_dead, i);
+		FOREACH_PHI_SOURCE(phi, source) {
+			add_to_phi_worklist_only(&ctx, source);
+		} FOREACH_PHI_SOURCE_END();
+	}
+
+	/* Now collect the actually dead phis */
 	FOREACH_PHI(phi) {
 		if (zend_bitset_in(ctx.phi_dead, phi->ssa_var)) {
 			OPT_STAT(dce_dead_phis)++;
