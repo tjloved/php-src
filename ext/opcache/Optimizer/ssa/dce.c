@@ -356,6 +356,10 @@ static inline zend_bool may_have_side_effects(
 	return 0;
 }
 
+static inline zend_bool has_improper_op1_use(zend_op *opline) {
+	return opline->opcode == ZEND_ASSIGN || opline->opcode == ZEND_UNSET_VAR;
+}
+
 static inline void add_to_worklists(context *ctx, int var_num) {
 	zend_ssa_var *var = &ctx->ssa->vars[var_num];
 	if (var->definition >= 0) {
@@ -380,7 +384,7 @@ static inline void add_operands_to_worklists(context *ctx, zend_op *opline, zend
 	if (ssa_op->result_use >= 0) {
 		add_to_worklists(ctx, ssa_op->result_use);
 	}
-	if (ssa_op->op1_use >= 0 && opline->opcode != ZEND_ASSIGN) {
+	if (ssa_op->op1_use >= 0 && !has_improper_op1_use(opline)) {
 		add_to_worklists(ctx, ssa_op->op1_use);
 	}
 	if (ssa_op->op2_use >= 0) {
@@ -600,16 +604,16 @@ void ssa_optimize_dce(ssa_opt_ctx *ssa_ctx) {
 		}
 	}
 
-	/* Assignment targets don't count as "uses" for the purpose of instruction elimination,
+	/* Improper uses don't count as "uses" for the purpose of instruction elimination,
 	 * but we have to retain phis defining them. Push those phis to the worklist. */
 	for (i = 0; i < op_array->last; i++) {
-		if (op_array->opcodes[i].opcode == ZEND_ASSIGN) {
+		if (has_improper_op1_use(&op_array->opcodes[i])) {
 			ZEND_ASSERT(ssa->ops[i].op1_use >= 0);
 			add_to_phi_worklist_only(&ctx, ssa->ops[i].op1_use);
 		}
 	}
 
-	/* Propagate this information backwards, marking everything required by an assignment
+	/* Propagate this information backwards, marking any phi with an improperly used
 	 * target as non-dead. */
 	while ((i = zend_bitset_pop_first(ctx.phi_worklist, ctx.phi_worklist_len)) >= 0) {
 		zend_ssa_phi *phi = ssa->vars[i].definition_phi;
