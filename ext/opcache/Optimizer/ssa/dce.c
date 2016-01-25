@@ -466,14 +466,14 @@ static void simplify_jumps(zend_ssa *ssa, zend_op_array *op_array) {
 			case ZEND_JMPZ_EX:
 				if (!var_used(&ssa->vars[ssa_op->result_def])) {
 					opline->opcode = ZEND_JMPZ;
-					ssa_op->result_def = -1;
+					remove_result_def(ssa, ssa_op);
 				}
 				break;
 			case ZEND_JMPNZ_EX:
 			case ZEND_JMP_SET:
 				if (!var_used(&ssa->vars[ssa_op->result_def])) {
 					opline->opcode = ZEND_JMPNZ;
-					ssa_op->result_def = -1;
+					remove_result_def(ssa, ssa_op);
 				}
 				break;
 			case ZEND_COALESCE:
@@ -518,7 +518,7 @@ static void simplify_jump_and_set(context *ctx) {
 		case ZEND_JMPZ_EX:
 			/* For jump-and-set only the set part is dead */
 			opline->opcode = ZEND_JMPZ;
-			ssa_op->result_def = -1;
+			remove_result_def(ssa, ssa_op);
 
 			/* Replace constant branch with JMP, so NOP pass may remove it */
 			if (opline->op1_type == IS_CONST && !zend_is_true(&ZEND_OP1_LITERAL(opline))) {
@@ -531,7 +531,7 @@ static void simplify_jump_and_set(context *ctx) {
 		case ZEND_JMPNZ_EX:
 		case ZEND_JMP_SET:
 			opline->opcode = ZEND_JMPNZ;
-			ssa_op->result_def = -1;
+			remove_result_def(ssa, ssa_op);
 
 			if (opline->op1_type == IS_CONST && zend_is_true(&ZEND_OP1_LITERAL(opline))) {
 				literal_dtor(&ZEND_OP1_LITERAL(opline));
