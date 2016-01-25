@@ -39,6 +39,7 @@ typedef struct _zend_optimizer_statistics {
 	uint32_t trivial_phis;
 	uint32_t copy_propagated;
 	uint32_t dce_frees;
+	uint32_t inlining_arg_assigns;
 } zend_optimizer_statistics;
 
 extern zend_optimizer_statistics optimizer_statistics;

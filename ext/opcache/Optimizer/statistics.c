@@ -34,6 +34,7 @@ void zend_optimizer_statistics_shutdown() {
 
 	PRINT_STAT(inlining_funcs);
 	PRINT_NORM_STAT(inlining_instrs, instrs);
+	PRINT_STAT(inlining_arg_assigns);
 
 	PRINT_NORM_STAT(trivial_phis, phis);
 
