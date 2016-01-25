@@ -408,15 +408,13 @@ static inline void add_phi_sources_to_worklists(context *ctx, zend_ssa_phi *phi)
 static inline zend_bool is_var_dead(context *ctx, int var_num) {
 	zend_ssa_var *var = &ctx->ssa->vars[var_num];
 	if (var->definition_phi) {
-		if (zend_bitset_in(ctx->phi_dead, var_num)) {
-			return 1;
-		}
+		return zend_bitset_in(ctx->phi_dead, var_num);
 	} else if (var->definition >= 0) {
-		if (zend_bitset_in(ctx->instr_dead, var->definition)) {
-			return 1;
-		}
+		return zend_bitset_in(ctx->instr_dead, var->definition);
+	} else {
+		/* This means the definition was already removed, so it's also dead */
+		return 1;
 	}
-	return 0;
 }
 
 static void dce_instr(context *ctx, zend_op *opline, zend_ssa_op *ssa_op) {
