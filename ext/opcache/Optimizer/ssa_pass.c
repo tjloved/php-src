@@ -5,6 +5,8 @@
 #include "Optimizer/ssa/liveness.h"
 #include "Optimizer/statistics.h"
 
+#define SSA_VERIFY_INTEGRITY ZEND_DEBUG
+
 static void collect_ssa_stats(zend_op_array *op_array, zend_ssa *ssa) {
 	int i;
 
@@ -172,6 +174,7 @@ static inline zend_bool is_in_phi_use_chain(zend_ssa *ssa, int var, zend_ssa_phi
 	return 0;
 }
 
+#if SSA_VERIFY_INTEGRITY
 static void verify_ssa_integrity(zend_ssa *ssa) {
 	int i;
 	zend_op_array *op_array = ssa->op_array;
@@ -218,6 +221,7 @@ static void verify_ssa_integrity(zend_ssa *ssa) {
 		} FOREACH_PHI_SOURCE_END();
 	} FOREACH_PHI_END();
 }
+#endif
 
 static zend_bool is_php_errormsg_used(zend_op_array *op_array) {
 	uint32_t i;
@@ -227,6 +231,20 @@ static zend_bool is_php_errormsg_used(zend_op_array *op_array) {
 		}
 	}
 	return 0;
+}
+
+static void run_pass(
+		ssa_opt_ctx *ctx, void (*optimize_fn)(ssa_opt_ctx *ctx),
+		const char *name, uint32_t debug_level) {
+	optimize_fn(ctx);
+#if SSA_VERIFY_INTEGRITY
+	verify_ssa_integrity(ctx->ssa);
+#endif
+
+	if (ZCG(accel_directives).ssa_debug_level & debug_level) {
+		zend_dump_op_array(ctx->op_array, ZEND_DUMP_SSA | ZEND_DUMP_HIDE_UNUSED_VARS,
+			name, ctx->ssa);
+	}
 }
 
 static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) {
@@ -312,22 +330,10 @@ static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) 
 			"before ssa pass", &info->ssa);
 	}
 
-	ssa_optimize_scp(&ssa_ctx);
+	run_pass(&ssa_ctx, ssa_optimize_scp, "SCP", 4);
+	run_pass(&ssa_ctx, ssa_optimize_dce, "DCE", 8);
+	run_pass(&ssa_ctx, ssa_optimize_copy, "copy propagation", 16);
 
-	if (ZCG(accel_directives).ssa_debug_level & 4) {
-		zend_dump_op_array(op_array, ZEND_DUMP_SSA | ZEND_DUMP_HIDE_UNUSED_VARS,
-			"after scp", &info->ssa);
-	}
-
-	ssa_optimize_dce(&ssa_ctx);
-	verify_ssa_integrity(&info->ssa);
-
-	if (ZCG(accel_directives).ssa_debug_level & 8) {
-		zend_dump_op_array(op_array, ZEND_DUMP_SSA | ZEND_DUMP_HIDE_UNUSED_VARS,
-			"after dce", &info->ssa);
-	}
-
-	ssa_optimize_copy(&ssa_ctx);
 	//ssa_optimize_cv_to_tmp(&ssa_ctx);
 	ssa_optimize_type_specialization(&ssa_ctx);
 	ssa_optimize_object_specialization(&ssa_ctx);
