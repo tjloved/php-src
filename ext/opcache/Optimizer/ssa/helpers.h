@@ -10,10 +10,14 @@
 
 #define MAY_BE_REFCOUNTED (MAY_BE_STRING|MAY_BE_ARRAY|MAY_BE_OBJECT|MAY_BE_RESOURCE)
 
+#define NUM_PHI_SOURCES(phi) \
+	((phi)->pi >= 0 ? 1 : (ssa->cfg.blocks[(phi)->block].predecessors_count))
+
+/* FOREACH_USE and FOREACH_PHI_USE explicitly support "continue"
+ * and changing the use chain of the current element */
 #define FOREACH_USE(var, use) do { \
 	int _var_num = (var) - ssa->vars, next; \
-	use = (var)->use_chain; \
-	for (; use >= 0; use = next) { \
+	for (use = (var)->use_chain; use >= 0; use = next) { \
 		next = zend_ssa_next_use(ssa->ops, _var_num, use);
 #define FOREACH_USE_END() \
 	} \
@@ -21,16 +25,16 @@
 
 #define FOREACH_PHI_USE(var, phi) do { \
 	int _var_num = (var) - ssa->vars; \
-	phi = (var)->phi_use_chain; \
-	while (phi) {
+	zend_ssa_phi *next_phi; \
+	for (phi = (var)->phi_use_chain; phi; phi = next_phi) { \
+		next_phi = zend_ssa_next_use_phi(ssa, _var_num, phi);
 #define FOREACH_PHI_USE_END() \
-		phi = zend_ssa_next_use_phi(ssa, _var_num, phi); \
 	} \
 } while (0)
 
 #define FOREACH_PHI_SOURCE(phi, source) do { \
 	zend_ssa_phi *_phi = (phi); \
-	int _i, _end = ssa->cfg.blocks[_phi->block].predecessors_count; \
+	int _i, _end = NUM_PHI_SOURCES(phi); \
 	for (_i = 0; _i < _end; _i++) { \
 		source = _phi->sources[_i];
 #define FOREACH_PHI_SOURCE_END() \
