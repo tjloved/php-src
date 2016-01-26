@@ -61,4 +61,6 @@ void zend_optimizer_statistics_shutdown() {
 	PRINT_STAT(type_spec_must_be_matching_int_key);
 	PRINT_STAT(type_spec_must_be_append_int_key);
 	PRINT_STAT(type_spec_must_be_notref_array_values);
+
+	PRINT_STAT(tmp);
 }
