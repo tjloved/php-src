@@ -136,7 +136,6 @@ void ssa_optimize_copy(ssa_opt_ctx *ctx) {
 		}
 
 		if (ssa->var_info[ssa_op->op1_use].type & (MAY_BE_REF|MAY_BE_REFCOUNTED)) {
-			OPT_STAT(tmp)++;
 			continue;
 		}
 
