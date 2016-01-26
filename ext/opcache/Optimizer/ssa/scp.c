@@ -1067,11 +1067,13 @@ static void eliminate_dead_blocks(scp_ctx *ctx) {
 			OPT_STAT(scp_dead_blocks)++;
 			block->flags &= ~ZEND_BB_REACHABLE;
 			for (phi = ssa_block->phis; phi; phi = phi->next) {
+				remove_uses_of_var(ssa, phi->ssa_var);
 				remove_phi(ssa, phi);
 				OPT_STAT(scp_dead_blocks_phis)++;
 			}
 			for (j = block->start; j <= block->end; j++) {
-				remove_instr_with_defs(ssa, &ctx->op_array->opcodes[j], &ssa->ops[j]);
+				remove_defs_of_instr(ssa, &ssa->ops[j]);
+				remove_instr(ssa, &ctx->op_array->opcodes[j], &ssa->ops[j]);
 				OPT_STAT(scp_dead_blocks_instrs)++;
 			}
 		}

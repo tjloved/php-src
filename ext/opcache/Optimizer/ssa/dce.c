@@ -442,7 +442,8 @@ static void dce_instr(context *ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 		free_var_type = opline->op2_type;
 	}
 
-	remove_instr_with_defs(ctx->ssa, opline, ssa_op);
+	rename_defs_of_instr(ctx->ssa, ssa_op);
+	remove_instr(ctx->ssa, opline, ssa_op);
 
 	if (free_var >= 0) {
 		// TODO Sometimes we can mark the var as EXT_UNUSED
@@ -632,6 +633,7 @@ void ssa_optimize_dce(ssa_opt_ctx *ssa_ctx) {
 	FOREACH_PHI(phi) {
 		if (zend_bitset_in(ctx.phi_dead, phi->ssa_var)) {
 			OPT_STAT(dce_dead_phis)++;
+			remove_uses_of_var(ssa, phi->ssa_var);
 			remove_phi(ssa, phi);
 		}
 	} FOREACH_PHI_END();

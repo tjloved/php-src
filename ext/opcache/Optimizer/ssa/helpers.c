@@ -220,9 +220,42 @@ static void remove_phi_from_block(zend_ssa *ssa, zend_ssa_phi *phi) {
 
 void remove_phi(zend_ssa *ssa, zend_ssa_phi *phi) {
 	ZEND_ASSERT(phi->ssa_var >= 0);
+	ZEND_ASSERT(!var_used(&ssa->vars[phi->ssa_var]));
 	remove_uses_of_phi_sources(ssa, phi);
 	remove_phi_from_block(ssa, phi);
-	remove_uses_in_phis(ssa, phi->ssa_var);
 	ssa->vars[phi->ssa_var].definition_phi = NULL;
 	phi->ssa_var = -1;
 }
+
+void remove_uses_of_var(zend_ssa *ssa, int var_num) {
+	zend_ssa_var *var = &ssa->vars[var_num];
+	zend_ssa_phi *phi;
+	int use;
+	FOREACH_PHI_USE(var, phi) {
+		int i, end = NUM_PHI_SOURCES(phi);
+		for (i = 0; i < end; i++) {
+			if (phi->sources[i] == var_num) {
+				phi->sources[i] = -1;
+				phi->use_chains[i] = NULL;
+			}
+		}
+	} FOREACH_PHI_USE_END();
+	var->phi_use_chain = NULL;
+	FOREACH_USE(var, use) {
+		zend_ssa_op *ssa_op = &ssa->ops[use];
+		if (ssa_op->op1_use == var_num) {
+			ssa_op->op1_use = -1;
+			ssa_op->op1_use_chain = -1;
+		}
+		if (ssa_op->op2_use == var_num) {
+			ssa_op->op2_use = -1;
+			ssa_op->op2_use_chain = -1;
+		}
+		if (ssa_op->result_use == var_num) {
+			ssa_op->result_use = -1;
+			ssa_op->res_use_chain = -1;
+		}
+	} FOREACH_USE_END();
+	var->use_chain = -1;
+}
+
