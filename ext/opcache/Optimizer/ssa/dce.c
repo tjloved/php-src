@@ -31,8 +31,10 @@ static inline zend_bool may_throw(
 
 	switch (opline->opcode) {
 		case ZEND_UNSET_VAR:
-			ZEND_ASSERT(opline->extended_value & ZEND_QUICK_SET);
-			return 0;
+			if (opline->extended_value & ZEND_QUICK_SET) {
+				return 0;
+			}
+			break;
 		case ZEND_ASSIGN:
 			return t2 & MAY_BE_UNDEF;
 	}
@@ -187,6 +189,7 @@ static inline zend_bool may_throw(
 		default:
 			return 1;
 	}
+#define UNSET_VAR (non-quick-set)
 #define ZEND_INIT_FCALL_BY_NAME               59
 #define ZEND_INIT_FCALL                       61
 #define ZEND_RETURN                           62
@@ -345,7 +348,10 @@ static inline zend_bool may_have_side_effects(
 			return 0;
 		}
 		case ZEND_UNSET_VAR:
-			return (OP1_INFO() & (MAY_BE_REF|MAY_HAVE_DTOR)) != 0;
+			if (opline->extended_value & ZEND_QUICK_SET) {
+				return (OP1_INFO() & (MAY_BE_REF|MAY_HAVE_DTOR)) != 0;
+			}
+			return 0;
 		case ZEND_PRE_INC:
 		case ZEND_POST_INC:
 		case ZEND_PRE_DEC:
@@ -357,7 +363,8 @@ static inline zend_bool may_have_side_effects(
 }
 
 static inline zend_bool has_improper_op1_use(zend_op *opline) {
-	return opline->opcode == ZEND_ASSIGN || opline->opcode == ZEND_UNSET_VAR;
+	return opline->opcode == ZEND_ASSIGN
+		|| (opline->opcode == ZEND_UNSET_VAR && opline->extended_value & ZEND_QUICK_SET);
 }
 
 static inline void add_to_worklists(context *ctx, int var_num) {

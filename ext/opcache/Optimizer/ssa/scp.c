@@ -115,7 +115,6 @@ static zend_bool can_replace_op1(zend_op_array *op_array, zend_op *opline, zend_
 		case ZEND_FETCH_OBJ_RW:
 		case ZEND_FETCH_OBJ_UNSET:
 		case ZEND_FETCH_OBJ_FUNC_ARG:
-		case ZEND_UNSET_VAR:
 		case ZEND_UNSET_DIM:
 		case ZEND_UNSET_OBJ:
 		case ZEND_SEND_REF:
@@ -134,9 +133,9 @@ static zend_bool can_replace_op1(zend_op_array *op_array, zend_op *opline, zend_
 		case ZEND_ROPE_END:
 		case ZEND_BIND_STATIC:
 			return 0;
+		case ZEND_UNSET_VAR:
 		case ZEND_ISSET_ISEMPTY_VAR:
 			/* CV has special meaning here - cannot simply be replaced */
-			// TODO We should be marking non-quick-set as TOO_DYNAMIC
 			return (opline->extended_value & ZEND_QUICK_SET) == 0;
 		case ZEND_INIT_ARRAY:
 		case ZEND_ADD_ARRAY_ELEMENT:
