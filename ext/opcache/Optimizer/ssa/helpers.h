@@ -58,6 +58,7 @@ void remove_result_use(zend_ssa *ssa, zend_ssa_op *ssa_op);
 void remove_op1_use(zend_ssa *ssa, zend_ssa_op *ssa_op);
 void remove_op2_use(zend_ssa *ssa, zend_ssa_op *ssa_op);
 void remove_phi(zend_ssa *ssa, zend_ssa_phi *phi);
+void remove_uses_of_var(zend_ssa *ssa, int var_num);
 
 static inline void set_op1_use(zend_ssa *ssa, zend_ssa_op *ssa_op, int var_num) {
 	zend_ssa_var *var = &ssa->vars[var_num];
@@ -104,43 +105,23 @@ static inline zend_bool var_used(zend_ssa_var *var) {
 	return var->use_chain >= 0 || var->phi_use_chain != NULL;
 }
 
-static inline void remove_uses_in_phis(zend_ssa *ssa, int var_num) {
-	zend_ssa_var *var = &ssa->vars[var_num];
-	zend_ssa_phi *phi;
-	FOREACH_PHI_USE(var, phi) {
-		int i, end = NUM_PHI_SOURCES(phi);
-		for (i = 0; i < end; i++) {
-			if (phi->sources[i] == var_num) {
-				phi->sources[i] = -1;
-				phi->use_chains[i] = NULL;
-			}
-		}
-	} FOREACH_PHI_USE_END();
-	var->phi_use_chain = NULL;
+static inline void remove_defs_of_instr(zend_ssa *ssa, zend_ssa_op *ssa_op) {
+	if (ssa_op->op1_def >= 0) {
+		remove_uses_of_var(ssa, ssa_op->op1_def);
+		remove_op1_def(ssa, ssa_op);
+	}
+	if (ssa_op->op2_def >= 0) {
+		remove_uses_of_var(ssa, ssa_op->op2_def);
+		remove_op2_def(ssa, ssa_op);
+	}
+	if (ssa_op->result_def >= 0) {
+		remove_uses_of_var(ssa, ssa_op->result_def);
+		remove_result_def(ssa, ssa_op);
+	}
 }
 
-static inline void remove_instr(zend_ssa *ssa, zend_op *opline, zend_ssa_op *ssa_op) {
-	if (ssa_op->result_use >= 0) {
-		remove_result_use(ssa, ssa_op);
-	}
-	if (ssa_op->op1_use >= 0) {
-		remove_op1_use(ssa, ssa_op);
-	}
-	if (ssa_op->op2_use >= 0) {
-		remove_op2_use(ssa, ssa_op);
-	}
-
-	/* We let the caller make sure that all defs are gone */
-	ZEND_ASSERT(ssa_op->result_def == -1);
-	ZEND_ASSERT(ssa_op->op1_def == -1);
-	ZEND_ASSERT(ssa_op->op2_def == -1);
-
-	MAKE_NOP(opline);
-}
-
-static inline void remove_instr_with_defs(zend_ssa *ssa, zend_op *opline, zend_ssa_op *ssa_op) {
+static inline void rename_defs_of_instr(zend_ssa *ssa, zend_ssa_op *ssa_op) {
 	/* Rename def to use if possible. Mark variable as not defined otherwise. */
-	// TODO Should we mark the uses as -1 (in particular in phis)?
 	if (ssa_op->op1_def >= 0) {
 		if (ssa_op->op1_use >= 0) {
 			rename_var_uses(ssa, ssa_op->op1_def, ssa_op->op1_use);
@@ -162,8 +143,25 @@ static inline void remove_instr_with_defs(zend_ssa *ssa, zend_op *opline, zend_s
 		ssa->vars[ssa_op->result_def].definition = -1;
 		ssa_op->result_def = -1;
 	}
+}
 
-	remove_instr(ssa, opline, ssa_op);
+static inline void remove_instr(zend_ssa *ssa, zend_op *opline, zend_ssa_op *ssa_op) {
+	if (ssa_op->result_use >= 0) {
+		remove_result_use(ssa, ssa_op);
+	}
+	if (ssa_op->op1_use >= 0) {
+		remove_op1_use(ssa, ssa_op);
+	}
+	if (ssa_op->op2_use >= 0) {
+		remove_op2_use(ssa, ssa_op);
+	}
+
+	/* We let the caller make sure that all defs are gone */
+	ZEND_ASSERT(ssa_op->result_def == -1);
+	ZEND_ASSERT(ssa_op->op1_def == -1);
+	ZEND_ASSERT(ssa_op->op2_def == -1);
+
+	MAKE_NOP(opline);
 }
 
 static inline int zend_bitset_pop_first(zend_bitset set, uint32_t len) {
