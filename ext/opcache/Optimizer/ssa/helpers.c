@@ -222,6 +222,7 @@ void remove_phi(zend_ssa *ssa, zend_ssa_phi *phi) {
 	ZEND_ASSERT(phi->ssa_var >= 0);
 	remove_uses_of_phi_sources(ssa, phi);
 	remove_phi_from_block(ssa, phi);
+	remove_uses_in_phis(ssa, phi->ssa_var);
 	ssa->vars[phi->ssa_var].definition_phi = NULL;
 	phi->ssa_var = -1;
 }
