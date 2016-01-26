@@ -437,12 +437,17 @@ static void merge_opcodes(
 
 			if ((new_opline->opcode == ZEND_SEND_VAL || new_opline->opcode == ZEND_SEND_VAR)
 					&& level == 0) {
-				/* Replace SEND with QM_ASSIGN to argument variable. */
+				/* Replace SEND with ASSIGN to argument variable. */
+				uint32_t var_num = cv_offset + new_opline->op2.num - 1; /* op2 is 1-based argno */
+				new_opline->opcode = ZEND_ASSIGN;
+				COPY_NODE(new_opline->op2, new_opline->op1);
+				new_opline->op1_type = IS_CV;
+				new_opline->op1.var = (zend_uintptr_t) ZEND_CALL_VAR_NUM(NULL, var_num);
+				new_opline->result_type = IS_VAR | EXT_TYPE_UNUSED;
+				new_opline->result.var = (zend_uintptr_t) ZEND_CALL_VAR_NUM(NULL,
+					merge->tmp_offset + op_array->last_var);
+				// TODO result.var: Currently simply picking U0
 				OPT_STAT(inlining_arg_assigns)++;
-				new_opline->opcode = ZEND_QM_ASSIGN;
-				new_opline->result_type = IS_CV;
-				new_opline->result.var =
-					(zend_uintptr_t) ZEND_CALL_VAR_NUM(NULL, cv_offset + new_opline->op2.num - 1);
 			}
 
 			new_opline++;
@@ -482,12 +487,14 @@ static void merge_opcodes(
 				}
 
 				if (new_opline->opcode == ZEND_RECV_INIT) {
-					/* Convert RECV_INIT into QM_ASSIGN */
+					/* Convert RECV_INIT into ASSIGN */
+					new_opline->opcode = ZEND_ASSIGN;
+					COPY_NODE(new_opline->op1, new_opline->result);
+					new_opline->result_type = IS_VAR | EXT_TYPE_UNUSED;
+					new_opline->result.var = (zend_uintptr_t) ZEND_CALL_VAR_NUM(NULL,
+						merge->tmp_offset + op_array->last_var);
+					// TODO result.var: Currently simply picking U0
 					OPT_STAT(inlining_arg_assigns)++;
-					new_opline->opcode = ZEND_QM_ASSIGN;
-					new_opline->op1_type = new_opline->op2_type;
-					new_opline->op1 = new_opline->op2;
-					new_opline->op2_type = IS_UNUSED;
 				} else if (new_opline->opcode == ZEND_RETURN) {
 					if (info->result_var_num != (uint32_t) -1) {
 						/* Convert RETURN into QM_ASSIGN to call result var */
