@@ -1,6 +1,16 @@
 #include "ZendAccelerator.h"
 #include "Optimizer/ssa/helpers.h"
 
+static void propagate_phi_type_widening(zend_ssa *ssa, int var) {
+	zend_ssa_phi *phi;
+	FOREACH_PHI_USE(&ssa->vars[var], phi) {
+		if (ssa->var_info[phi->ssa_var].type & ~ssa->var_info[var].type) {
+			ssa->var_info[phi->ssa_var].type |= ssa->var_info[var].type;
+			propagate_phi_type_widening(ssa, phi->ssa_var);
+		}
+	} FOREACH_PHI_USE_END();
+}
+
 void rename_var_uses(zend_ssa *ssa, int old, int new) {
 	zend_ssa_var *old_var = &ssa->vars[old];
 	zend_ssa_var *new_var = &ssa->vars[new];
@@ -102,6 +112,15 @@ void rename_var_uses(zend_ssa *ssa, int old, int new) {
 					after_first_new_source = 1;
 				}
 			}
+		}
+
+		/* Make sure phi result types are not incorrectly narrow after renaming.
+		 * This should not normally happen, but can occur if we DCE an assignment
+		 * or unset and there is an improper phi-indirected use lateron. */
+		// TODO Alternatively we could rerun type-inference after DCE
+		if (ssa->var_info[phi->ssa_var].type & ~ssa->var_info[new].type) {
+			ssa->var_info[phi->ssa_var].type |= ssa->var_info[new].type;
+			propagate_phi_type_widening(ssa, phi->ssa_var);
 		}
 	} FOREACH_PHI_USE_END();
 	old_var->phi_use_chain = NULL;
