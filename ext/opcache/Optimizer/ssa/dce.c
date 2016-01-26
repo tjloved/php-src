@@ -344,11 +344,6 @@ static inline zend_bool may_have_side_effects(
 			}
 			return 0;
 		}
-		case ZEND_QM_ASSIGN:
-			/* DCE might result in dtor firing too early. Usually this wouldn't matter as
-			 * QM_ASSIGN is shortlived. However we also use it for CV assignments after some
-			 * optimizations. */
-			return (OP1_INFO() & MAY_HAVE_DTOR) != 0;
 		case ZEND_UNSET_VAR:
 			return (OP1_INFO() & (MAY_BE_REF|MAY_HAVE_DTOR)) != 0;
 		case ZEND_PRE_INC:
@@ -552,20 +547,43 @@ static void simplify_jump_and_set(context *ctx) {
 }
 #endif
 
+static inline int get_common_phi_source(zend_ssa *ssa, zend_ssa_phi *phi) {
+	int common_source = -1;
+	int source;
+	FOREACH_PHI_SOURCE(phi, source) {
+		if (common_source == -1) {
+			common_source = source;
+		} else if (common_source != source) {
+			return -1;
+		}
+	} FOREACH_PHI_SOURCE_END();
+	return common_source;
+}
+
+static void try_remove_trivial_phi(context *ctx, zend_ssa_phi *phi) {
+	zend_ssa *ssa = ctx->ssa;
+	if (phi->pi < 0) {
+		int common_source = get_common_phi_source(ssa, phi);
+		if (common_source >= 0) {
+			rename_var_uses(ssa, phi->ssa_var, common_source);
+			remove_phi(ssa, phi);
+			OPT_STAT(dce_dead_phis)++;
+		}
+	}
+}
+
 void ssa_optimize_dce(ssa_opt_ctx *ssa_ctx) {
 	zend_op_array *op_array = ssa_ctx->op_array;
 	zend_ssa *ssa = ssa_ctx->ssa;
 	int i;
 	zend_ssa_phi *phi;
+	/* DCE of CV operations may affect vararg functions. For now simply treat all instructions
+	 * as live if varargs in use and only collect dead phis. */
+	zend_bool has_varargs = (ZEND_FUNC_INFO(op_array)->flags & ZEND_FUNC_VARARG) != 0;
 
 	context ctx;
 	ctx.ssa = ssa;
 	ctx.op_array = op_array;
-
-	/* DCE of assignments may affect varargs */
-	if (ZEND_FUNC_INFO(op_array)->flags & ZEND_FUNC_VARARG) {
-		return;
-	}
 
 	/* We have no dedicated phi vector, so we use the whole ssa var vector instead */
 	ctx.instr_worklist_len = zend_bitset_len(op_array->last);
@@ -583,7 +601,8 @@ void ssa_optimize_dce(ssa_opt_ctx *ssa_ctx) {
 
 	/* Mark instruction with side effects as live */
 	for (i = 0; i < op_array->last; ++i) {
-		if (may_have_side_effects(op_array, ssa, &op_array->opcodes[i], &ssa->ops[i])) {
+		if (may_have_side_effects(op_array, ssa, &op_array->opcodes[i], &ssa->ops[i])
+				|| has_varargs) {
 			zend_bitset_excl(ctx.instr_dead, i);
 			add_operands_to_worklists(&ctx, &op_array->opcodes[i], &ssa->ops[i]);
 		}
@@ -636,6 +655,11 @@ void ssa_optimize_dce(ssa_opt_ctx *ssa_ctx) {
 			remove_uses_of_var(ssa, phi->ssa_var);
 			remove_phi(ssa, phi);
 		}
+	} FOREACH_PHI_END();
+
+	/* Remove trivial phis (phis with identical source operands) */
+	FOREACH_PHI(phi) {
+		try_remove_trivial_phi(&ctx, phi);
 	} FOREACH_PHI_END();
 
 	simplify_jumps(ssa, op_array);
