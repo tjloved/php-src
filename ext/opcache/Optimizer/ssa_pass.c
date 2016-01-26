@@ -234,8 +234,7 @@ static int ssa_verify_integrity(zend_ssa *ssa, const char *extra) {
 		}
 		if (var->definition >= 0) {
 			if (!is_defined_by_op(ssa, var->definition, i)) {
-				zend_bool is_nop = op_array->opcodes[var->definition].opcode == ZEND_NOP;
-				FAIL("var %d not defined by %sop %d\n", i, is_nop ? "NOP " : "", var->definition);
+				FAIL("var %d not defined by op %d\n", i, var->definition);
 			}
 		}
 		if (var->definition_phi) {
@@ -283,6 +282,21 @@ static int ssa_verify_integrity(zend_ssa *ssa, const char *extra) {
 				FAIL("result use of %d in %d not in use chain\n", ssa_op->result_use, i);
 			}
 		}
+		if (ssa_op->op1_def >= 0) {
+			if (ssa->vars[ssa_op->op1_def].definition != i) {
+				FAIL("op1 def of %d in %d invalid\n", ssa_op->op1_def, i);
+			}
+		}
+		if (ssa_op->op2_def >= 0) {
+			if (ssa->vars[ssa_op->op2_def].definition != i) {
+				FAIL("op2 def of %d in %d invalid\n", ssa_op->op2_def, i);
+			}
+		}
+		if (ssa_op->result_def >= 0) {
+			if (ssa->vars[ssa_op->result_def].definition != i) {
+				FAIL("result def of %d in %d invalid\n", ssa_op->result_def, i);
+			}
+		}
 	}
 	FOREACH_PHI(phi) {
 		int source;
@@ -291,6 +305,9 @@ static int ssa_verify_integrity(zend_ssa *ssa, const char *extra) {
 				FAIL("%d not in phi use chain of %d\n", phi->ssa_var, source);
 			}
 		} FOREACH_PHI_SOURCE_END();
+		if (ssa->vars[phi->ssa_var].definition_phi != phi) {
+			FAIL("%d does not define this phi\n", phi->ssa_var);
+		}
 	} FOREACH_PHI_END();
 	return status;
 }
