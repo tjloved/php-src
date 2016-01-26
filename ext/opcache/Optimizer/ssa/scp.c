@@ -921,12 +921,18 @@ static void handle_phi(scp_ctx *ctx, zend_ssa_phi *phi) {
 		zval result;
 		MAKE_TOP(&result);
 		SCP_DEBUG("Handling PHI(");
-		for (i = 0; i < block->predecessors_count; i++) {
-			if (is_edge_feasible(ctx, predecessors[i], phi->block)) {
-				SCP_DEBUG("val, ");
-				join_phi_values(&result, &ctx->values[phi->sources[i]]);
-			} else {
-				SCP_DEBUG("--, ");
+		if (phi->pi >= 0) {
+			if (is_edge_feasible(ctx, phi->pi, phi->block)) {
+				join_phi_values(&result, &ctx->values[phi->sources[0]]);
+			}
+		} else {
+			for (i = 0; i < block->predecessors_count; i++) {
+				if (is_edge_feasible(ctx, predecessors[i], phi->block)) {
+					SCP_DEBUG("val, ");
+					join_phi_values(&result, &ctx->values[phi->sources[i]]);
+				} else {
+					SCP_DEBUG("--, ");
+				}
 			}
 		}
 		SCP_DEBUG(")\n");
