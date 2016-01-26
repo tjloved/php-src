@@ -36,6 +36,7 @@
 	zend_ssa_phi *_phi = (phi); \
 	int _i, _end = NUM_PHI_SOURCES(phi); \
 	for (_i = 0; _i < _end; _i++) { \
+		if (_phi->sources[_i] < 0) continue; \
 		source = _phi->sources[_i];
 #define FOREACH_PHI_SOURCE_END() \
 	} \
@@ -101,6 +102,21 @@ static inline void remove_op2_def(zend_ssa *ssa, zend_ssa_op *ssa_op) {
 static inline zend_bool var_used(zend_ssa_var *var) {
 	// TODO Do we care about sym_use_chain at this point?
 	return var->use_chain >= 0 || var->phi_use_chain != NULL;
+}
+
+static inline void remove_uses_in_phis(zend_ssa *ssa, int var_num) {
+	zend_ssa_var *var = &ssa->vars[var_num];
+	zend_ssa_phi *phi;
+	FOREACH_PHI_USE(var, phi) {
+		int i, end = NUM_PHI_SOURCES(phi);
+		for (i = 0; i < end; i++) {
+			if (phi->sources[i] == var_num) {
+				phi->sources[i] = -1;
+				phi->use_chains[i] = NULL;
+			}
+		}
+	} FOREACH_PHI_USE_END();
+	var->phi_use_chain = NULL;
 }
 
 static inline void remove_instr(zend_ssa *ssa, zend_op *opline, zend_ssa_op *ssa_op) {

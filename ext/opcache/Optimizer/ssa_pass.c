@@ -208,6 +208,11 @@ static inline zend_bool is_in_phi_sources(zend_ssa *ssa, zend_ssa_phi *phi, int 
 	status = FAILURE; \
 } while (0)
 
+#define VARFMT "%d (%s%s)"
+#define VAR(i) \
+	(i), (ssa->vars[i].var < op_array->last_var ? "CV $" : "TMP"), \
+	(ssa->vars[i].var < op_array->last_var ? ZSTR_VAL(op_array->vars[ssa->vars[i].var]) : "")
+
 static int ssa_verify_integrity(zend_ssa *ssa, const char *extra) {
 	zend_op_array *op_array = ssa->op_array;
 	zend_ssa_phi *phi;
@@ -220,9 +225,9 @@ static int ssa_verify_integrity(zend_ssa *ssa, const char *extra) {
 			if (var->use_chain >= 0) {
 				FAIL("var %d without def has op uses\n", i);
 			}
-			/*if (var->phi_use_chain) {
-				FAIL("var %d without def has phi uses\n", i);
-			}*/
+			if (var->phi_use_chain) {
+				FAIL("var " VARFMT " without def has phi uses\n", VAR(i));
+			}
 		}
 		if (var->definition >= 0 && var->definition_phi) {
 			FAIL("var %d has both def and def_phi\n", i);
