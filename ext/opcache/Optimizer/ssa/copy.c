@@ -4,6 +4,11 @@
 #include "Optimizer/ssa/liveness.h"
 #include "Optimizer/statistics.h"
 
+static inline zend_bool has_improper_op1_use(zend_op *opline) {
+	return opline->opcode == ZEND_ASSIGN
+		|| (opline->opcode == ZEND_UNSET_VAR && opline->extended_value & ZEND_QUICK_SET);
+}
+
 int try_copy_propagation(ssa_opt_ctx *ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 	zend_op_array *op_array = ctx->op_array;
 	zend_ssa *ssa = ctx->ssa;
@@ -41,7 +46,7 @@ int try_copy_propagation(ssa_opt_ctx *ctx, zend_op *opline, zend_ssa_op *ssa_op)
 			// TODO allow if same name?
 			return FAILURE;
 		}
-		if (use_opline->opcode == ZEND_UNSET_VAR || use_opline->opcode == ZEND_ASSIGN) {
+		if (has_improper_op1_use(use_opline)) {
 			continue;
 		}
 		if ((use_op->op1_use == lhs_var_num && use_op->op1_def >= 0)
@@ -74,7 +79,7 @@ int try_copy_propagation(ssa_opt_ctx *ctx, zend_op *opline, zend_ssa_op *ssa_op)
 	FOREACH_USE(lhs_var, use) {
 		zend_op *use_opline = &op_array->opcodes[use];
 		zend_ssa_op *use_op = &ssa->ops[use];
-		if (use_opline->opcode == ZEND_UNSET_VAR) {
+		if (use_opline->opcode == ZEND_UNSET_VAR && (opline->extended_value & ZEND_QUICK_SET)) {
 			rename_var_uses(ssa, use_op->op1_def, old_lhs_var_num);
 			remove_op1_def(ssa, use_op);
 			remove_instr(ssa, use_opline, use_op);
