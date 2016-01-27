@@ -5,7 +5,15 @@
 #include "Optimizer/ssa/liveness.h"
 #include "Optimizer/statistics.h"
 
-#define SSA_VERIFY_INTEGRITY ZEND_DEBUG
+#if 0
+/* Verify after each pass */
+#define SSA_VERIFY_INTEGRITY 2
+#elif ZEND_DEBUG
+/* Verify once at the end */
+#define SSA_VERIFY_INTEGRITY 1
+#else
+#define SSA_VERIFY_INTEGRITY 0
+#endif
 
 static void collect_ssa_stats(zend_op_array *op_array, zend_ssa *ssa) {
 	int i;
@@ -168,7 +176,7 @@ static void run_pass(
 		ssa_opt_ctx *ctx, void (*optimize_fn)(ssa_opt_ctx *ctx),
 		const char *name, uint32_t debug_level) {
 	optimize_fn(ctx);
-#if SSA_VERIFY_INTEGRITY
+#if SSA_VERIFY_INTEGRITY > 1
 	ssa_verify_integrity(ctx->ssa, name);
 #endif
 
@@ -269,7 +277,10 @@ static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) 
 	ssa_optimize_type_specialization(&ssa_ctx);
 	ssa_optimize_object_specialization(&ssa_ctx);
 	ssa_optimize_peephole(&ssa_ctx);
+
+#if SSA_VERIFY_INTEGRITY
 	ssa_verify_integrity(&info->ssa, "after SSA pass");
+#endif
 
 	ssa_optimize_vars(&ssa_ctx);
 

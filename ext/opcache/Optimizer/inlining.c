@@ -229,6 +229,23 @@ static zend_op *find_call_opline(zend_op *opline) {
 	}
 }
 
+/* RETURN_BY_REF and ASSIGN_REF check a u2 var flag, which will not be cleared if we use
+ * inling, so prohibit inlining of calls used by these opcodes. */
+zend_bool used_in_ref_context(zend_op *opline) {
+	uint32_t var = opline->result.var;
+	zend_uchar var_type = opline->result_type;
+	if (var_type & EXT_TYPE_UNUSED) {
+		return 0;
+	}
+
+	while ((opline->op1_type != var_type || opline->op1.var != var)
+			&& (opline->op2_type != var_type || opline->op2.var != var)) {
+		opline++;
+	}
+
+	return opline->opcode == ZEND_RETURN_BY_REF || opline->opcode == ZEND_ASSIGN_REF;
+}
+
 static inline_info *find_inlinable_calls(zend_op_array *op_array, zend_optimizer_ctx *ctx) {
 	zend_op *opline = op_array->opcodes;
 	zend_op *end = opline + op_array->last;
@@ -243,6 +260,9 @@ static inline_info *find_inlinable_calls(zend_op_array *op_array, zend_optimizer
 				inline_info *info;
 				zend_op *call_opline = find_call_opline(opline);
 				if (!call_opline) {
+					continue;
+				}
+				if (used_in_ref_context(call_opline)) {
 					continue;
 				}
 
