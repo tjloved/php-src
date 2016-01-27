@@ -3,6 +3,7 @@
 #include "Optimizer/zend_dump.h"
 #include "Optimizer/ssa_pass.h"
 #include "Optimizer/ssa/liveness.h"
+#include "Optimizer/ssa/instructions.h"
 #include "Optimizer/statistics.h"
 
 #if 0
@@ -172,6 +173,81 @@ static zend_bool is_php_errormsg_used(zend_op_array *op_array) {
 	return 0;
 }
 
+typedef struct _arginfo {
+	zend_string *lcname;
+	uint32_t arg_offset;
+} arginfo;
+
+typedef struct _arginfo_context {
+	zend_cfg *cfg;
+	arginfo *info;
+	uint32_t pos;
+} arginfo_context;
+
+static inline zend_bool have_arginfo(
+		arginfo_context *ctx, zend_string *lcname, uint32_t arg_offset) {
+	uint32_t i;
+	for (i = 0; i < ctx->pos; i++) {
+		if (zend_string_equals(ctx->info[i].lcname, lcname)
+				&& ctx->info[i].arg_offset == arg_offset) {
+			return 1;
+		}
+	}
+	return 0;
+}
+
+static void propagate_recursive(arginfo_context *ctx, zend_op_array *op_array, int block_num) {
+	zend_cfg *cfg = ctx->cfg;
+	zend_basic_block *block = &cfg->blocks[block_num];
+	uint32_t orig_pos = ctx->pos;
+	zend_op *opline = &op_array->opcodes[block->start], *end = &op_array->opcodes[block->end];
+	int i;
+	for (; opline <= end; opline++) {
+		if (opline->opcode == ZEND_INIT_FCALL_BY_NAME) {
+			zend_string *lcname = Z_STR_P(&ZEND_OP2_LITERAL(opline) + 1);
+			int level = 0;
+			while (++opline <= end) {
+				if (is_init_opline(opline)) {
+					level++;
+				} else if (is_call_opline(opline)) {
+					if (level == 0) {
+						break;
+					}
+					level--;
+				}
+				if (level == 0) {
+					if (opline->opcode == ZEND_SEND_VAL_EX) {
+						if (have_arginfo(ctx, lcname, opline->op2.num)) {
+							opline->opcode = ZEND_SEND_VAL;
+							OPT_STAT(tmp)++;
+						} else {
+							ctx->info[ctx->pos].lcname = lcname;
+							ctx->info[ctx->pos].arg_offset = opline->op2.num;
+							ctx->pos++;
+						}
+					} else if (opline->opcode == ZEND_SEND_VAR_EX) {
+						if (have_arginfo(ctx, lcname, opline->op2.num)) {
+							opline->opcode = ZEND_SEND_VAR;
+							OPT_STAT(tmp)++;
+						}
+					}
+				}
+			}
+		}
+	}
+	for (i = cfg->blocks[block_num].children; i >= 0; i = cfg->blocks[i].next_child) {
+		propagate_recursive(ctx, op_array, i);
+	}
+	ctx->pos = orig_pos;
+}
+static void propagate_passing_semantics(zend_op_array *op_array, zend_cfg *cfg) {
+	arginfo *info = safe_emalloc(sizeof(arginfo), op_array->last, 0);
+	arginfo_context ctx = {cfg, info, 0};
+	propagate_recursive(&ctx, op_array, 0);
+
+	efree(info);
+}
+
 static void run_pass(
 		ssa_opt_ctx *ctx, void (*optimize_fn)(ssa_opt_ctx *ctx),
 		const char *name, uint32_t debug_level) {
@@ -225,6 +301,8 @@ static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) 
 		return;
 	}
 
+	propagate_passing_semantics(op_array, &info->ssa.cfg);
+
 	if (zend_cfg_identify_loops(op_array, &info->ssa.cfg, &info->flags) != SUCCESS) {
 		return;
 	}
@@ -256,18 +334,21 @@ static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) 
 	complete_block_map(&info->ssa.cfg, op_array->last);
 	remove_spurious_ssa_vars(op_array, &info->ssa);
 	remove_trivial_phis(&info->ssa);
+
+#if SSA_VERIFY_INTEGRITY > 1
 	ssa_verify_integrity(&info->ssa, "before SSA pass");
+#endif
+
+	if (ZCG(accel_directives).ssa_debug_level & 2) {
+		zend_dump_op_array(op_array, ZEND_DUMP_SSA | ZEND_DUMP_HIDE_UNUSED_VARS,
+			"before ssa pass", &info->ssa);
+	}
 
 	ssa_liveness_precompute(ctx, &liveness, &info->ssa);
 	ssa_ctx.opt_ctx = ctx;
 	ssa_ctx.op_array = op_array;
 	ssa_ctx.ssa = &info->ssa;
 	ssa_ctx.liveness = &liveness;
-
-	if (ZCG(accel_directives).ssa_debug_level & 2) {
-		zend_dump_op_array(op_array, ZEND_DUMP_SSA | ZEND_DUMP_HIDE_UNUSED_VARS,
-			"before ssa pass", &info->ssa);
-	}
 
 	run_pass(&ssa_ctx, ssa_optimize_scp, "after SCP", 4);
 	run_pass(&ssa_ctx, ssa_optimize_dce, "after DCE", 8);
