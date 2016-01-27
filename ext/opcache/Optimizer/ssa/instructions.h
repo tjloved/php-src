@@ -19,5 +19,33 @@ static inline zend_uchar instr_get_compound_assign_op(zend_op *opline) {
 	}
 }
 
+static inline zend_bool is_init_opline(zend_op *opline) {
+	switch (opline->opcode) {
+		case ZEND_INIT_FCALL_BY_NAME:
+		case ZEND_INIT_NS_FCALL_BY_NAME:
+		case ZEND_NEW:
+		case ZEND_INIT_DYNAMIC_CALL:
+		case ZEND_INIT_METHOD_CALL:
+		case ZEND_INIT_STATIC_METHOD_CALL:
+		case ZEND_INIT_FCALL:
+		case ZEND_INIT_USER_CALL:
+			return 1;
+		default:
+			return 0;
+	}
+}
+
+static inline zend_bool is_call_opline(zend_op *opline) {
+	switch (opline->opcode) {
+		case ZEND_DO_FCALL:
+		case ZEND_DO_ICALL:
+		case ZEND_DO_UCALL:
+		case ZEND_DO_FCALL_BY_NAME:
+			return 1;
+		default:
+			return 0;
+	}
+}
+
 #endif
 
