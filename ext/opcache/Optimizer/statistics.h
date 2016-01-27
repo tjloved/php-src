@@ -41,6 +41,8 @@ typedef struct _zend_optimizer_statistics {
 	uint32_t dce_frees;
 	uint32_t inlining_arg_assigns;
 	uint32_t tmp;
+	uint32_t vars_orig_cvs;
+	uint32_t vars_dead_cvs;
 } zend_optimizer_statistics;
 
 extern zend_optimizer_statistics optimizer_statistics;

@@ -14,6 +14,7 @@ void ssa_optimize_vars(ssa_opt_ctx *ctx) {
 	uint32_t *cv_map = do_alloca(op_array->last_var * sizeof(uint32_t), use_heap2);
 	uint32_t num_cvs, tmp_offset;
 
+	/* Determine which CVs are used */
 	zend_bitset_clear(used_cvs, used_cvs_len);
 	for (i = 0; i < op_array->last; i++) {
 		zend_op *opline = &op_array->opcodes[i];
@@ -40,6 +41,7 @@ void ssa_optimize_vars(ssa_opt_ctx *ctx) {
 	free_alloca(used_cvs, use_heap1);
 	if (num_cvs == op_array->last_var) {
 		free_alloca(cv_map, use_heap2);
+		OPT_STAT(vars_orig_cvs) += op_array->last_var;
 		return;
 	}
 
@@ -87,6 +89,13 @@ void ssa_optimize_vars(ssa_opt_ctx *ctx) {
 		op_array->vars = names;
 	}
 
+	/* Update $this reference */
+	if (op_array->this_var != (uint32_t) -1) {
+		op_array->this_var = NUM_VAR(cv_map[VAR_NUM(op_array->this_var)]);
+	}
+
+	OPT_STAT(vars_orig_cvs) += op_array->last_var;
+	OPT_STAT(vars_dead_cvs) += op_array->last_var - num_cvs;
 	op_array->last_var = num_cvs;
 
 	free_alloca(cv_map, use_heap2);

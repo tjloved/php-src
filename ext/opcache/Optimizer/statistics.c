@@ -62,5 +62,8 @@ void zend_optimizer_statistics_shutdown() {
 	PRINT_STAT(type_spec_must_be_append_int_key);
 	PRINT_STAT(type_spec_must_be_notref_array_values);
 
+	PRINT_STAT(vars_orig_cvs);
+	PRINT_NORM_STAT(vars_dead_cvs, vars_orig_cvs);
+
 	PRINT_STAT(tmp);
 }
