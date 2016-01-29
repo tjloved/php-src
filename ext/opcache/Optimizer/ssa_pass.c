@@ -219,7 +219,7 @@ static void propagate_recursive(arginfo_context *ctx, zend_op_array *op_array, i
 					if (opline->opcode == ZEND_SEND_VAL_EX) {
 						if (have_arginfo(ctx, lcname, opline->op2.num)) {
 							opline->opcode = ZEND_SEND_VAL;
-							OPT_STAT(tmp)++;
+							OPT_STAT(simplified_sends)++;
 						} else {
 							ctx->info[ctx->pos].lcname = lcname;
 							ctx->info[ctx->pos].arg_offset = opline->op2.num;
@@ -228,7 +228,7 @@ static void propagate_recursive(arginfo_context *ctx, zend_op_array *op_array, i
 					} else if (opline->opcode == ZEND_SEND_VAR_EX) {
 						if (have_arginfo(ctx, lcname, opline->op2.num)) {
 							opline->opcode = ZEND_SEND_VAR;
-							OPT_STAT(tmp)++;
+							OPT_STAT(simplified_sends)++;
 						}
 					}
 				}
