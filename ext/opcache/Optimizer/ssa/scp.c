@@ -493,8 +493,7 @@ static void interp_instr(scp_ctx *ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 		case ZEND_ASSIGN:
 			/* The value of op1 is irrelevant here, because we are overwriting it
 			 * -- unless it can be a reference, in which case we propagate a BOT. */
-			if (IS_BOT(op1) && ssa_op->op1_use >= 0
-					&& (ctx->ssa->var_info[ssa_op->op1_use].type & MAY_BE_REF)) {
+			if (IS_BOT(op1) && (ctx->ssa->var_info[ssa_op->op1_use].type & MAY_BE_REF)) {
 				SET_RESULT_BOT(op1);
 			} else {
 				SET_RESULT(op1, op2);
@@ -560,9 +559,8 @@ static void interp_instr(scp_ctx *ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 		case ZEND_BW_AND:
 		case ZEND_BW_XOR:
 		case ZEND_BOOL_XOR:
-			if (IS_TOP(op1) || IS_TOP(op2)) {
-				break;
-			}
+			SKIP_IF_TOP(op1);
+			SKIP_IF_TOP(op2);
 
 			if (ct_eval_binary(&zv, opline->opcode, op1, op2) == SUCCESS) {
 				SET_RESULT(result, &zv);
@@ -590,9 +588,8 @@ static void interp_instr(scp_ctx *ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 				break;
 			}
 
-			if (IS_TOP(op1) || IS_TOP(op2)) {
-				break;
-			}
+			SKIP_IF_TOP(op1);
+			SKIP_IF_TOP(op2);
 
 			if (ct_eval_binary(&zv, instr_get_compound_assign_op(opline), op1, op2) == SUCCESS) {
 				SET_RESULT(op1, &zv);
@@ -646,6 +643,8 @@ static void interp_instr(scp_ctx *ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 			SET_RESULT_BOT(result);
 			break;
 		case ZEND_BOOL:
+		case ZEND_JMPZ_EX:
+		case ZEND_JMPNZ_EX:
 			SKIP_IF_TOP(op1);
 			ZVAL_BOOL(&zv, zend_is_true(op1));
 			SET_RESULT(result, &zv);
@@ -693,13 +692,8 @@ static void interp_instr(scp_ctx *ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 			}
 			SET_RESULT(result, op1);
 			break;
-		case ZEND_JMPZ_EX:
-		case ZEND_JMPNZ_EX:
-			SKIP_IF_TOP(op1);
-			ZVAL_BOOL(&zv, zend_is_true(op1));
-			SET_RESULT(result, &zv);
-			break;
 		case ZEND_ISSET_ISEMPTY_VAR:
+			SKIP_IF_TOP(op1);
 			if (ct_eval_isset_isempty(&zv, opline->extended_value, op1) == SUCCESS) {
 				SET_RESULT(result, &zv);
 				zval_ptr_dtor_nogc(&zv);
@@ -740,9 +734,20 @@ static void interp_instr(scp_ctx *ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 			break;
 		case ZEND_INIT_ARRAY:
 		case ZEND_ADD_ARRAY_ELEMENT:
+		{
+			zval *result = NULL;
 			if (opline->extended_value & ZEND_ARRAY_ELEMENT_REF) {
 				SET_RESULT_BOT(result);
 				break;
+			}
+
+			if (opline->opcode == ZEND_ADD_ARRAY_ELEMENT) {
+				result = &ctx->values[ssa_op->result_use];
+				if (IS_BOT(result)) {
+					SET_RESULT_BOT(result);
+					break;
+				}
+				SKIP_IF_TOP(result);
 			}
 
 			SKIP_IF_TOP(op1);
@@ -750,16 +755,10 @@ static void interp_instr(scp_ctx *ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 				SKIP_IF_TOP(op2);
 			}
 
-			if (opline->opcode == ZEND_INIT_ARRAY) {
-				array_init(&zv);
-			} else {
-				zval *result = &ctx->values[ssa_op->result_use];
-				if (IS_BOT(result)) {
-					SET_RESULT_BOT(result);
-					break;
-				}
-				SKIP_IF_TOP(result);
+			if (result) {
 				ZVAL_DUP(&zv, result);
+			} else {
+				array_init(&zv);
 			}
 
 			if (ct_eval_add_array_elem(&zv, op1, op2) == SUCCESS) {
@@ -770,6 +769,7 @@ static void interp_instr(scp_ctx *ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 			SET_RESULT_BOT(result);
 			zval_ptr_dtor_nogc(&zv);
 			break;
+		}
 		case ZEND_ASSIGN_DIM:
 		{
 			zval *data = get_op1_value(ctx, opline+1, ssa_op+1);
