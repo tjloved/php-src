@@ -62,7 +62,7 @@ int try_copy_propagation(ssa_opt_ctx *ctx, zend_op *opline, zend_ssa_op *ssa_op)
 		if ((use_op->op1_use == rhs_var_num && use_op->op1_def >= 0)
 				|| (use_op->op2_use == rhs_var_num && use_op->op2_def >= 0)
 				|| (use_op->result_use == rhs_var_num && use_op->result_def >= 0)) {
-			if (ssa_is_live_in_at_op(ctx->liveness, lhs_var_num, use)) {
+			if (ssa_is_live_out_at_op(ctx->liveness, lhs_var_num, use)) {
 				return FAILURE;
 			}
 		}
