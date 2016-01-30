@@ -259,23 +259,23 @@ zend_bool ssa_is_live_in_at_block(const ssa_liveness *liveness, int var_num, int
 	}
 	return 0;
 }
-zend_bool ssa_is_live_in_at_op(const ssa_liveness *liveness, int var_num, int op) {
+zend_bool ssa_is_live_out_at_op(const ssa_liveness *liveness, int var_num, int op) {
 	zend_ssa *ssa = liveness->ssa;
 	zend_ssa_var *var = &ssa->vars[var_num];
 	int def_block = get_def_block(ssa, var);
 	int block = ssa->cfg.map[op];
 #if LIVENESS_DEBUG
-	fprintf(stderr, "Live-in query for var %d (def block %d) at op %d in block %d\n",
+	fprintf(stderr, "Live-out query for var %d (def block %d) at op %d in block %d\n",
 		var_num, def_block, op, block);
 #endif
 	if (block == def_block) {
 		int use;
-		if (var->definition >= op) {
+		if (var->definition > op) {
 			return 0;
 		}
 		FOREACH_USE(var, use) {
 			int use_block = ssa->cfg.map[use];
-			if (use_block != block || use >= op) {
+			if (use_block != block || use > op) {
 				return 1;
 			}
 		} FOREACH_USE_END();
@@ -288,7 +288,7 @@ zend_bool ssa_is_live_in_at_op(const ssa_liveness *liveness, int var_num, int op
 				zend_ssa_phi *phi;
 				FOREACH_USE(var, use) {
 					int use_block = ssa->cfg.map[use];
-					if (use_block == block && use < op
+					if (use_block == block && use <= op
 							&& !zend_bitset_in(liveness->backedge_targets, block)) {
 						continue;
 					}
