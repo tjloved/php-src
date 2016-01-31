@@ -2,8 +2,88 @@
 #include "Optimizer/zend_optimizer_internal.h"
 #include "Optimizer/ssa_pass.h"
 #include "Optimizer/statistics.h"
+#include "Optimizer/ssa/liveness.h"
+
+static int block_dominates(const ssa_liveness *liveness, int a, int b) {
+	return a == b || zend_bitset_in(liveness->sdom + a * liveness->block_set_len, b);
+}
+
+static uint32_t get_def_block(const zend_ssa *ssa, const zend_ssa_var *var) {
+	if (var->definition >= 0) {
+		return ssa->cfg.map[var->definition];
+	} else if (var->definition_phi) {
+		return var->definition_phi->block;
+	} else {
+		/* Implicit define at start of start block */
+		return 0;
+	}
+}
+
+static zend_bool var_dominates(
+		const zend_ssa *ssa, const ssa_liveness *liveness,
+		zend_ssa_var *var_a, zend_ssa_var *var_b) {
+	int block_a = get_def_block(ssa, var_a);
+	int block_b = get_def_block(ssa, var_b);
+	if (block_a == block_b) {
+		// TODO Is this phi handling correct?
+		if (var_a->definition_phi) {
+			return 1;
+		}
+		if (var_b->definition_phi) {
+			return 0;
+		}
+		return var_a->definition <= var_b->definition;
+	}
+	return block_dominates(liveness, block_a, block_b);
+}
+
+static zend_bool interfere_dominating(const ssa_liveness *liveness, int a, zend_ssa_var *var_b) {
+	if (var_b->definition >= 0) {
+		return ssa_is_live_out_at_op(liveness, a, var_b->definition);
+	} else if (var_b->definition_phi) {
+		return ssa_is_live_in_at_block(liveness, a, var_b->definition_phi->block);
+	} else {
+		return 1;
+	}
+}
+
+static zend_bool interfere(const zend_ssa *ssa, const ssa_liveness *liveness, int a, int b) {
+	zend_ssa_var *var_a = &ssa->vars[a];
+	zend_ssa_var *var_b = &ssa->vars[b];
+	if (var_dominates(ssa, liveness, var_a, var_b)) {
+		return interfere_dominating(liveness, a, var_b);
+	} else {
+		return interfere_dominating(liveness, b, var_a);
+	}
+}
+
+static void check_interferences(ssa_opt_ctx *ctx) {
+	zend_ssa *ssa = ctx->ssa;
+	int last_var = ctx->op_array->last_var;
+	int i, j;
+	for (i = 0; i < ssa->vars_count; i++) {
+		int var = ssa->vars[i].var;
+		if (var >= last_var) {
+			continue;
+		}
+
+		for (j = 0; j < i; j++) {
+			if (ssa->vars[j].var != var) {
+				continue;
+			}
+
+			if (interfere(ssa, ctx->liveness, i, j)) {
+				fprintf(stderr,
+					"%d and %d for var %d ($%s) interfere\n",
+					i, j, var, ZSTR_VAL(ctx->op_array->vars[var]));
+			}
+		}
+	}
+}
 
 void ssa_optimize_vars(ssa_opt_ctx *ctx) {
+	check_interferences(ctx); // TODO temporarily in here...
+
 	zend_op_array *op_array = ctx->op_array;
 	int i;
 
