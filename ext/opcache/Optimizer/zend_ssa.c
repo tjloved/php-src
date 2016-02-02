@@ -52,6 +52,9 @@ static zend_ssa_phi *add_pi(
 	phi->next = ssa->blocks[to].phis;
 	ssa->blocks[to].phis = phi;
 
+	/* Block to now defines var via the pi statement */
+	DFG_SET(dfg->gen, dfg->size, to, var);
+
 	return phi;
 }
 /* }}} */
@@ -807,6 +810,9 @@ int zend_build_ssa(zend_arena **arena, const zend_op_array *op_array, uint32_t b
 	gen = dfg.gen;
 	in  = dfg.in;
 
+	/* This will add additional gen points, so must happen before gen propagation. */
+	place_essa_pis(arena, op_array, build_flags, ssa, &dfg);
+
 	/* SSA construction, Step 1: Propagate "gen" sets in merge points */
 	do {
 		changed = 0;
@@ -870,9 +876,6 @@ int zend_build_ssa(zend_arena **arena, const zend_op_array *op_array, uint32_t b
 							sizeof(int) * blocks[j].predecessors_count +
 							sizeof(void*) * blocks[j].predecessors_count);
 
-						if (!phi) {
-							goto failure;
-						}
 						phi->sources = (int*)(((char*)phi) + sizeof(zend_ssa_phi));
 						memset(phi->sources, 0xff, sizeof(int) * blocks[j].predecessors_count);
 						phi->use_chains = (zend_ssa_phi**)(((char*)phi->sources) + sizeof(int) * ssa->cfg.blocks[j].predecessors_count);
@@ -880,80 +883,17 @@ int zend_build_ssa(zend_arena **arena, const zend_op_array *op_array, uint32_t b
 					    phi->pi = -1;
 						phi->var = i;
 						phi->ssa_var = -1;
-						phi->next = ssa_blocks[j].phis;
-						ssa_blocks[j].phis = phi;
-					}
-				}
-			}
-		}
-	}
 
-	place_essa_pis(arena, op_array, build_flags, ssa, &dfg);
-
-	/* SSA construction, Step ?: Phi after Pi placement based on Dominance Frontiers */
-	for (j = 0; j < blocks_count; j++) {
-		if ((blocks[j].flags & ZEND_BB_REACHABLE) == 0) {
-			continue;
-		}
-		if (blocks[j].predecessors_count > 1) {
-			zend_bitset_clear(tmp, set_size);
-			if (blocks[j].flags & ZEND_BB_IRREDUCIBLE_LOOP) {
-				/* Prevent any values from flowing into irreducible loops by
-				   replacing all incoming values with explicit phis.  The
-				   register allocator depends on this property.  */
-				zend_bitset_copy(tmp, in + (j * set_size), set_size);
-			} else {
-				for (k = 0; k < blocks[j].predecessors_count; k++) {
-					i = ssa->cfg.predecessors[blocks[j].predecessor_offset + k];
-					while (i != -1 && i != blocks[j].idom) {
-						zend_ssa_phi *p = ssa_blocks[i].phis;
-						while (p) {
-							if (p) {
-								if (p->pi >= 0) {
-									if (zend_bitset_in(in + (j * set_size), p->var) &&
-									    !zend_bitset_in(gen + (i * set_size), p->var)) {
-										zend_bitset_incl(tmp, p->var);
-									}
-								} else {
-									zend_bitset_excl(tmp, p->var);
+						/* Place phis after pis */
+						{
+							zend_ssa_phi **pp = &ssa_blocks[j].phis;
+							while (*pp) {
+								if ((*pp)->pi < 0) {
+									break;
 								}
+								pp = &(*pp)->next;
 							}
-							p = p->next;
-						}
-						i = blocks[i].idom;
-					}
-				}
-			}
-
-			if (!zend_bitset_empty(tmp, set_size)) {
-				i = op_array->last_var + op_array->T;
-				while (i > 0) {
-					i--;
-					if (zend_bitset_in(tmp, i)) {
-						zend_ssa_phi **pp = &ssa_blocks[j].phis;
-						while (*pp) {
-							if ((*pp)->pi < 0 && (*pp)->var == i) {
-								break;
-							}
-							pp = &(*pp)->next;
-						}
-						if (*pp == NULL) {
-							zend_ssa_phi *phi = zend_arena_calloc(arena, 1,
-								sizeof(zend_ssa_phi) +
-								sizeof(int) * blocks[j].predecessors_count +
-								sizeof(void*) * blocks[j].predecessors_count);
-
-							if (!phi) {
-								goto failure;
-							}
-							phi->sources = (int*)(((char*)phi) + sizeof(zend_ssa_phi));
-							memset(phi->sources, 0xff, sizeof(int) * blocks[j].predecessors_count);
-							phi->use_chains = (zend_ssa_phi**)(((char*)phi->sources) + sizeof(int) * ssa->cfg.blocks[j].predecessors_count);
-
-						    phi->pi = -1;
-							phi->var = i;
-							phi->ssa_var = -1;
-							phi->next = NULL;
+							phi->next = *pp;
 							*pp = phi;
 						}
 					}
@@ -976,7 +916,6 @@ int zend_build_ssa(zend_arena **arena, const zend_op_array *op_array, uint32_t b
 	}
 	ssa->vars_count = op_array->last_var;
 	if (zend_ssa_rename(op_array, build_flags, ssa, var, 0) != SUCCESS) {
-failure:
 		free_alloca(var, var_use_heap);
 		free_alloca(dfg.tmp, dfg_use_heap);
 		return FAILURE;
