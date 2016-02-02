@@ -259,13 +259,7 @@ static uint32_t get_def_block(const zend_ssa *ssa, const zend_ssa_var *var) {
 static zend_bool phi_use_reachable(
 		const ssa_liveness *liveness, const zend_ssa *ssa,
 		const zend_ssa_phi *phi, int from_block, int var_num) {
-	/* The i-th phi operand is used along the CFG edge from the i-th predecessor.
-	 * We first do a quick check to see if the block containing the phi is reduced
-	 * reachable, otherwise the predecessor won't be either */
-	// TODO Is that actually true?
-	if (!zend_bitset_in(REDUCED_REACHABLE(from_block), phi->block)) {
-		return 0;
-	}
+	/* The i-th phi operand is used along the CFG edge from the i-th predecessor. */
 	if (phi->pi >= 0) {
 		if (zend_bitset_in(REDUCED_REACHABLE(from_block), phi->pi)) {
 			DEBUG_PRINT("Live via predecessor %d\n", phi->pi);
@@ -390,12 +384,6 @@ static inline zend_bool ssa_is_live_at_op(
 					if (op_array->opcodes[use].opcode == ZEND_OP_DATA) {
 						use--;
 					}
-#if LIVENESS_DEBUG
-					if (use_block == block && use + live_in <= op
-							&& zend_bitset_in(liveness->backedge_targets, block)) {
-						fprintf(stderr, "Not skipping due to backedge target\n");
-					}
-#endif
 					if (use_block == block && use + live_in <= op
 							&& !zend_bitset_in(liveness->backedge_targets, block)) {
 						continue;
