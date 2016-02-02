@@ -125,9 +125,11 @@ void ssa_optimize_copy(ssa_opt_ctx *ctx) {
 		zend_ssa_op *ssa_op = &ssa->ops[i];
 
 		if ((opline->opcode == ZEND_ASSIGN && !RETURN_VALUE_USED(opline)
-				&& opline->op1_type == IS_CV && opline->op2_type == IS_CV)
+				&& opline->op1_type == IS_CV && opline->op2_type == IS_CV
+				&& !(ssa->var_info[ssa_op->op2_use].type & MAY_BE_UNDEF))
 			|| (opline->opcode == ZEND_QM_ASSIGN
-				&& opline->result_type == IS_CV && opline->op1_type == IS_CV)) {
+				&& opline->result_type == IS_CV && opline->op1_type == IS_CV
+				&& !(ssa->var_info[ssa_op->op1_use].type & MAY_BE_UNDEF))) {
 			if (try_copy_propagation(ctx, opline, ssa_op) == SUCCESS) {
 				continue;
 			}
