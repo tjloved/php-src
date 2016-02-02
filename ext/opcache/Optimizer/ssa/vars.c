@@ -68,7 +68,6 @@ static zend_bool interfere_dominating(const ssa_liveness *liveness, int a, zend_
 	if (var_b->definition >= 0) {
 		return ssa_is_live_out_at_op(liveness, a, var_b->definition);
 	} else if (var_b->definition_phi) {
-		//return ssa_is_live_in_at_op(liveness, a, liveness->ssa->cfg.blocks[var_b->definition_phi->block].start);
 		return ssa_is_live_in_at_block(liveness, a, var_b->definition_phi->block);
 	} else {
 		return 1;

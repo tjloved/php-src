@@ -288,12 +288,23 @@ static zend_bool phi_use_reachable(
 	}
 }
 
+/* If a pi result is used as a phi operand in the same block, the usual rule about phi uses
+ * occuring along the CFG edge from the predecessor does not apply. Instead this variable is
+ * simply never live. */
+static inline zend_bool is_immediately_consumed_pi(const zend_ssa *ssa, const zend_ssa_var *var) {
+	return var->definition_phi && var->definition_phi->pi >= 0 && var->use_chain < 0 &&
+		var->phi_use_chain && var->phi_use_chain->block == var->definition_phi->block;
+}
+
 zend_bool ssa_is_live_in_at_block(const ssa_liveness *liveness, int var_num, int block) {
 	zend_ssa *ssa = liveness->ssa;
 	zend_ssa_var *var = &ssa->vars[var_num];
 	int def_block = get_def_block(ssa, var);
 	int i = 0;
 	DEBUG_PRINT("Live-in query for var %d (def block %d) at block %d\n", var_num, def_block, block);
+	if (is_immediately_consumed_pi(ssa, var)) {
+		return 0;
+	}
 	while ((i = zend_bitset_next(TARGETS(block), liveness->block_set_len, i)) >= 0) {
 		if (zend_bitset_in(SDOM(def_block), i)) {
 			int use;
@@ -326,6 +337,9 @@ static inline zend_bool ssa_is_live_at_op(
 	int block = ssa->cfg.map[op];
 	DEBUG_PRINT("Live-%s query for var %d (def block %d) at op %d in block %d\n",
 		live_in ? "in" : "out", var_num, def_block, op, block);
+	if (is_immediately_consumed_pi(ssa, var)) {
+		return 0;
+	}
 	if (block == def_block) {
 		int use;
 		zend_ssa_phi *phi;
@@ -356,14 +370,6 @@ static inline zend_bool ssa_is_live_at_op(
 					if (phi->sources[i] == var_num) {
 						int predecessor = ssa->cfg.predecessors[phi_block->predecessor_offset + i];
 						if (predecessor != block) {
-							if (var->definition_phi && var->definition_phi->pi >= 0
-									&& var->definition_phi->block == block) {
-								/* The usual rule that a phi source is used along the CFG edge from
-								 * the corresponding predecessor does not apply for the case where
-								 * a pi-node result is directly consumed by a phi in the same block.
-								 * In this case the use is located in the phi's block. */
-								continue;
-							}
 							DEBUG_PRINT("Live due to use in phi for %d via predecessor %d\n",
 								phi->ssa_var, predecessor);
 							return 1;
