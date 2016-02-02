@@ -25,16 +25,6 @@
 
 static int needs_pi(const zend_op_array *op_array, zend_dfg *dfg, zend_ssa *ssa, int from, int to, int var) /* {{{ */
 {
-	if (from == to || ssa->cfg.blocks[to].predecessors_count != 1) {
-		zend_ssa_phi *p = ssa->blocks[to].phis;
-		while (p) {
-			if (p->pi < 0 && p->var == var) {
-				return 1;
-			}
-			p = p->next;
-		}
-		return 0;
-	}
 	return DFG_ISSET(dfg->in, dfg->size, to, var);
 }
 /* }}} */
@@ -942,7 +932,7 @@ int zend_build_ssa(zend_arena **arena, const zend_op_array *op_array, uint32_t b
 					if (zend_bitset_in(tmp, i)) {
 						zend_ssa_phi **pp = &ssa_blocks[j].phis;
 						while (*pp) {
-							if ((*pp)->pi <= 0 && (*pp)->var == i) {
+							if ((*pp)->pi < 0 && (*pp)->var == i) {
 								break;
 							}
 							pp = &(*pp)->next;
