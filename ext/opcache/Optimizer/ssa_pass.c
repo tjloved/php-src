@@ -372,7 +372,7 @@ static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) 
 	}
 }
 
-void optimize_ssa(zend_op_array *op_array, zend_optimizer_ctx *ctx) {
+void zend_optimize_ssa(zend_op_array *op_array, zend_optimizer_ctx *ctx) {
 	void *checkpoint = zend_arena_checkpoint(ctx->arena);
 	optimize_ssa_impl(ctx, op_array);
 	zend_arena_release(&ctx->arena, checkpoint);

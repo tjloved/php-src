@@ -769,7 +769,7 @@ static void inline_calls(zend_optimizer_ctx *ctx, zend_op_array *op_array, inlin
 	// TODO merge early binding
 }
 
-void optimize_inlining(zend_op_array *op_array, zend_optimizer_ctx *ctx) {
+void zend_optimize_inlining(zend_op_array *op_array, zend_optimizer_ctx *ctx) {
 	void *checkpoint;
 	inline_info *info;
 	int i;

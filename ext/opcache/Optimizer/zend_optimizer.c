@@ -758,7 +758,7 @@ static void zend_optimize(zend_op_array      *op_array,
 	 */
 	if ((ZEND_OPTIMIZER_PASS_6 & ctx->optimization_level) &&
 	    !(ZEND_OPTIMIZER_PASS_7 & ctx->optimization_level)) {
-		optimize_ssa(op_array, ctx);
+		zend_optimize_ssa(op_array, ctx);
 		//zend_optimize_dfa(op_array, ctx);
 		if (ctx->debug_level & ZEND_DUMP_AFTER_PASS_6) {
 			zend_dump_op_array(op_array, 0, "after pass 6", NULL);
@@ -901,7 +901,7 @@ static void zend_optimize_pass_set_2(zend_op_array *op_array, zend_optimizer_ctx
 
 	/* pass 8: Function inlining */
 	if (ZEND_OPTIMIZER_PASS_8 & ctx->optimization_level) {
-		optimize_inlining(op_array, ctx);
+		zend_optimize_inlining(op_array, ctx);
 		if (ctx->debug_level & ZEND_DUMP_AFTER_PASS_8) {
 			zend_dump_op_array(op_array, 0, "after pass 8", NULL);
 		}
