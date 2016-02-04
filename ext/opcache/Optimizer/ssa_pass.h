@@ -7,6 +7,7 @@ typedef struct _ssa_opt_ctx {
 	zend_optimizer_ctx *opt_ctx;
 	zend_op_array *op_array;
 	zend_ssa *ssa;
+	struct _cfg_info *cfg_info;
 	struct _ssa_liveness *liveness;
 } ssa_opt_ctx;
 
