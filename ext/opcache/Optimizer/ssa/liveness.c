@@ -29,80 +29,9 @@ static void zend_bitset_dump(zend_bitset bitset, uint32_t len, uint32_t count) {
 #define TARGETS(block) (liveness->targets + (block) * liveness->block_set_len)
 #define SDOM(block) (liveness->sdom + (block) * liveness->block_set_len)
 
-typedef struct _graphinfo {
-	uint32_t *preorder;
-	uint32_t *postorder;
-	zend_bitset backedges;
-	zend_bitset backedge_targets;
-	zend_bitset backedge_sources;
-} graphinfo;
-typedef struct _graphinfo_state {
-	zend_bitset active;
-	zend_bitset finished;
-	uint32_t *preorder;
-	uint32_t *postorder;
-	zend_bitset backedges;
-	zend_bitset backedge_targets;
-	zend_bitset backedge_sources;
-} graphinfo_state;
-
-// TODO Compute graphinfo iteratively?
-static void compute_postorder_recursive(
-		graphinfo_state *state, const zend_cfg *cfg, uint32_t block_num) {
-	zend_basic_block *block = &cfg->blocks[block_num];
-	int s;
-
-	zend_bitset_incl(state->active, block_num);
-	*state->preorder++ = block_num;
-	for (s = 0; s < 2; s++) {
-		if (block->successors[s] < 0) {
-			break;
-		}
-		if (zend_bitset_in(state->active, block->successors[s])) {
-			/* Backedge detected */
-			zend_bitset_incl(state->backedges, block_num * 2 + s);
-			zend_bitset_incl(state->backedge_targets, block->successors[s]);
-			zend_bitset_incl(state->backedge_sources, block_num);
-			continue;
-		}
-		if (!zend_bitset_in(state->finished, block->successors[s])) {
-			compute_postorder_recursive(state, cfg, block->successors[s]);
-		}
-	}
-	*state->postorder++ = block_num;
-	zend_bitset_excl(state->active, block_num);
-	zend_bitset_incl(state->finished, block_num);
-}
-static void compute_graphinfo(graphinfo *info, zend_optimizer_ctx *opt_ctx, const zend_cfg *cfg) {
-	ALLOCA_FLAG(use_heap_active);
-	ALLOCA_FLAG(use_heap_finished);
-	uint32_t block_set_len = zend_bitset_len(cfg->blocks_count);
-	graphinfo_state state;
-	state.active = ZEND_BITSET_ALLOCA(block_set_len, use_heap_active);
-	state.finished = ZEND_BITSET_ALLOCA(block_set_len, use_heap_finished);
-	zend_bitset_clear(state.active, block_set_len);
-	zend_bitset_clear(state.finished, block_set_len);
-
-	info->preorder = state.preorder = zend_arena_calloc(
-		&opt_ctx->arena, cfg->blocks_count, sizeof(uint32_t));
-	info->postorder = state.postorder = zend_arena_calloc(
-		&opt_ctx->arena, cfg->blocks_count, sizeof(uint32_t));
-	info->backedges = state.backedges = zend_arena_calloc(
-		&opt_ctx->arena, zend_bitset_len(2 * cfg->blocks_count), sizeof(zend_ulong));
-	info->backedge_targets = state.backedge_targets = zend_arena_calloc(
-		&opt_ctx->arena, block_set_len, sizeof(zend_ulong));
-	info->backedge_sources = state.backedge_sources =  zend_arena_calloc(
-		&opt_ctx->arena, block_set_len, sizeof(zend_ulong));
-
-	compute_postorder_recursive(&state, cfg, 0);
-
-	free_alloca(state.active, use_heap_active);
-	free_alloca(state.finished, use_heap_finished);
-}
-
 static void compute_reduced_reachable(
 		zend_optimizer_ctx *opt_ctx, ssa_liveness *liveness,
-		const zend_cfg *cfg, const graphinfo *info) {
+		const zend_cfg *cfg, const cfg_info *info) {
 	/* Traverse CFG in postorder and build
 	 * R_v = {v} union unionall_{v' in succ(v)} R_v' */
 	int i;
@@ -123,7 +52,7 @@ static void compute_reduced_reachable(
 
 static void compute_targets(
 		zend_optimizer_ctx *opt_ctx, ssa_liveness *liveness,
-		const zend_cfg *cfg, const graphinfo *info) {
+		const zend_cfg *cfg, const cfg_info *info) {
 	ALLOCA_FLAG(use_heap);
 	zend_bitset tmp = ZEND_BITSET_ALLOCA(liveness->block_set_len, use_heap);
 	int i;
@@ -196,9 +125,9 @@ static void compute_sdom_recursive(ssa_liveness *liveness, const zend_cfg *cfg, 
 	}
 }
 
-void ssa_liveness_precompute(zend_optimizer_ctx *opt_ctx, ssa_liveness *liveness, zend_ssa *ssa) {
+void ssa_liveness_precompute(
+		zend_optimizer_ctx *opt_ctx, ssa_liveness *liveness, zend_ssa *ssa, cfg_info *info) {
 	zend_cfg *cfg = &ssa->cfg;
-	graphinfo info;
 
 	liveness->ssa = ssa;
 	liveness->block_set_len = zend_bitset_len(cfg->blocks_count);
@@ -209,12 +138,10 @@ void ssa_liveness_precompute(zend_optimizer_ctx *opt_ctx, ssa_liveness *liveness
 	liveness->sdom = zend_arena_calloc(&opt_ctx->arena,
 		liveness->block_set_len * sizeof(zend_ulong), cfg->blocks_count);
 
-	compute_graphinfo(&info, opt_ctx, cfg);
-	compute_reduced_reachable(opt_ctx, liveness, cfg, &info);
-	compute_targets(opt_ctx, liveness, cfg, &info);
+	compute_reduced_reachable(opt_ctx, liveness, cfg, info);
+	compute_targets(opt_ctx, liveness, cfg, info);
 	compute_sdom_recursive(liveness, cfg, 0);
-	liveness->backedge_targets = info.backedge_targets;
-	// TODO We're leaking graphinfo here
+	liveness->backedge_targets = info->backedge_targets;
 	
 #if LIVENESS_DEBUG
 	int i;

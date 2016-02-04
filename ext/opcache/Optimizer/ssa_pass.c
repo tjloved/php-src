@@ -265,6 +265,7 @@ static void run_pass(
 static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) {
 	zend_call_graph call_graph;
 	zend_func_info *info;
+	cfg_info cfg_info;
 	ssa_liveness liveness;
 	ssa_opt_ctx ssa_ctx;
 
@@ -344,10 +345,12 @@ static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) 
 			"before ssa pass", &info->ssa);
 	}
 
-	ssa_liveness_precompute(ctx, &liveness, &info->ssa);
+	compute_cfg_info(&cfg_info, ctx, &info->ssa.cfg);
+	ssa_liveness_precompute(ctx, &liveness, &info->ssa, &cfg_info);
 	ssa_ctx.opt_ctx = ctx;
 	ssa_ctx.op_array = op_array;
 	ssa_ctx.ssa = &info->ssa;
+	ssa_ctx.cfg_info = &cfg_info;
 	ssa_ctx.liveness = &liveness;
 
 	run_pass(&ssa_ctx, ssa_optimize_scp, "after SCP", 4);

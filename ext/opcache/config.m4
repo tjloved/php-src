@@ -424,7 +424,8 @@ fi
     Optimizer/ssa/liveness.c \
     Optimizer/ssa/integrity.c \
 	Optimizer/ssa/vars.c \
-	Optimizer/ssa/gvn.c,
+	Optimizer/ssa/gvn.c \
+	Optimizer/ssa/cfg_info.c,
 	shared,,-DZEND_ENABLE_STATIC_TSRMLS_CACHE=1,,yes)
 
   PHP_ADD_BUILD_DIR([$ext_builddir/Optimizer], 1)
