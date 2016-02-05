@@ -9,6 +9,8 @@
 #define MUST_BE(t, types) (!((t & MAY_BE_ANY) & ~(types)))
 
 #define MAY_BE_REFCOUNTED (MAY_BE_STRING|MAY_BE_ARRAY|MAY_BE_OBJECT|MAY_BE_RESOURCE)
+#define MAY_BE_SIMPLE \
+	(MAY_BE_NULL|MAY_BE_TRUE|MAY_BE_FALSE|MAY_BE_LONG|MAY_BE_DOUBLE|MAY_BE_STRING)
 
 #define NUM_PHI_SOURCES(phi) \
 	((phi)->pi >= 0 ? 1 : (ssa->cfg.blocks[(phi)->block].predecessors_count))
