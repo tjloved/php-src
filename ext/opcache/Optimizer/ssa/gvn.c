@@ -218,6 +218,8 @@ static inline zend_bool handle_instr(context *ctx, zend_ssa_op *ssa_op, zend_op 
 		}
 	}
 
+	// TODO This check skip not-gvnable instructions, but it will also exclude instructions that
+	// are gvnable but have no leader from being added to the hash. So this is totally wrong...
 	if (ssa_op->result_def >= 0 && ctx->valnums[ssa_op->result_def] != ssa_op->result_def) {
 		uint32_t valnum;
 		if (opline->opcode == ZEND_QM_ASSIGN) {
@@ -225,7 +227,20 @@ static inline zend_bool handle_instr(context *ctx, zend_ssa_op *ssa_op, zend_op 
 		} else if (opline->opcode == ZEND_ASSIGN) {
 			valnum = op2_num != INVALID ? op2_num : ssa_op->result_def;
 		} else {
-			valnum = ssa_op->result_def;
+			zend_ulong hash = hash_instr(opline, op1_num, op2_num);
+			if (hash != -Z_UL(1)) {
+				zval *zv = zend_hash_index_find(&ctx->hash, hash);
+				if (zv) {
+					valnum = Z_LVAL_P(zv);
+				} else {
+					zval new_zv;
+					ZVAL_LONG(&new_zv, ssa_op->result_def);
+					zend_hash_index_add_new(&ctx->hash, hash, &new_zv);
+					valnum = ssa_op->result_def;
+				}
+			} else {
+				valnum = ssa_op->result_def;
+			}
 		}
 		if (ctx->valnums[ssa_op->result_def] != valnum) {
 			ctx->valnums[ssa_op->result_def] = valnum;
