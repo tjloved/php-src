@@ -1,10 +1,12 @@
 #include "ZendAccelerator.h"
 #include "Optimizer/zend_optimizer_internal.h"
 #include "Optimizer/ssa_pass.h"
+#include "Optimizer/ssa/instructions.h"
 
 /* Whether the opline might throw an exception or a diagnostic, excluding
  * exceptions thrown by destruction of the opline operands. */
-zend_bool may_throw(zend_op_array *op_array, zend_ssa *ssa, zend_op *opline, zend_ssa_op *ssa_op) {
+zend_bool may_throw(
+		zend_op_array *op_array, zend_ssa *ssa, const zend_op *opline, const zend_ssa_op *ssa_op) {
 	uint32_t t1 = OP1_INFO();
 	uint32_t t2 = OP2_INFO();
 

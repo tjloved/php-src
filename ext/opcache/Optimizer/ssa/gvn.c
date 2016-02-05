@@ -2,6 +2,7 @@
 #include "Optimizer/zend_optimizer_internal.h"
 #include "Optimizer/ssa_pass.h"
 #include "Optimizer/ssa/cfg_info.h"
+#include "Optimizer/ssa/instructions.h"
 #include "Optimizer/statistics.h"
 
 /* GVN instruction encoding:
@@ -43,7 +44,8 @@ typedef struct _context {
 	HashTable const_valnums;
 } context;
 
-static inline zend_bool can_gvn(const zend_ssa_op *ssa_op, const zend_op *opline) {
+static inline zend_bool can_gvn(
+		const context *ctx, const zend_ssa_op *ssa_op, const zend_op *opline) {
 	if (ssa_op->result_use >= 0) {
 		return 0;
 	}
@@ -52,9 +54,68 @@ static inline zend_bool can_gvn(const zend_ssa_op *ssa_op, const zend_op *opline
 	}
 
 	switch (opline->opcode) {
+		/* Basic assignments */
 		case ZEND_ASSIGN:
 		case ZEND_QM_ASSIGN:
 			return 1;
+		/* Ordinary binary operators */
+		case ZEND_ADD:
+		case ZEND_SUB:
+		case ZEND_MUL:
+		case ZEND_DIV:
+		case ZEND_MOD:
+		case ZEND_POW:
+		case ZEND_CONCAT:
+		case ZEND_FAST_CONCAT:
+		case ZEND_SL:
+		case ZEND_SR:
+		case ZEND_BW_OR:
+		case ZEND_BW_AND:
+		case ZEND_BW_XOR:
+		case ZEND_BOOL_XOR:
+		case ZEND_IS_IDENTICAL:
+		case ZEND_IS_NOT_IDENTICAL:
+		case ZEND_IS_EQUAL:
+		case ZEND_IS_NOT_EQUAL:
+		case ZEND_IS_SMALLER:
+		case ZEND_IS_SMALLER_OR_EQUAL:
+		/* Ordinary unary operators */
+		case ZEND_BOOL:
+		case ZEND_BOOL_NOT:
+		case ZEND_BW_NOT:
+			return !may_throw(ctx->op_array, ctx->ssa, opline, ssa_op);
+		//case ZEND_PRE_INC: // TODO encoding
+		//case ZEND_POST_INC:
+		//case ZEND_PRE_DEC:
+		//case ZEND_POST_DEC:
+		//case ZEND_JMPZ_EX: // TODO ?
+		//case ZEND_JMPNZ_EX:
+		//case ZEND_JMP_SET:
+		//case ZEND_CASE: // TODO special op semantics?
+		//case ZEND_COALESCE:
+		case ZEND_TYPE_CHECK:
+		case ZEND_CAST:
+			// TODO extended_value encoding!
+			return 0;
+		//case ZEND_ROPE_INIT: // TODO unlikely
+		//case ZEND_ROPE_ADD:
+		//case ZEND_ROPE_END:
+		//case ZEND_ASSIGN_ADD: // TODO encode to underlying ops
+		//case ZEND_ASSIGN_SUB:
+		//case ZEND_ASSIGN_MUL:
+		//case ZEND_ASSIGN_DIV:
+		//case ZEND_ASSIGN_MOD:
+		//case ZEND_ASSIGN_SL:
+		//case ZEND_ASSIGN_SR:
+		//case ZEND_ASSIGN_CONCAT:
+		//case ZEND_ASSIGN_BW_OR:
+		//case ZEND_ASSIGN_BW_AND:
+		//case ZEND_ASSIGN_BW_XOR:
+		//case ZEND_ASSIGN_POW:
+		//case ZEND_DO_ICALL: // Might be salvagable?
+		case ZEND_DEFINED:
+			/* The constant might become defined in between two checks, which is hard to
+			 * disprove if there are calls in between. */
 		default:
 			return 0;
 	}
@@ -222,7 +283,7 @@ static void init_valnums(context *ctx) {
 
 		/* Instructions that cannot be GVNd trivially map to themselves */
 		int def = var->definition;
-		if (def >= 0 && !can_gvn(&ssa->ops[def], &op_array->opcodes[def])) {
+		if (def >= 0 && !can_gvn(ctx, &ssa->ops[def], &op_array->opcodes[def])) {
 			ctx->valnums[i] = i;
 			continue;
 		}
