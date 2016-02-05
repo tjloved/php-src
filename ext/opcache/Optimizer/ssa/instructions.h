@@ -3,7 +3,8 @@
 
 /* Whether the opline might throw an exception or a diagnostic, excluding
  * exceptions thrown by destruction of the opline operands. */
-zend_bool may_throw(zend_op_array *op_array, zend_ssa *ssa, zend_op *opline, zend_ssa_op *ssa_op);
+zend_bool may_throw(
+	zend_op_array *op_array, zend_ssa *ssa, const zend_op *opline, const zend_ssa_op *ssa_op);
 
 static inline zend_uchar instr_get_compound_assign_op(zend_op *opline) {
 	switch (opline->opcode) {
