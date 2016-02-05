@@ -131,10 +131,7 @@ static inline uint32_t get_op2_valnum(
 	}
 }
 
-static inline zend_ulong hash_instr(
-		context *ctx, const zend_ssa_op *ssa_op, const zend_op *opline) {
-	uint32_t op1_num = get_op1_valnum(ctx, ssa_op, opline);
-	uint32_t op2_num = get_op2_valnum(ctx, ssa_op, opline);
+static inline zend_ulong hash_instr(const zend_op *opline, uint32_t op1_num, uint32_t op2_num) {
 	if (op1_num == INVALID || op2_num == INVALID) {
 		return -Z_UL(1);
 	}
@@ -143,12 +140,13 @@ static inline zend_ulong hash_instr(
 
 static inline zend_bool handle_instr(context *ctx, zend_ssa_op *ssa_op, zend_op *opline) {
 	zend_bool changed = 0;
+	uint32_t op1_num = get_op1_valnum(ctx, ssa_op, opline);
+	uint32_t op2_num = get_op2_valnum(ctx, ssa_op, opline);
 
 	if (ssa_op->op1_def >= 0 && ctx->valnums[ssa_op->op1_def] != ssa_op->op1_def) {
 		uint32_t valnum;
 		if (opline->opcode == ZEND_ASSIGN) {
-			uint32_t rhs_num = get_op2_valnum(ctx, ssa_op, opline);
-			valnum = rhs_num != INVALID ? rhs_num : ssa_op->op1_def;
+			valnum = op2_num != INVALID ? op2_num : ssa_op->op1_def;
 		} else {
 			valnum = ssa_op->op1_def;
 		}
@@ -161,11 +159,9 @@ static inline zend_bool handle_instr(context *ctx, zend_ssa_op *ssa_op, zend_op 
 	if (ssa_op->result_def >= 0 && ctx->valnums[ssa_op->result_def] != ssa_op->result_def) {
 		uint32_t valnum;
 		if (opline->opcode == ZEND_QM_ASSIGN) {
-			uint32_t rhs_num = get_op1_valnum(ctx, ssa_op, opline);
-			valnum = rhs_num != INVALID ? rhs_num : ssa_op->result_def;
+			valnum = op1_num != INVALID ? op1_num : ssa_op->result_def;
 		} else if (opline->opcode == ZEND_ASSIGN) {
-			uint32_t rhs_num = get_op2_valnum(ctx, ssa_op, opline);
-			valnum = rhs_num != INVALID ? rhs_num : ssa_op->result_def;
+			valnum = op2_num != INVALID ? op2_num : ssa_op->result_def;
 		} else {
 			valnum = ssa_op->result_def;
 		}
@@ -178,8 +174,34 @@ static inline zend_bool handle_instr(context *ctx, zend_ssa_op *ssa_op, zend_op 
 	return changed;
 }
 
-static inline zend_bool handle_phi(context *ctx) {
-	return 0;
+static inline zend_bool handle_phi(context *ctx, zend_ssa_phi *phi) {
+	if (ctx->valnums[phi->ssa_var] == phi->ssa_var) {
+		return 0;
+	}
+
+	// TODO what about pis? Their predecessor doesn't have to be visited
+	{
+		const zend_ssa *ssa = ctx->ssa;
+		uint32_t valnum = TOP;
+		int source;
+		FOREACH_PHI_SOURCE(phi, source) {
+			uint32_t source_num = ctx->valnums[source];
+			if (valnum == TOP) {
+				valnum = source_num;
+			} else if (valnum != source_num) {
+				valnum = INVALID;
+			}
+		} FOREACH_PHI_SOURCE_END();
+
+		if (valnum == INVALID) {
+			valnum = phi->ssa_var;
+		}
+		if (ctx->valnums[phi->ssa_var] != valnum) {
+			ctx->valnums[phi->ssa_var] = valnum;
+			return 1;
+		}
+		return 0;
+	}
 }
 
 static void init_valnums(context *ctx) {
@@ -234,7 +256,7 @@ static void gvn_solve(context *ctx) {
 				changed |= handle_instr(ctx, &ssa->ops[j], &op_array->opcodes[j]);
 			}
 			for (phi = ssa_block->phis; phi; phi = phi->next) {
-				changed |= handle_phi(ctx);
+				changed |= handle_phi(ctx, phi);
 			}
 		}
 		zend_hash_clean(&ctx->hash);
