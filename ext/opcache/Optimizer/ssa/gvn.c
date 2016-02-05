@@ -143,6 +143,7 @@ static inline zend_bool handle_instr(context *ctx, zend_ssa_op *ssa_op, zend_op 
 	uint32_t op1_num = get_op1_valnum(ctx, ssa_op, opline);
 	uint32_t op2_num = get_op2_valnum(ctx, ssa_op, opline);
 
+	// TODO we handle RHS assign references, but what about LHS references?
 	if (ssa_op->op1_def >= 0 && ctx->valnums[ssa_op->op1_def] != ssa_op->op1_def) {
 		uint32_t valnum;
 		if (opline->opcode == ZEND_ASSIGN) {
@@ -180,6 +181,7 @@ static inline zend_bool handle_phi(context *ctx, zend_ssa_phi *phi) {
 	}
 
 	// TODO what about pis? Their predecessor doesn't have to be visited
+	// However in that case, must it flow into a phi?
 	{
 		const zend_ssa *ssa = ctx->ssa;
 		uint32_t valnum = TOP;

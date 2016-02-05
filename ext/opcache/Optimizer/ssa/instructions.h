@@ -1,6 +1,10 @@
 #ifndef SSA_INSTRUCTIONS_H
 #define SSA_INSTRUCTIONS_H
 
+/* Whether the opline might throw an exception or a diagnostic, excluding
+ * exceptions thrown by destruction of the opline operands. */
+zend_bool may_throw(zend_op_array *op_array, zend_ssa *ssa, zend_op *opline, zend_ssa_op *ssa_op);
+
 static inline zend_uchar instr_get_compound_assign_op(zend_op *opline) {
 	switch (opline->opcode) {
 		case ZEND_ASSIGN_ADD: return ZEND_ADD;
