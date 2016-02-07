@@ -469,6 +469,27 @@ static inline void ct_eval_type_check(zval *result, uint32_t type, zval *op1) {
 	}
 }
 
+static inline int ct_eval_func_call(
+		zval *result, zend_string *name, uint32_t num_args, zval **args) {
+	if (zend_string_equals_literal(name, "chr")) {
+		zend_long c;
+		if (num_args != 1 || Z_TYPE_P(args[0]) != IS_LONG) {
+			return FAILURE;
+		}
+
+		c = Z_LVAL_P(args[0]) & 0xff;
+		if (CG(one_char_string)[c]) {
+			ZVAL_INTERNED_STR(result, CG(one_char_string)[c]);
+		} else {
+			ZVAL_NEW_STR(result, zend_string_alloc(1, 0));
+			Z_STRVAL_P(result)[0] = (char)c;
+			Z_STRVAL_P(result)[1] = '\0';
+		}
+		return SUCCESS;
+	}
+	return FAILURE;
+}
+
 #define SET_RESULT(op, zv) do { \
 	if (ssa_op->op##_def >= 0) { \
 		set_value(ctx, ssa_op->op##_def, zv); \
@@ -815,7 +836,7 @@ static void interp_instr(scp_ctx *ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 		case ZEND_DO_ICALL:
 		{
 			zend_call_info *call = ctx->call_map[opline - ctx->op_array->opcodes];
-			zend_op *init_opline = call->caller_init_opline;
+			zval *name = CT_CONSTANT_EX(ctx->op_array, call->caller_init_opline->op2.constant);
 			zval *args[2] = {NULL};
 			int i;
 
@@ -849,16 +870,24 @@ static void interp_instr(scp_ctx *ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 				}
 			}
 
-			zval *name = CT_CONSTANT_EX(ctx->op_array, init_opline->op2.constant);
-			fprintf(stderr, "%s\n", Z_STRVAL_P(name));
+			/* We didn't get a BOT argument, so value stays the same */
+			if (!IS_TOP(&ctx->values[ssa_op->result_def])) {
+				break;
+			}
+
+			//fprintf(stderr, "%s\n", Z_STRVAL_P(name));
 			/*if (arg2) {
 				php_printf("%s %Z %Z\n", Z_STRVAL_P(name), arg1, arg2);
 			} else {
 				php_printf("%s %Z\n", Z_STRVAL_P(name), arg1);
 			}*/
-			/*while (!is_init_opline(--opline));
-			if (opline->opcode == ZEND_INIT_FCALL) {
-			}*/
+
+			if (ct_eval_func_call(&zv, Z_STR_P(name), call->num_args, args) == SUCCESS) {
+				//fprintf(stderr, "%s\n", Z_STRVAL_P(name));
+				SET_RESULT(result, &zv);
+				zval_ptr_dtor_nogc(&zv);
+				break;
+			}
 			SET_RESULT_BOT(result);
 			break;
 		}
@@ -1175,13 +1204,15 @@ static void replace_constant_operands(scp_ctx *ctx) {
 
 /* This is a basic DCE pass we run after SCP. It only works on those instructions those result
  * value(s) were determined by SCP. It removes dead computational instructions and converts
- * CV-affecting instructions into CONST ASSIGNs. This basic DCE is performed for two reasons:
+ * CV-affecting instructions into CONST ASSIGNs. This basic DCE is performed for multiple reasons:
  * a) During operand replacement we eliminate FREEs. The corresponding computational instructions
  *    must be removed to avoid leaks. This way SCP can run independently of the full DCE pass.
  * b) The main DCE pass relies on type analysis to determine whether instructions have side-effects
  *    and can't be DCEd. This means that it will not be able collect all instructions rendered dead
  *    by SCP, because they may have potentially side-effecting types, but the actual values are
- *    not. As such doing DCE here will allow us to eliminate more dead code in combination. */
+ *    not. As such doing DCE here will allow us to eliminate more dead code in combination.
+ * c) The ordinary DCE pass cannot collect dead calls. However SCP can result in dead calls, which
+ *    we need to collect. */
 static void eliminate_dead_instructions(scp_ctx *ctx) {
 	zend_ssa *ssa = ctx->ssa;
 	zend_op_array *op_array = ctx->op_array;
@@ -1196,10 +1227,27 @@ static void eliminate_dead_instructions(scp_ctx *ctx) {
 			zend_ssa_op *ssa_op = &ssa->ops[var->definition];
 			if (ssa_op->result_def >= 0 && ssa_op->op1_def < 0 && ssa_op->op2_def < 0
 					&& !var_used(&ssa->vars[ssa_op->result_def])) {
-				/* Ordinary computational instruction -> remove it */
-				OPT_STAT(scp_dead_instrs)++;
-				remove_result_def(ssa, ssa_op);
-				remove_instr(ssa, opline, ssa_op);
+				if (opline->opcode == ZEND_DO_ICALL) {
+					/* Call instruction -> remove opcodes that are part of the call */
+					zend_call_info *call = ctx->call_map[var->definition];
+					int i;
+					OPT_STAT(scp_dead_instrs) += 2 + call->num_args;
+
+					remove_result_def(ssa, ssa_op);
+					remove_instr(ssa, opline, ssa_op);
+					remove_instr(ssa, call->caller_init_opline,
+						&ssa->ops[call->caller_init_opline - op_array->opcodes]);
+
+					for (i = 0; i < call->num_args; i++) {
+						remove_instr(ssa, call->arg_info[i].opline,
+							&ssa->ops[call->arg_info[i].opline - op_array->opcodes]);
+					}
+				} else {
+					/* Ordinary computational instruction -> remove it */
+					OPT_STAT(scp_dead_instrs)++;
+					remove_result_def(ssa, ssa_op);
+					remove_instr(ssa, opline, ssa_op);
+				}
 			} else if (opline->opcode != ZEND_ASSIGN && ssa_op->op1_def >= 0) {
 				/* Compound assign or incdec -> convert to direct ASSIGN */
 				zval *val = &ctx->values[ssa_op->op1_def];
