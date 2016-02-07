@@ -397,4 +397,25 @@ void ssa_optimize_dce(ssa_opt_ctx *ssa_ctx) {
 	} FOREACH_PHI_END();
 
 	simplify_jumps(ssa, op_array);
+
+	for (i = 0; i < op_array->last; ++i) {
+		zend_ssa_op *ssa_op = &ssa->ops[i];
+		zend_op *opline = &op_array->opcodes[i];
+		if (!may_have_side_effects(op_array, ssa, opline, ssa_op)) {
+			continue;
+		}
+		if (ssa_op->op1_use < 0 && ssa_op->op2_use < 0 && ssa_op->result_use < 0) {
+			continue;
+		}
+		if ((ssa_op->op1_def >= 0 && var_used(&ssa->vars[ssa_op->op1_def])) ||
+			(ssa_op->op2_def >= 0 && var_used(&ssa->vars[ssa_op->op2_def])) ||
+			(ssa_op->result_def >= 0 && var_used(&ssa->vars[ssa_op->result_def]))
+		) {
+			continue;
+		}
+		if (opline->opcode == ZEND_OP_DATA) {
+			opline--;
+		}
+		fprintf(stderr, "ROOT %s\n", zend_get_opcode_name(opline->opcode));
+	}
 }
