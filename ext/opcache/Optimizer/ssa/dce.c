@@ -71,9 +71,12 @@ static inline zend_bool may_have_side_effects(
 			return 0;
 		}
 		case ZEND_UNSET_VAR:
-			if (opline->extended_value & ZEND_QUICK_SET) {
-				return (OP1_INFO() & MAY_BE_REF) != 0;
-			}
+			/* We handle the case where op1 is a reference, or has a dtor effect in dce_instr().
+			 * The reason is that due to unreachable code elimination the reference/dtor case may
+			 * no longer exist, but the type information does not reflect it. If there is a
+			 * reference/dtor case, then there will be a live instruction generating it and the
+			 * unset will not be DCEd. As unset makes the result var a non-reference, there exist
+			 * no transitive reference effects (the same is *not* true of assign). */
 			return 0;
 		case ZEND_PRE_INC:
 		case ZEND_POST_INC:
@@ -137,13 +140,16 @@ static inline zend_bool is_var_dead(context *ctx, int var_num) {
 	} else if (var->definition >= 0) {
 		return zend_bitset_in(ctx->instr_dead, var->definition);
 	} else {
-		/* This means the definition was already removed, so it's also dead */
-		return 1;
+		/* Variable has no definition, so either the definition has already been removed (var is
+		 * dead) or this is one of the implicit variables at the start of the function (for our
+		 * purposes live) */
+		return var_num >= ctx->op_array->last_var;
 	}
 }
 
 static inline zend_bool may_have_dtor_effect(context *ctx, int var) {
-	return !is_var_dead(ctx, var) && (ctx->ssa->var_info[var].type & MAY_HAVE_DTOR) != 0;
+	return !is_var_dead(ctx, var)
+		&& (ctx->ssa->var_info[var].type & (MAY_BE_REF|MAY_HAVE_DTOR)) != 0;
 }
 
 /* Returns whether the instruction has been DCEd */
@@ -165,8 +171,7 @@ static zend_bool dce_instr(context *ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 	 * its execution. We check this here rather than in may_have_side_effect(), because, if the
 	 * instruction generating the value can be DCEd, the assign/unset over it can be as well. */
 	// TODO This is still not quite precise enough due to SSA variable renaming
-	if ((opline->opcode == ZEND_UNSET_VAR || opline->opcode == ZEND_ASSIGN)
-			&& may_have_dtor_effect(ctx, ssa_op->op1_use)) {
+	if (has_improper_op1_use(opline) && may_have_dtor_effect(ctx, ssa_op->op1_use)) {
 		return 0;
 	}
 
@@ -388,7 +393,9 @@ try_again:
 		if (zend_bitset_in(ctx.instr_dead, i)) {
 			const char *name = zend_get_opcode_name(op_array->opcodes[i].opcode);
 			if (dce_instr(&ctx, &op_array->opcodes[i], &ssa->ops[i]) && j != 0) {
-				fprintf(stderr, "!!!!! %s\n", name);
+				fprintf(stderr, "!!!!! %s %s::%s\n", name,
+					op_array->scope ? ZSTR_VAL(op_array->scope->name) : "",
+					op_array->function_name ? ZSTR_VAL(op_array->function_name) : "{main}");
 			}
 		}
 	}
