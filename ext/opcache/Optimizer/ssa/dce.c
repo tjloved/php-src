@@ -64,10 +64,6 @@ static inline zend_bool may_have_side_effects(
 			if (t1 & MAY_BE_REF) {
 				return 1;
 			}
-			if (t1 & MAY_HAVE_DTOR) {
-				/* DCE might delay call to dtor */
-				return 1;
-			}
 			if (t2 & MAY_HAVE_DTOR) {
 				/* DCE might result in dtor firing too early */
 				return 1;
@@ -76,7 +72,7 @@ static inline zend_bool may_have_side_effects(
 		}
 		case ZEND_UNSET_VAR:
 			if (opline->extended_value & ZEND_QUICK_SET) {
-				return (OP1_INFO() & (MAY_BE_REF|MAY_HAVE_DTOR)) != 0;
+				return (OP1_INFO() & MAY_BE_REF) != 0;
 			}
 			return 0;
 		case ZEND_PRE_INC:
@@ -146,18 +142,32 @@ static inline zend_bool is_var_dead(context *ctx, int var_num) {
 	}
 }
 
-static void dce_instr(context *ctx, zend_op *opline, zend_ssa_op *ssa_op) {
+static inline zend_bool may_have_dtor_effect(context *ctx, int var) {
+	return !is_var_dead(ctx, var) && (ctx->ssa->var_info[var].type & MAY_HAVE_DTOR) != 0;
+}
+
+/* Returns whether the instruction has been DCEd */
+static zend_bool dce_instr(context *ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 	zend_ssa *ssa = ctx->ssa;
 	int free_var = -1;
 	zend_uchar free_var_type;
 
 	if (opline->opcode == ZEND_NOP) {
-		return;
+		return 0;
 	}
 
 	/* We mark FREEs as dead, but they're only really dead if the destroyed var is dead */
 	if (opline->opcode == ZEND_FREE && !is_var_dead(ctx, ssa_op->op1_use)) {
-		return;
+		return 0;
+	}
+
+	/* We cannot DCE unsets/assigns on variables which may have a dtor effect, as it might delay
+	 * its execution. We check this here rather than in may_have_side_effect(), because, if the
+	 * instruction generating the value can be DCEd, the assign/unset over it can be as well. */
+	// TODO This is still not quite precise enough due to SSA variable renaming
+	if ((opline->opcode == ZEND_UNSET_VAR || opline->opcode == ZEND_ASSIGN)
+			&& may_have_dtor_effect(ctx, ssa_op->op1_use)) {
+		return 0;
 	}
 
 	OPT_STAT(dce_dead_instr)++;
@@ -185,6 +195,7 @@ static void dce_instr(context *ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 		ssa_op->op1_use_chain = ssa->vars[free_var].use_chain;
 		ssa->vars[free_var].use_chain = ssa_op - ssa->ops;
 	}
+	return 1;
 }
 
 // TODO Move this somewhere else
@@ -243,6 +254,20 @@ static void simplify_jumps(zend_ssa *ssa, zend_op_array *op_array) {
 				}
 				break;
 		}
+
+		/*if (opline->opcode == ZEND_JMPZ || opline->opcode == ZEND_JMPNZ) {
+			zend_op *target = ZEND_OP2_JMP_ADDR(opline);
+			if (target > opline) {
+				while (--target > opline) {
+					if (target != ZEND_NOP) break;
+				}
+			}
+			if (target == opline) {
+				if (opline->op1_type != IS_CV) {
+					opline->opcode = ZEND_FREE;
+				}
+			}
+		}*/
 	}
 }
 
@@ -319,6 +344,9 @@ void ssa_optimize_dce(ssa_opt_ctx *ssa_ctx) {
 	ctx.ssa = ssa;
 	ctx.op_array = op_array;
 
+	int j = 0;
+try_again:
+
 	/* We have no dedicated phi vector, so we use the whole ssa var vector instead */
 	ctx.instr_worklist_len = zend_bitset_len(op_array->last);
 	ctx.instr_worklist = alloca(sizeof(zend_ulong) * ctx.instr_worklist_len);
@@ -358,7 +386,10 @@ void ssa_optimize_dce(ssa_opt_ctx *ssa_ctx) {
 	/* Eliminate dead instructions */
 	for (i = 0; i < op_array->last; ++i) {
 		if (zend_bitset_in(ctx.instr_dead, i)) {
-			dce_instr(&ctx, &op_array->opcodes[i], &ssa->ops[i]);
+			const char *name = zend_get_opcode_name(op_array->opcodes[i].opcode);
+			if (dce_instr(&ctx, &op_array->opcodes[i], &ssa->ops[i]) && j != 0) {
+				fprintf(stderr, "!!!!! %s\n", name);
+			}
 		}
 	}
 
@@ -397,6 +428,10 @@ void ssa_optimize_dce(ssa_opt_ctx *ssa_ctx) {
 	} FOREACH_PHI_END();
 
 	simplify_jumps(ssa, op_array);
+	if (j < 1) {
+		j++;
+		goto try_again;
+	}
 
 	for (i = 0; i < op_array->last; ++i) {
 		zend_ssa_op *ssa_op = &ssa->ops[i];
@@ -416,6 +451,6 @@ void ssa_optimize_dce(ssa_opt_ctx *ssa_ctx) {
 		if (opline->opcode == ZEND_OP_DATA) {
 			opline--;
 		}
-		fprintf(stderr, "ROOT %s\n", zend_get_opcode_name(opline->opcode));
+		//fprintf(stderr, "ROOT %s\n", zend_get_opcode_name(opline->opcode));
 	}
 }
