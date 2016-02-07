@@ -9,6 +9,8 @@ typedef struct _ssa_opt_ctx {
 	zend_ssa *ssa;
 	struct _cfg_info *cfg_info;
 	struct _ssa_liveness *liveness;
+	zend_func_info *func_info;
+	zend_call_info **call_map;
 } ssa_opt_ctx;
 
 void ssa_optimize_scp(ssa_opt_ctx *ctx);

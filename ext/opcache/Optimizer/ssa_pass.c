@@ -248,6 +248,28 @@ static void propagate_passing_semantics(zend_op_array *op_array, zend_cfg *cfg) 
 	efree(info);
 }
 
+typedef struct _call_info {
+	int16_t start;
+	int16_t next;
+} call_info;
+
+static zend_call_info **compute_call_map(
+		zend_optimizer_ctx *opt_ctx, zend_func_info *info, zend_op_array *op_array) {
+	zend_call_info **map = zend_arena_calloc(
+		&opt_ctx->arena, sizeof(zend_call_info *), op_array->last);
+	zend_op *start = op_array->opcodes;
+	zend_call_info *call;
+	for (call = info->callee_info; call; call = call->next_callee) {
+		int i;
+		map[call->caller_init_opline - start] = call;
+		map[call->caller_call_opline - start] = call;
+		for (i = 0; i < call->num_args; i++) {
+			map[call->arg_info[i].opline - start] = call;
+		}
+	}
+	return map;
+}
+
 static void run_pass(
 		ssa_opt_ctx *ctx, void (*optimize_fn)(ssa_opt_ctx *ctx),
 		const char *name, uint32_t debug_level) {
@@ -350,13 +372,15 @@ static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) 
 	ssa_ctx.opt_ctx = ctx;
 	ssa_ctx.op_array = op_array;
 	ssa_ctx.ssa = &info->ssa;
+	ssa_ctx.func_info = info;
 	ssa_ctx.cfg_info = &cfg_info;
 	ssa_ctx.liveness = &liveness;
+	ssa_ctx.call_map = compute_call_map(ctx, info, op_array);
 
 	run_pass(&ssa_ctx, ssa_optimize_scp, "after SCP", 4);
 	run_pass(&ssa_ctx, ssa_optimize_dce, "after DCE", 8);
 	run_pass(&ssa_ctx, ssa_optimize_copy, "after copy propagation", 16);
-	run_pass(&ssa_ctx, ssa_optimize_gvn, "after GVN", 32);
+	//run_pass(&ssa_ctx, ssa_optimize_gvn, "after GVN", 32);
 
 	//ssa_optimize_cv_to_tmp(&ssa_ctx);
 	ssa_optimize_type_specialization(&ssa_ctx);
