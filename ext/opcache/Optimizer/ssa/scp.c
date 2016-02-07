@@ -522,6 +522,19 @@ static inline int ct_eval_func_call(
 
 		ZVAL_LONG(result, zend_hash_num_elements(Z_ARRVAL_P(args[0])));
 		return SUCCESS;
+	} else if (zend_string_equals_literal(name, "array_key_exists")) {
+		zval *value;
+		if (num_args != 2 || Z_TYPE_P(args[1]) != IS_ARRAY ||
+				(Z_TYPE_P(args[0]) != IS_LONG && Z_TYPE_P(args[0]) != IS_STRING
+				 && Z_TYPE_P(args[0]) != IS_NULL)) {
+			return FAILURE;
+		}
+
+		if (fetch_array_elem(&value, args[1], args[0])) {
+			return FAILURE;
+		}
+		ZVAL_BOOL(result, value != NULL);
+		return SUCCESS;
 	}
 	return FAILURE;
 }
@@ -873,7 +886,7 @@ static void interp_instr(scp_ctx *ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 		{
 			zend_call_info *call = ctx->call_map[opline - ctx->op_array->opcodes];
 			zval *name = CT_CONSTANT_EX(ctx->op_array, call->caller_init_opline->op2.constant);
-			zval *args[2] = {NULL};
+			zval *args[3] = {NULL};
 			int i;
 
 			/* We already know it can't be evaluated, don't bother checking again */
@@ -882,7 +895,7 @@ static void interp_instr(scp_ctx *ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 			}
 
 			/* We're only interested in functions with one or two arguments right now */
-			if (call->num_args == 0 || call->num_args > 2) {
+			if (call->num_args == 0 || call->num_args > 3) {
 				SET_RESULT_BOT(result);
 				break;
 			}
@@ -919,7 +932,9 @@ static void interp_instr(scp_ctx *ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 			}
 
 			fprintf(stderr, "%s\n", Z_STRVAL_P(name));
-			/*if (args[1]) {
+			/*if (args[2]) {
+				php_printf("%s %Z %Z %Z\n", Z_STRVAL_P(name), args[0], args[1], args[2]);
+			} else if (args[1]) {
 				php_printf("%s %Z %Z\n", Z_STRVAL_P(name), args[0], args[1]);
 			} else {
 				php_printf("%s %Z\n", Z_STRVAL_P(name), args[0]);
