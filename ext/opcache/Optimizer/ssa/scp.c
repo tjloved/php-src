@@ -14,6 +14,7 @@
 typedef struct _scp_ctx {
 	zend_op_array *op_array;
 	zend_ssa *ssa;
+	zend_call_info **call_map;
 	zend_bitset var_worklist;
 	zend_bitset block_worklist;
 	zend_bitset executable_blocks;
@@ -797,6 +798,68 @@ static void interp_instr(scp_ctx *ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 			zval_ptr_dtor_nogc(&zv);
 			break;
 		}
+		case ZEND_SEND_VAL:
+		case ZEND_SEND_VAR:
+		{
+			int level = 0;
+			zval *arg1 = NULL, *arg2 = NULL;
+			zend_op *init_opline;
+			zend_call_info *call;
+			SKIP_IF_TOP(op1);
+
+			call = ctx->call_map[opline - ctx->op_array->opcodes];
+			if (!call) {
+				break;
+			}
+
+			opline = init_opline = call->caller_init_opline;
+			if (opline->opcode != ZEND_INIT_FCALL
+					|| opline->extended_value == 0 || opline->extended_value > 2) {
+				break;
+			}
+
+			while (1) {
+				opline++;
+				if (is_init_opline(opline)) {
+					level++;
+				} else if (is_call_opline(opline)) {
+					if (level == 0) {
+						break;
+					}
+					level--;
+				} else if (level == 0) {
+					if (opline->opcode == ZEND_SEND_VAL || opline->opcode == ZEND_SEND_VAR) {
+						if (opline->op2.num == 1) {
+							arg1 = get_op1_value(ctx, opline,
+								&ctx->ssa->ops[opline - ctx->op_array->opcodes]);
+						} else if (opline->op2.num == 2) {
+							arg2 = get_op1_value(ctx, opline,
+								&ctx->ssa->ops[opline - ctx->op_array->opcodes]);
+						}
+					}
+				}
+			}
+
+			if (opline->opcode != ZEND_DO_ICALL) {
+				break;
+			}
+
+			if (!arg1 || !value_known(arg1) || (arg2 && !value_known(arg2))) {
+				break;
+			}
+
+			zval *name = CT_CONSTANT_EX(ctx->op_array, init_opline->op2.constant);
+			fprintf(stderr, "%s\n", Z_STRVAL_P(name));
+			/*if (arg2) {
+				php_printf("%s %Z %Z\n", Z_STRVAL_P(name), arg1, arg2);
+			} else {
+				php_printf("%s %Z\n", Z_STRVAL_P(name), arg1);
+			}*/
+			/*while (!is_init_opline(--opline));
+			if (opline->opcode == ZEND_INIT_FCALL) {
+			}*/
+			break;
+		}
 		default:
 		{
 			/* If we have no explicit implementation return BOT */
@@ -1182,6 +1245,7 @@ void ssa_optimize_scp(ssa_opt_ctx *ssa_ctx) {
 
 	ctx.op_array = op_array;
 	ctx.ssa = ssa;
+	ctx.call_map = ssa_ctx->call_map;
 	ctx.values = alloca(sizeof(zval) * ssa_vars);
 
 	MAKE_TOP(&ctx.top);
