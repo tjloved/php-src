@@ -486,6 +486,42 @@ static inline int ct_eval_func_call(
 			Z_STRVAL_P(result)[1] = '\0';
 		}
 		return SUCCESS;
+	} else if (zend_string_equals_literal(name, "in_array")) {
+		zval *val;
+		if (num_args != 2 || Z_TYPE_P(args[1]) != IS_ARRAY) {
+			return FAILURE;
+		}
+
+		ZEND_HASH_FOREACH_VAL(Z_ARRVAL_P(args[1]), val) {
+			if (fast_equal_check_function(val, args[0])) {
+				ZVAL_TRUE(result);
+				return SUCCESS;
+			}
+		} ZEND_HASH_FOREACH_END();
+		ZVAL_FALSE(result);
+		return SUCCESS;
+	} else if (zend_string_equals_literal(name, "strpos")) {
+		const char *found;
+		if (num_args != 2 || Z_TYPE_P(args[0]) != IS_STRING || Z_TYPE_P(args[1]) != IS_STRING) {
+			return FAILURE;
+		}
+
+		found = zend_memnstr(
+			Z_STRVAL_P(args[0]), Z_STRVAL_P(args[1]), Z_STRLEN_P(args[1]),
+			Z_STRVAL_P(args[0]) + Z_STRLEN_P(args[0]));
+		if (found) {
+			ZVAL_LONG(result, found - Z_STRVAL_P(args[0]));
+		} else {
+			ZVAL_FALSE(result);
+		}
+		return SUCCESS;
+	} else if (zend_string_equals_literal(name, "count")) {
+		if (num_args != 1 || Z_TYPE_P(args[0]) != IS_ARRAY) {
+			return FAILURE;
+		}
+
+		ZVAL_LONG(result, zend_hash_num_elements(Z_ARRVAL_P(args[0])));
+		return SUCCESS;
 	}
 	return FAILURE;
 }
@@ -875,19 +911,20 @@ static void interp_instr(scp_ctx *ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 				break;
 			}
 
-			//fprintf(stderr, "%s\n", Z_STRVAL_P(name));
-			/*if (arg2) {
-				php_printf("%s %Z %Z\n", Z_STRVAL_P(name), arg1, arg2);
-			} else {
-				php_printf("%s %Z\n", Z_STRVAL_P(name), arg1);
-			}*/
-
 			if (ct_eval_func_call(&zv, Z_STR_P(name), call->num_args, args) == SUCCESS) {
 				//fprintf(stderr, "%s\n", Z_STRVAL_P(name));
 				SET_RESULT(result, &zv);
 				zval_ptr_dtor_nogc(&zv);
 				break;
 			}
+
+			fprintf(stderr, "%s\n", Z_STRVAL_P(name));
+			/*if (args[1]) {
+				php_printf("%s %Z %Z\n", Z_STRVAL_P(name), args[0], args[1]);
+			} else {
+				php_printf("%s %Z\n", Z_STRVAL_P(name), args[0]);
+			}*/
+
 			SET_RESULT_BOT(result);
 			break;
 		}
