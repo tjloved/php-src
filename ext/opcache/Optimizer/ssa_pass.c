@@ -391,12 +391,12 @@ static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) 
 	ssa_verify_integrity(&info->ssa, "after SSA pass");
 #endif
 
-	ssa_optimize_vars(&ssa_ctx);
-
 	if (ZCG(accel_directives).ssa_debug_level & 1) {
 		zend_dump_op_array(op_array, ZEND_DUMP_SSA | ZEND_DUMP_HIDE_UNUSED_VARS,
 			"after ssa pass", &info->ssa);
 	}
+
+	ssa_optimize_vars(&ssa_ctx);
 }
 
 void zend_optimize_ssa(zend_op_array *op_array, zend_optimizer_ctx *ctx) {
