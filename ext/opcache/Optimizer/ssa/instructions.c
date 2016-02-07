@@ -132,6 +132,9 @@ zend_bool may_throw(
 		case ZEND_ROPE_ADD:
 		case ZEND_ROPE_END:
 			return !MUST_BE(t1, MAY_BE_SIMPLE);
+		case ZEND_INIT_ARRAY:
+		case ZEND_ADD_ARRAY_ELEMENT:
+			return opline->op2_type != IS_UNUSED && !MUST_BE(t2, MAY_BE_SIMPLE);
 		case ZEND_ASSIGN_ADD:
 		case ZEND_ASSIGN_SUB:
 		case ZEND_ASSIGN_MUL:
@@ -179,8 +182,6 @@ zend_bool may_throw(
 #define ZEND_SEND_REF                         67
 #define ZEND_NEW                              68
 #define ZEND_INIT_NS_FCALL_BY_NAME            69
-#define ZEND_INIT_ARRAY                       71
-#define ZEND_ADD_ARRAY_ELEMENT                72
 #define ZEND_UNSET_DIM                        75
 #define ZEND_UNSET_OBJ                        76
 #define ZEND_FE_RESET_R                       77
