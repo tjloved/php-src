@@ -886,7 +886,7 @@ static void interp_instr(scp_ctx *ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 		{
 			zend_call_info *call = ctx->call_map[opline - ctx->op_array->opcodes];
 			zval *name = CT_CONSTANT_EX(ctx->op_array, call->caller_init_opline->op2.constant);
-			zval *args[3] = {NULL};
+			zval *args[2] = {NULL};
 			int i;
 
 			/* We already know it can't be evaluated, don't bother checking again */
@@ -895,7 +895,7 @@ static void interp_instr(scp_ctx *ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 			}
 
 			/* We're only interested in functions with one or two arguments right now */
-			if (call->num_args == 0 || call->num_args > 3) {
+			if (call->num_args == 0 || call->num_args > 2) {
 				SET_RESULT_BOT(result);
 				break;
 			}
@@ -925,16 +925,13 @@ static void interp_instr(scp_ctx *ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 			}
 
 			if (ct_eval_func_call(&zv, Z_STR_P(name), call->num_args, args) == SUCCESS) {
-				//fprintf(stderr, "%s\n", Z_STRVAL_P(name));
 				SET_RESULT(result, &zv);
 				zval_ptr_dtor_nogc(&zv);
 				break;
 			}
 
-			fprintf(stderr, "%s\n", Z_STRVAL_P(name));
-			/*if (args[2]) {
-				php_printf("%s %Z %Z %Z\n", Z_STRVAL_P(name), args[0], args[1], args[2]);
-			} else if (args[1]) {
+			/*fprintf(stderr, "%s\n", Z_STRVAL_P(name));
+			if (args[1]) {
 				php_printf("%s %Z %Z\n", Z_STRVAL_P(name), args[0], args[1]);
 			} else {
 				php_printf("%s %Z\n", Z_STRVAL_P(name), args[0]);
