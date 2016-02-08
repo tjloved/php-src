@@ -255,21 +255,30 @@ static void simplify_jumps(zend_ssa *ssa, zend_op_array *op_array) {
 				}
 				break;
 		}
+	}
 
-		/*if (opline->opcode == ZEND_JMPZ || opline->opcode == ZEND_JMPNZ) {
+#if 0
+	for (i = 0; i < op_array->last; i++) {
+		zend_op *opline = &op_array->opcodes[i];
+		if (opline->opcode == ZEND_JMPZ || opline->opcode == ZEND_JMPNZ) {
 			zend_op *target = ZEND_OP2_JMP_ADDR(opline);
 			if (target > opline) {
 				while (--target > opline) {
-					if (target != ZEND_NOP) break;
+					if (target->opcode != ZEND_NOP) break;
+				}
+				if (target == opline) {
+					if (opline->op1_type == IS_CV) {
+						if (!(ssa->var_info[ssa->ops[i].op1_use].type & MAY_BE_UNDEF)) {
+							remove_instr(ssa, opline, &ssa->ops[i]);
+						}
+					} else {
+						opline->opcode = ZEND_FREE;
+					}
 				}
 			}
-			if (target == opline) {
-				if (opline->op1_type != IS_CV) {
-					opline->opcode = ZEND_FREE;
-				}
-			}
-		}*/
+		}
 	}
+#endif
 }
 
 #if 0
@@ -431,11 +440,12 @@ try_again:
 	} FOREACH_PHI_END();
 
 	simplify_jumps(ssa, op_array);
-	if (j < 1) {
+	if (j < 0) {
 		j++;
 		goto try_again;
 	}
 
+#if 0
 	for (i = 0; i < op_array->last; ++i) {
 		zend_ssa_op *ssa_op = &ssa->ops[i];
 		zend_op *opline = &op_array->opcodes[i];
@@ -454,6 +464,7 @@ try_again:
 		if (opline->opcode == ZEND_OP_DATA) {
 			opline--;
 		}
-		//fprintf(stderr, "ROOT %s\n", zend_get_opcode_name(opline->opcode));
+		fprintf(stderr, "ROOT %s\n", zend_get_opcode_name(opline->opcode));
 	}
+#endif
 }
