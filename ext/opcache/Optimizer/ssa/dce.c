@@ -199,6 +199,29 @@ static zend_bool dce_instr(context *ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 	return 1;
 }
 
+#if 0
+static inline zend_op *simplify_target(
+		zend_cfg *cfg, zend_op_array *op_array, zend_op *target) {
+	zend_basic_block *block = &cfg->blocks[cfg->map[target - op_array->opcodes]];
+	zend_op *opline;
+	int i;
+	for (i = block->start; i < block->end; i++) {
+		if (op_array->opcodes[i].opcode != ZEND_NOP) {
+			return target;
+		}
+	}
+	opline = &op_array->opcodes[i];
+	switch (opline->opcode) {
+		case ZEND_NOP:
+			return simplify_target(cfg, op_array, opline + 1);
+		case ZEND_JMP:
+			return simplify_target(cfg, op_array, ZEND_OP1_JMP_ADDR(opline));
+		default:
+			return target;
+	}
+}
+#endif
+
 // TODO Move this somewhere else
 static void simplify_jumps(zend_ssa *ssa, zend_op_array *op_array) {
 	int i;
@@ -262,11 +285,13 @@ static void simplify_jumps(zend_ssa *ssa, zend_op_array *op_array) {
 		zend_op *opline = &op_array->opcodes[i];
 		if (opline->opcode == ZEND_JMPZ || opline->opcode == ZEND_JMPNZ) {
 			zend_op *target = ZEND_OP2_JMP_ADDR(opline);
-			if (target > opline) {
+			if (simplify_target(&ssa->cfg, op_array, target)
+					== simplify_target(&ssa->cfg, op_array, opline + 1)) {
+			/*if (target > opline) {
 				while (--target > opline) {
 					if (target->opcode != ZEND_NOP) break;
 				}
-				if (target == opline) {
+				if (target == opline) {*/
 					if (opline->op1_type == IS_CV) {
 						if (!(ssa->var_info[ssa->ops[i].op1_use].type & MAY_BE_UNDEF)) {
 							remove_instr(ssa, opline, &ssa->ops[i]);
@@ -274,47 +299,12 @@ static void simplify_jumps(zend_ssa *ssa, zend_op_array *op_array) {
 					} else {
 						opline->opcode = ZEND_FREE;
 					}
-				}
+				//}
 			}
 		}
 	}
 #endif
 }
-
-#if 0
-static void simplify_jump_and_set(context *ctx) {
-	switch (opline->opcode) {
-		case ZEND_JMPZ_EX:
-			/* For jump-and-set only the set part is dead */
-			opline->opcode = ZEND_JMPZ;
-			remove_result_def(ssa, ssa_op);
-
-			/* Replace constant branch with JMP, so NOP pass may remove it */
-			if (opline->op1_type == IS_CONST && !zend_is_true(&ZEND_OP1_LITERAL(opline))) {
-				literal_dtor(&ZEND_OP1_LITERAL(opline));
-				opline->opcode = ZEND_JMP;
-				opline->op1_type = IS_UNUSED;
-				opline->op1.num = opline->op2.num;
-			}
-			return;
-		case ZEND_JMPNZ_EX:
-		case ZEND_JMP_SET:
-			opline->opcode = ZEND_JMPNZ;
-			remove_result_def(ssa, ssa_op);
-
-			if (opline->op1_type == IS_CONST && zend_is_true(&ZEND_OP1_LITERAL(opline))) {
-				literal_dtor(&ZEND_OP1_LITERAL(opline));
-				opline->opcode = ZEND_JMP;
-				opline->op1_type = IS_UNUSED;
-				opline->op1.num = opline->op2.num;
-			}
-			return;
-		case ZEND_COALESCE:
-			// TODO
-			return;
-	}
-}
-#endif
 
 static inline int get_common_phi_source(zend_ssa *ssa, zend_ssa_phi *phi) {
 	int common_source = -1;
