@@ -58,7 +58,7 @@ static inline zend_bool may_have_side_effects(
 		case ZEND_ASSIGN_REF:
 			return 1;
 		case ZEND_ASSIGN:
-			if (OP1_INFO() & MAY_BE_REF) {
+			if (ssa_op->op1_def < 0 || (OP1_INFO() & MAY_BE_REF)) {
 				return 1;
 			}
 			if (opline->op2_type != IS_CONST && (OP2_INFO() & MAY_HAVE_DTOR)) {
@@ -79,7 +79,7 @@ static inline zend_bool may_have_side_effects(
 		case ZEND_PRE_DEC:
 		case ZEND_POST_DEC:
 			/* If there's no op1 def it's an indirected incref not tracked by SSA */
-			return (OP1_INFO() & MAY_BE_REF) || ssa_op->op1_def < 0;
+			return ssa_op->op1_def < 0 || (OP1_INFO() & MAY_BE_REF);
 	}
 	return 0;
 }

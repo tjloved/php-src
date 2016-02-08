@@ -1282,6 +1282,11 @@ static void eliminate_dead_instructions(scp_ctx *ctx) {
 		if (value_known(&ctx->values[i]) && var->definition >= 0) {
 			zend_op *opline = &op_array->opcodes[var->definition];
 			zend_ssa_op *ssa_op = &ssa->ops[var->definition];
+			if (opline->opcode == ZEND_ASSIGN) {
+				/* Leave assigns to DCE (due to dtor effects) */
+				continue;
+			}
+
 			if (ssa_op->result_def >= 0 && ssa_op->op1_def < 0 && ssa_op->op2_def < 0
 					&& !var_used(&ssa->vars[ssa_op->result_def])) {
 				if (opline->opcode == ZEND_DO_ICALL) {
@@ -1306,7 +1311,7 @@ static void eliminate_dead_instructions(scp_ctx *ctx) {
 					remove_result_def(ssa, ssa_op);
 					remove_instr(ssa, opline, ssa_op);
 				}
-			} else if (opline->opcode != ZEND_ASSIGN && ssa_op->op1_def >= 0) {
+			} else if (ssa_op->op1_def >= 0) {
 				/* Compound assign or incdec -> convert to direct ASSIGN */
 				zval *val = &ctx->values[ssa_op->op1_def];
 				ZEND_ASSERT(value_known(val));
