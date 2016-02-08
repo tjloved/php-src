@@ -1199,6 +1199,7 @@ static void scp_solve(scp_ctx *ctx) {
  * CFG would be overly painful at this point. */
 static void eliminate_dead_blocks(scp_ctx *ctx) {
 	zend_ssa *ssa = ctx->ssa;
+	zend_op_array *op_array = ctx->op_array;
 	int i;
 	for (i = 0; i < ssa->cfg.blocks_count; i++) {
 		if (!zend_bitset_in(ctx->executable_blocks, i)) {
@@ -1215,9 +1216,13 @@ static void eliminate_dead_blocks(scp_ctx *ctx) {
 				OPT_STAT(scp_dead_blocks_phis)++;
 			}
 			for (j = block->start; j <= block->end; j++) {
-				remove_defs_of_instr(ssa, &ssa->ops[j]);
-				remove_instr(ssa, &ctx->op_array->opcodes[j], &ssa->ops[j]);
+				if (op_array->opcodes[j].opcode == ZEND_NOP) {
+					continue;
+				}
+
 				OPT_STAT(scp_dead_blocks_instrs)++;
+				remove_defs_of_instr(ssa, &ssa->ops[j]);
+				remove_instr(ssa, &op_array->opcodes[j], &ssa->ops[j]);
 			}
 		}
 	}
