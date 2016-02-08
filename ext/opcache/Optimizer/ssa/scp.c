@@ -1238,9 +1238,11 @@ static void replace_constant_operands(scp_ctx *ctx) {
 			zend_ssa_op *ssa_op = &ssa->ops[use];
 			if (try_replace_op1(ctx, i, opline, ssa_op)) {
 				ZEND_ASSERT(ssa_op->op1_def == -1);
+				OPT_STAT(scp_const_operands)++;
 				remove_op1_use(ssa, ssa_op);
 			}
 			if (try_replace_op2(ctx, i, opline, ssa_op)) {
+				OPT_STAT(scp_const_operands)++;
 				if (ssa_op->op2_def >= 0) {
 					rename_var_uses(ssa, ssa_op->op2_def, ssa_op->op2_use);
 					remove_op2_def(ssa, ssa_op);
@@ -1281,6 +1283,7 @@ static void eliminate_dead_instructions(scp_ctx *ctx) {
 					zend_call_info *call = ctx->call_map[var->definition];
 					int i;
 					OPT_STAT(scp_dead_instrs) += 2 + call->num_args;
+					OPT_STAT(scp_dead_calls)++;
 
 					remove_result_def(ssa, ssa_op);
 					remove_instr(ssa, opline, ssa_op);
