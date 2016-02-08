@@ -44,6 +44,8 @@ typedef struct _zend_optimizer_statistics {
 	uint32_t vars_orig_cvs;
 	uint32_t vars_dead_cvs;
 	uint32_t simplified_sends;
+	uint32_t scp_const_operands;
+	uint32_t scp_dead_calls;
 } zend_optimizer_statistics;
 
 extern zend_optimizer_statistics optimizer_statistics;

@@ -39,10 +39,12 @@ void zend_optimizer_statistics_shutdown() {
 	PRINT_NORM_STAT(trivial_phis, phis);
 
 	PRINT_NORM_STAT(scp_const_vars, ssa_vars);
-	PRINT_NORM_STAT(scp_dead_blocks, cfg_blocks);
+	PRINT_STAT(scp_const_operands);
 	PRINT_NORM_STAT(scp_dead_instrs, instrs);
 	PRINT_NORM_STAT(scp_semi_dead_instrs, instrs);
 	PRINT_NORM_STAT(scp_dead_phis, phis);
+	PRINT_STAT(scp_dead_calls);
+	PRINT_NORM_STAT(scp_dead_blocks, cfg_blocks);
 	PRINT_NORM_STAT(scp_dead_blocks_instrs, instrs);
 	PRINT_NORM_STAT(scp_dead_blocks_phis, phis);
 
