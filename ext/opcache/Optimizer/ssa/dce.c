@@ -58,18 +58,14 @@ static inline zend_bool may_have_side_effects(
 		case ZEND_ASSIGN_REF:
 			return 1;
 		case ZEND_ASSIGN:
-		{
-			uint32_t t1 = OP1_INFO();
-			uint32_t t2 = OP2_INFO();
-			if (t1 & MAY_BE_REF) {
+			if (OP1_INFO() & MAY_BE_REF) {
 				return 1;
 			}
-			if (t2 & MAY_HAVE_DTOR) {
+			if (opline->op2_type != IS_CONST && (OP2_INFO() & MAY_HAVE_DTOR)) {
 				/* DCE might result in dtor firing too early */
 				return 1;
 			}
 			return 0;
-		}
 		case ZEND_UNSET_VAR:
 			/* We handle the case where op1 is a reference, or has a dtor effect in dce_instr().
 			 * The reason is that due to unreachable code elimination the reference/dtor case may
