@@ -823,6 +823,7 @@ static void interp_instr(scp_ctx *ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 			zval *result = NULL;
 			if (opline->extended_value & ZEND_ARRAY_ELEMENT_REF) {
 				SET_RESULT_BOT(result);
+				SET_RESULT_BOT(op1);
 				break;
 			}
 
@@ -1376,10 +1377,6 @@ void ssa_optimize_scp(ssa_opt_ctx *ssa_ctx) {
 		MAKE_BOT(&ctx.values[i]);
 	}
 	for (; i < ssa_vars; ++i) {
-		if (ssa->var_info[i].type & MAY_BE_REF) {
-			MAKE_BOT(&ctx.values[i]);
-			continue;
-		}
 		MAKE_TOP(&ctx.values[i]);
 	}
 
