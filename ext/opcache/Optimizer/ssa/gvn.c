@@ -201,11 +201,16 @@ static inline zend_ulong hash_instr(const zend_op *opline, uint32_t op1_num, uin
 
 static inline zend_bool handle_instr(context *ctx, zend_ssa_op *ssa_op, zend_op *opline) {
 	zend_bool changed = 0;
-	uint32_t op1_num = get_op1_valnum(ctx, ssa_op, opline);
-	uint32_t op2_num = get_op2_valnum(ctx, ssa_op, opline);
+	uint32_t op1_num, op2_num;
 
-	// TODO we handle RHS assign references, but what about LHS references?
-	if (ssa_op->op1_def >= 0 && ctx->valnums[ssa_op->op1_def] != ssa_op->op1_def) {
+	if (!can_gvn(ctx, ssa_op, opline)) {
+		return changed;
+	}
+
+	op1_num = get_op1_valnum(ctx, ssa_op, opline);
+	op2_num = get_op2_valnum(ctx, ssa_op, opline);
+
+	if (ssa_op->op1_def >= 0 && ctx->valnums[ssa_op->op1_def] != INVALID) {
 		uint32_t valnum;
 		if (opline->opcode == ZEND_ASSIGN) {
 			valnum = op2_num != INVALID ? op2_num : ssa_op->op1_def;
@@ -218,9 +223,7 @@ static inline zend_bool handle_instr(context *ctx, zend_ssa_op *ssa_op, zend_op 
 		}
 	}
 
-	// TODO This check skip not-gvnable instructions, but it will also exclude instructions that
-	// are gvnable but have no leader from being added to the hash. So this is totally wrong...
-	if (ssa_op->result_def >= 0 && ctx->valnums[ssa_op->result_def] != ssa_op->result_def) {
+	if (ssa_op->result_def >= 0 && ctx->valnums[ssa_op->result_def] != INVALID) {
 		uint32_t valnum;
 		if (opline->opcode == ZEND_QM_ASSIGN) {
 			valnum = op1_num != INVALID ? op1_num : ssa_op->result_def;
@@ -252,7 +255,7 @@ static inline zend_bool handle_instr(context *ctx, zend_ssa_op *ssa_op, zend_op 
 }
 
 static inline zend_bool handle_phi(context *ctx, zend_ssa_phi *phi) {
-	if (ctx->valnums[phi->ssa_var] == phi->ssa_var) {
+	if (ctx->valnums[phi->ssa_var] == INVALID) {
 		return 0;
 	}
 
@@ -293,19 +296,25 @@ static void init_valnums(context *ctx) {
 	ctx->true_num = ctx->max_num++;
 	zend_hash_init(&ctx->const_valnums, 0, NULL, NULL, 0);
 
-	for (i = 0; i < ssa->vars_count; i++) {
-		const zend_ssa_var *var = &ssa->vars[i];
+	for (i = 0; i < op_array->last_var; i++) {
+		/* Initial undefined/unknown variables cannot participate in GVN */
+		ctx->valnums[i] = INVALID;
+	}
 
-		/* Instructions that cannot be GVNd trivially map to themselves */
+	for (; i < ssa->vars_count; i++) {
+		const zend_ssa_var *var = &ssa->vars[i];
 		int def = var->definition;
-		if (def >= 0 && !can_gvn(ctx, &ssa->ops[def], &op_array->opcodes[def])) {
-			ctx->valnums[i] = i;
-			continue;
-		}
 
 		/* Reference variables cannot participate in GVN at all */
 		if (ssa->var_info[i].type & MAY_BE_REF) {
 			ctx->valnums[i] = INVALID;
+			continue;
+		}
+
+		/* Instructions that cannot be GVNd trivially map to themselves */
+		if (def >= 0 && !can_gvn(ctx, &ssa->ops[def], &op_array->opcodes[def])) {
+			// TODO As things stand, might want to drop this and only keep handle_instr()
+			ctx->valnums[i] = i;
 			continue;
 		}
 
@@ -320,9 +329,10 @@ static void gvn_solve(context *ctx) {
 	const zend_cfg *cfg = &ssa->cfg;
 	const uint32_t *postorder = ctx->info->postorder;
 
-	zend_bool changed = 0;
+	zend_bool changed;
 	do {
 		int i;
+		changed = 0;
 		/* Traverse CFG in RPO */
 		for (i = cfg->blocks_count - 1; i >= 0; i--) {
 			uint32_t n = postorder[i];
@@ -330,11 +340,11 @@ static void gvn_solve(context *ctx) {
 			const zend_ssa_block *ssa_block = &ssa->blocks[n];
 			int j;
 			zend_ssa_phi *phi;
-			for (j = block->start; j < block->end; j++) {
-				changed |= handle_instr(ctx, &ssa->ops[j], &op_array->opcodes[j]);
-			}
 			for (phi = ssa_block->phis; phi; phi = phi->next) {
 				changed |= handle_phi(ctx, phi);
+			}
+			for (j = block->start; j <= block->end; j++) {
+				changed |= handle_instr(ctx, &ssa->ops[j], &op_array->opcodes[j]);
 			}
 		}
 		zend_hash_clean(&ctx->hash);
@@ -345,7 +355,7 @@ void ssa_optimize_gvn(ssa_opt_ctx *ssa_ctx) {
 	void *checkpoint = zend_arena_checkpoint(ssa_ctx->opt_ctx->arena);
 	context ctx;
 
-	if (ctx.ssa->vars_count >= TOP) {
+	if (ssa_ctx->ssa->vars_count >= TOP) {
 		/* Our instruction encoding only has limited valnum space */
 		return;
 	}
@@ -361,6 +371,7 @@ void ssa_optimize_gvn(ssa_opt_ctx *ssa_ctx) {
 	gvn_solve(&ctx);
 
 	zend_hash_destroy(&ctx.hash);
+	zend_hash_destroy(&ctx.const_valnums);
 	zend_arena_release(&ctx.arena, checkpoint);
 	ssa_ctx->opt_ctx->arena = ctx.arena;
 }
