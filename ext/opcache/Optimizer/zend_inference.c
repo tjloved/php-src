@@ -288,7 +288,7 @@ int zend_ssa_find_false_dependencies(const zend_op_array *op_array, zend_ssa *ss
 			/* mark all possible sources as used */
 			p = ssa_vars[i].definition_phi;
 			if (p->pi >= 0) {
-				if (ssa_vars[p->sources[0]].no_val) {
+				if (p->sources[0] >= 0 && ssa_vars[p->sources[0]].no_val) {
 					ssa_vars[p->sources[0]].no_val = 0; /* used indirectly */
 					zend_bitset_incl(worklist, p->sources[0]);
 				}
@@ -781,7 +781,7 @@ int zend_inference_calc_range(const zend_op_array *op_array, zend_ssa *ssa, int 
 		tmp->min = ZEND_LONG_MAX;
 		tmp->max = ZEND_LONG_MIN;
 		tmp->overflow = 0;
-		if (p->pi >= 0 && p->has_range_constraint) {
+		if (p->pi >= 0 && p->has_range_constraint && p->sources[0] >= 0) {
 			zend_ssa_range_constraint *constraint = &p->constraint.range;
 			if (constraint->negative) {
 				if (ssa->var_info[p->sources[0]].has_range) {
@@ -3279,7 +3279,7 @@ int zend_infer_types_ex(const zend_op_array *op_array, const zend_script *script
 	WHILE_WORKLIST(worklist, zend_bitset_len(ssa_vars_count), j) {
 		if (ssa_vars[j].definition_phi) {
 			zend_ssa_phi *p = ssa_vars[j].definition_phi;
-			if (p->pi >= 0) {
+			if (p->pi >= 0 && p->sources[0] >= 0) {
 				zend_class_entry *ce = ssa_var_info[p->sources[0]].ce;
 				int is_instanceof = ssa_var_info[p->sources[0]].is_instanceof;
 				tmp = get_ssa_var_info(ssa, p->sources[0]);
@@ -3309,7 +3309,9 @@ int zend_infer_types_ex(const zend_op_array *op_array, const zend_script *script
 
 				tmp = 0;
 				for (i = 0; i < blocks[p->block].predecessors_count; i++) {
-					tmp |= get_ssa_var_info(ssa, p->sources[i]);
+					if (p->sources[i] >= 0) {
+						tmp |= get_ssa_var_info(ssa, p->sources[i]);
+					}
 				}
 				UPDATE_SSA_TYPE(tmp, j);
 				for (i = 0; i < blocks[p->block].predecessors_count; i++) {
