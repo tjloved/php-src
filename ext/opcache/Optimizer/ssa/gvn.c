@@ -83,6 +83,9 @@ static inline zend_bool can_gvn(
 		case ZEND_BOOL:
 		case ZEND_BOOL_NOT:
 		case ZEND_BW_NOT:
+		/* Unary operators with extended_value */
+		case ZEND_TYPE_CHECK:
+		case ZEND_CAST:
 			return !may_throw(ctx->op_array, ctx->ssa, opline, ssa_op);
 		//case ZEND_PRE_INC: // TODO encoding
 		//case ZEND_POST_INC:
@@ -93,13 +96,11 @@ static inline zend_bool can_gvn(
 		//case ZEND_JMP_SET:
 		//case ZEND_CASE: // TODO special op semantics?
 		//case ZEND_COALESCE:
-		case ZEND_TYPE_CHECK:
-		case ZEND_CAST:
-			// TODO extended_value encoding!
-			return 0;
-		//case ZEND_ROPE_INIT: // TODO unlikely
+		//case ZEND_ROPE_INIT: // TODO likely, but needs special handling
 		//case ZEND_ROPE_ADD:
 		//case ZEND_ROPE_END:
+		//case ZEND_INIT_ARRAY:
+		//case ZEND_ADD_ARRAY_ELEMENT:
 		//case ZEND_ASSIGN_ADD: // TODO encode to underlying ops
 		//case ZEND_ASSIGN_SUB:
 		//case ZEND_ASSIGN_MUL:
@@ -193,10 +194,27 @@ static inline uint32_t get_op2_valnum(
 }
 
 static inline zend_ulong hash_instr(const zend_op *opline, uint32_t op1_num, uint32_t op2_num) {
+	zend_ulong hash;
 	if (op1_num == INVALID || op2_num == INVALID) {
 		return -Z_UL(1);
 	}
-	return (((zend_ulong) opline->opcode) << (2 * OP_WIDTH)) | (op1_num << OP_WIDTH) | op2_num;
+	/*if (opline->opcode == ZEND_IS_IDENTICAL || opline->opcode == ZEND_IS_NOT_IDENTICAL
+			|| opline->opcode == ZEND_IS_EQUAL || opline->opcode == ZEND_IS_NOT_EQUAL) {
+		if (op1_num > op2_num) {
+			uint32_t tmp = op1_num;
+			op1_num = op2_num;
+			op2_num = tmp;
+		}
+	}*/
+
+	hash = ((zend_ulong) opline->opcode) << (2 * OP_WIDTH);
+	hash |= op1_num << OP_WIDTH;
+	if (opline->opcode == ZEND_CAST || opline->opcode == ZEND_TYPE_CHECK) {
+		hash |= opline->extended_value;
+	} else {
+		hash |= op2_num;
+	}
+	return hash;
 }
 
 static inline zend_bool handle_instr(context *ctx, zend_ssa_op *ssa_op, zend_op *opline) {
@@ -351,24 +369,59 @@ static void gvn_solve(context *ctx) {
 	} while (changed);
 }
 
+static uint32_t find_cv_num(context *ctx, uint32_t num, uint32_t skip) {
+	int i;
+	for (i = 0; i < ctx->ssa->vars_count; i++) {
+		if (i != skip && ctx->valnums[i] == num
+				&& ctx->ssa->vars[i].var < ctx->op_array->last_var) {
+			return i;
+		}
+	}
+	return INVALID;
+}
+
+static void remove_redundancies(context *ctx) {
+	zend_ssa *ssa = ctx->ssa;
+	zend_op_array *op_array = ctx->op_array;
+	int i;
+	for (i = 0; i < ssa->vars_count; i++) {
+		uint32_t valnum = ctx->valnums[i];
+		if (valnum == INVALID || valnum == TOP || valnum == i) {
+			continue;
+		}
+		if (ssa->vars[i].var >= op_array->last_var) {
+			/* We only simplify operations on CVs for now */
+			continue;
+		}
+		//if (valnum < op_array->last_var) {
+		uint32_t cv_num = find_cv_num(ctx, valnum, i);
+		if (cv_num != INVALID) {
+			OPT_STAT(tmp)++;
+			//fprintf(stderr, "%d -> %d\n", i, ctx->valnums[i]);
+		}
+	}
+}
+
 void ssa_optimize_gvn(ssa_opt_ctx *ssa_ctx) {
+	zend_ssa *ssa = ssa_ctx->ssa;
 	void *checkpoint = zend_arena_checkpoint(ssa_ctx->opt_ctx->arena);
 	context ctx;
 
-	if (ssa_ctx->ssa->vars_count >= TOP) {
+	if (ssa->vars_count >= TOP) {
 		/* Our instruction encoding only has limited valnum space */
 		return;
 	}
 
 	ctx.arena = ssa_ctx->opt_ctx->arena;
 	ctx.op_array = ssa_ctx->op_array;
-	ctx.ssa = ssa_ctx->ssa;
+	ctx.ssa = ssa;
 	ctx.info = ssa_ctx->cfg_info;
-	ctx.valnums = zend_arena_alloc(&ctx.arena, sizeof(int32_t) * ctx.ssa->vars_count);
+	ctx.valnums = zend_arena_alloc(&ctx.arena, sizeof(int32_t) * ssa->vars_count);
 	zend_hash_init(&ctx.hash, 0, NULL, NULL, 0); // TODO size estimate
 
 	init_valnums(&ctx);
 	gvn_solve(&ctx);
+	remove_redundancies(&ctx);
 
 	zend_hash_destroy(&ctx.hash);
 	zend_hash_destroy(&ctx.const_valnums);
