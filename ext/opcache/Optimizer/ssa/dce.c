@@ -15,10 +15,6 @@ typedef struct {
 	uint32_t phi_worklist_len;
 } context;
 
-#define MAY_HAVE_DTOR \
-	(MAY_BE_OBJECT|MAY_BE_RESOURCE \
-	|MAY_BE_ARRAY_OF_ARRAY|MAY_BE_ARRAY_OF_OBJECT|MAY_BE_ARRAY_OF_RESOURCE)
-
 static inline zend_bool may_have_side_effects(
 		zend_op_array *op_array, zend_ssa *ssa, zend_op *opline, zend_ssa_op *ssa_op) {
 	if (may_throw(op_array, ssa, opline, ssa_op)) {
