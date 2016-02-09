@@ -235,6 +235,7 @@ static void simplify_jumps(zend_ssa *ssa, zend_op_array *op_array) {
 			case ZEND_JMPZ_EX:
 				if (!var_used(&ssa->vars[ssa_op->result_def])) {
 					opline->opcode = ZEND_JMPZ;
+					opline->result_type = IS_UNUSED;
 					remove_result_def(ssa, ssa_op);
 				}
 				break;
@@ -242,6 +243,7 @@ static void simplify_jumps(zend_ssa *ssa, zend_op_array *op_array) {
 			case ZEND_JMP_SET:
 				if (!var_used(&ssa->vars[ssa_op->result_def])) {
 					opline->opcode = ZEND_JMPNZ;
+					opline->result_type = IS_UNUSED;
 					remove_result_def(ssa, ssa_op);
 				}
 				break;

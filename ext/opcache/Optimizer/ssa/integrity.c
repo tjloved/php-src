@@ -46,9 +46,14 @@ static inline zend_bool is_in_phi_sources(zend_ssa *ssa, zend_ssa_phi *phi, int 
 	return 0;
 }
 
+static inline zend_bool is_var_type(zend_uchar type) {
+	return type == IS_CV || type == IS_VAR || type == IS_TMP_VAR;
+}
+
 #define FAIL(...) do { \
 	if (status == SUCCESS) { \
-		fprintf(stderr, "\nIn function %s (%s):\n", \
+		fprintf(stderr, "\nIn function %s::%s (%s):\n", \
+			op_array->scope ? ZSTR_VAL(op_array->scope->name) : "", \
 			op_array->function_name ? ZSTR_VAL(op_array->function_name) : "{main}", extra); \
 	} \
 	fprintf(stderr, __VA_ARGS__); \
@@ -59,6 +64,10 @@ static inline zend_bool is_in_phi_sources(zend_ssa *ssa, zend_ssa_phi *phi, int 
 #define VAR(i) \
 	(i), (ssa->vars[i].var < op_array->last_var ? "CV $" : "TMP"), \
 	(ssa->vars[i].var < op_array->last_var ? ZSTR_VAL(op_array->vars[ssa->vars[i].var]) : "")
+
+#define INSTRFMT "%d (%s)"
+#define INSTR(i) \
+	(i), (zend_get_opcode_name(op_array->opcodes[i].opcode))
 
 int ssa_verify_integrity(zend_ssa *ssa, const char *extra) {
 	zend_op_array *op_array = ssa->op_array;
@@ -81,7 +90,8 @@ int ssa_verify_integrity(zend_ssa *ssa, const char *extra) {
 		}
 		if (var->definition >= 0) {
 			if (!is_defined_by_op(ssa, var->definition, i)) {
-				FAIL("var " VARFMT " not defined by op %d\n", VAR(i), var->definition);
+				FAIL("var " VARFMT " not defined by op " INSTRFMT "\n",
+						VAR(i), INSTR(var->definition));
 			}
 		}
 		if (var->definition_phi) {
@@ -114,35 +124,93 @@ int ssa_verify_integrity(zend_ssa *ssa, const char *extra) {
 	}
 	for (i = 0; i < op_array->last; i++) {
 		zend_ssa_op *ssa_op = &ssa->ops[i];
+		zend_op *opline = &op_array->opcodes[i];
+		if (is_var_type(opline->op1_type)) {
+			if (ssa_op->op1_use < 0 && ssa_op->op1_def < 0) {
+				FAIL("var op1 of " INSTRFMT " does not use/def an ssa var\n", INSTR(i));
+			}
+		} else {
+			if (ssa_op->op1_use >= 0 || ssa_op->op1_def >= 0) {
+				FAIL("non-var op1 of " INSTRFMT " uses or defs an ssa var\n", INSTR(i));
+			}
+		}
+		if (is_var_type(opline->op2_type)) {
+			if (ssa_op->op2_use < 0 && ssa_op->op2_def < 0) {
+				FAIL("var op2 of " INSTRFMT " does not use/def an ssa var\n", INSTR(i));
+			}
+		} else {
+			if (ssa_op->op2_use >= 0 || ssa_op->op2_def >= 0) {
+				FAIL("non-var op2 of " INSTRFMT " uses or defs an ssa var\n", INSTR(i));
+			}
+		}
+		if (is_var_type(opline->result_type)) {
+			if (ssa_op->result_use < 0 && ssa_op->result_def < 0) {
+				FAIL("var result of " INSTRFMT " does not use/def an ssa var\n", INSTR(i));
+			}
+		} else {
+			if (ssa_op->result_use >= 0 || ssa_op->result_def >= 0) {
+				FAIL("non-var result of " INSTRFMT " uses or defs an ssa var\n", INSTR(i));
+			}
+		}
+
 		if (ssa_op->op1_use >= 0) {
 			if (!is_in_use_chain(ssa, ssa_op->op1_use, i)) {
-				FAIL("op1 use of " VARFMT " in %d not in use chain\n", VAR(ssa_op->op1_use), i);
+				FAIL("op1 use of " VARFMT " in " INSTRFMT " not in use chain\n",
+						VAR(ssa_op->op1_use), INSTR(i));
+			}
+			if (VAR_NUM(opline->op1.var) != ssa->vars[ssa_op->op1_use].var) {
+				FAIL("op1 use of " VARFMT " does not match op %d of " INSTRFMT "\n",
+						VAR(ssa_op->op1_use), VAR_NUM(opline->op1.var), INSTR(i));
 			}
 		}
 		if (ssa_op->op2_use >= 0) {
 			if (!is_in_use_chain(ssa, ssa_op->op2_use, i)) {
-				FAIL("op1 use of " VARFMT " in %d not in use chain\n", VAR(ssa_op->op2_use), i);
+				FAIL("op1 use of " VARFMT " in " INSTRFMT " not in use chain\n",
+						VAR(ssa_op->op2_use), INSTR(i));
+			}
+			if (VAR_NUM(opline->op2.var) != ssa->vars[ssa_op->op2_use].var) {
+				FAIL("op2 use of " VARFMT " does not match op %d of " INSTRFMT "\n",
+						VAR(ssa_op->op2_use), VAR_NUM(opline->op2.var), INSTR(i));
 			}
 		}
 		if (ssa_op->result_use >= 0) {
 			if (!is_in_use_chain(ssa, ssa_op->result_use, i)) {
-				FAIL("result use of " VARFMT " in %d not in use chain\n",
-					VAR(ssa_op->result_use), i);
+				FAIL("result use of " VARFMT " in " INSTRFMT " not in use chain\n",
+					VAR(ssa_op->result_use), INSTR(i));
+			}
+			if (VAR_NUM(opline->result.var) != ssa->vars[ssa_op->result_use].var) {
+				FAIL("result use of " VARFMT " does not match op %d of " INSTRFMT "\n",
+						VAR(ssa_op->result_use), VAR_NUM(opline->result.var), INSTR(i));
 			}
 		}
 		if (ssa_op->op1_def >= 0) {
 			if (ssa->vars[ssa_op->op1_def].definition != i) {
-				FAIL("op1 def of " VARFMT " in %d invalid\n", VAR(ssa_op->op1_def), i);
+				FAIL("op1 def of " VARFMT " in " INSTRFMT " invalid\n",
+						VAR(ssa_op->op1_def), INSTR(i));
+			}
+			if (VAR_NUM(opline->op1.var) != ssa->vars[ssa_op->op1_def].var) {
+				FAIL("op1 def of " VARFMT " does not match op %d of " INSTRFMT "\n",
+						VAR(ssa_op->op1_def), VAR_NUM(opline->op1.var), INSTR(i));
 			}
 		}
 		if (ssa_op->op2_def >= 0) {
 			if (ssa->vars[ssa_op->op2_def].definition != i) {
-				FAIL("op2 def of " VARFMT " in %d invalid\n", VAR(ssa_op->op2_def), i);
+				FAIL("op2 def of " VARFMT " in " INSTRFMT " invalid\n",
+						VAR(ssa_op->op2_def), INSTR(i));
+			}
+			if (VAR_NUM(opline->op2.var) != ssa->vars[ssa_op->op2_def].var) {
+				FAIL("op2 def of " VARFMT " does not match op %d of " INSTRFMT "\n",
+						VAR(ssa_op->op2_def), VAR_NUM(opline->op2.var), INSTR(i));
 			}
 		}
 		if (ssa_op->result_def >= 0) {
 			if (ssa->vars[ssa_op->result_def].definition != i) {
-				FAIL("result def of " VARFMT " in %d invalid\n", VAR(ssa_op->result_def), i);
+				FAIL("result def of " VARFMT " in " INSTRFMT " invalid\n",
+						VAR(ssa_op->result_def), INSTR(i));
+			}
+			if (VAR_NUM(opline->result.var) != ssa->vars[ssa_op->result_def].var) {
+				FAIL("result def of " VARFMT " does not match op %d of " INSTRFMT "\n",
+						VAR(ssa_op->result_def), VAR_NUM(opline->result.var), INSTR(i));
 			}
 		}
 	}
