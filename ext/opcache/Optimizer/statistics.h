@@ -19,8 +19,8 @@ typedef struct _zend_optimizer_statistics {
 	uint32_t scp_dead_instrs;
 	uint32_t scp_semi_dead_instrs;
 	uint32_t dce_dead_instr;
-	uint32_t copy_contracted_assign;
-	uint32_t copy_qm_assign;
+	uint32_t assign_contracted_assign;
+	uint32_t assign_qm_assign;
 	uint32_t type_spec_arithm;
 	uint32_t type_spec_must_be_array;
 	uint32_t type_spec_not_known_to_be_array;

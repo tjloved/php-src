@@ -52,8 +52,8 @@ void zend_optimizer_statistics_shutdown() {
 	PRINT_NORM_STAT(dce_dead_phis, phis);
 	PRINT_STAT(dce_frees),
 
-	PRINT_STAT(copy_contracted_assign);
-	PRINT_STAT(copy_qm_assign);
+	PRINT_STAT(assign_contracted_assign);
+	PRINT_STAT(assign_qm_assign);
 	PRINT_STAT(copy_propagated);
 	PRINT_STAT(type_spec_arithm);
 	PRINT_STAT(type_spec_must_be_array);
