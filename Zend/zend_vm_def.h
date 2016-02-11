@@ -2745,7 +2745,7 @@ ZEND_VM_HANDLER(47, ZEND_JMPNZ_EX, CONST|TMPVAR|CV, JMP_ADDR)
 	ZEND_VM_JMP(opline);
 }
 
-ZEND_VM_HANDLER(70, ZEND_FREE, TMPVAR, LIVE_RANGE)
+ZEND_VM_HANDLER(70, ZEND_FREE, TMPVAR, ANY)
 {
 	USE_OPLINE
 
@@ -2754,7 +2754,7 @@ ZEND_VM_HANDLER(70, ZEND_FREE, TMPVAR, LIVE_RANGE)
 	ZEND_VM_NEXT_OPCODE_CHECK_EXCEPTION();
 }
 
-ZEND_VM_HANDLER(127, ZEND_FE_FREE, TMPVAR, LIVE_RANGE)
+ZEND_VM_HANDLER(127, ZEND_FE_FREE, TMPVAR, ANY)
 {
 	zval *var;
 	USE_OPLINE
@@ -7290,7 +7290,7 @@ ZEND_VM_HANDLER(149, ZEND_HANDLE_EXCEPTION, ANY, ANY)
 			 * are logically thrown at the end of the foreach loop, so adjust the
 			 * op_num.
 			 */
-			op_num = EX(func)->op_array.live_range[exc_opline->op2.num].end;
+			op_num = find_live_range(execute_data, op_num, exc_opline->op1.num)->end;
 		}
 	}
 

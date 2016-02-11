@@ -1836,7 +1836,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_HANDLE_EXCEPTION_SPEC_HANDLER(
 			 * are logically thrown at the end of the foreach loop, so adjust the
 			 * op_num.
 			 */
-			op_num = EX(func)->op_array.live_range[exc_opline->op2.num].end;
+			op_num = find_live_range(execute_data, op_num, exc_opline->op1.num)->end;
 		}
 	}
 

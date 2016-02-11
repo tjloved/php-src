@@ -2585,6 +2585,23 @@ void zend_cleanup_unfinished_execution(zend_execute_data *execute_data, uint32_t
 	cleanup_live_vars(execute_data, op_num, catch_op_num);
 }
 
+static inline const zend_live_range *find_live_range(const zend_execute_data *execute_data, uint32_t op_num, uint32_t var_num) /* {{{ */
+{
+	int i;
+	for (i = 0; i < EX(func)->op_array.last_live_range; i++) {
+		const zend_live_range *range = &EX(func)->op_array.live_range[i];
+		if (range->start > op_num) {
+			/* further blocks will not be relevant... */
+			break;
+		}
+		if (op_num < range->end && (range->var & ~ZEND_LIVE_MASK) == var_num) {
+			return range;
+		}
+	}
+	return NULL;
+}
+/* }}} */
+
 #ifdef HAVE_GCC_GLOBAL_REGS
 # if defined(__GNUC__) && ZEND_GCC_VERSION >= 4008 && defined(i386)
 #  define ZEND_VM_FP_GLOBAL_REG "%esi"
