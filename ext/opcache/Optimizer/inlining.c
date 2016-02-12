@@ -234,7 +234,7 @@ static zend_op *find_call_opline(zend_op *opline) {
 zend_bool used_in_ref_context(zend_op *opline) {
 	uint32_t var = opline->result.var;
 	zend_uchar var_type = opline->result_type;
-	if (var_type & EXT_TYPE_UNUSED) {
+	if (var_type == IS_UNUSED) {
 		return 0;
 	}
 
@@ -276,7 +276,7 @@ static inline_info *find_inlinable_calls(zend_op_array *op_array, zend_optimizer
 				info->num_inlined_opcodes = fbc->last + num_returns(fbc) - num_args_passed;
 				info->opnum_diff = opnum_diff(fbc, info->num_inlined_opcodes);
 
-				if (call_opline->result_type & EXT_TYPE_UNUSED) {
+				if (call_opline->result_type == IS_UNUSED) {
 					info->result_var_num = (uint32_t) -1;
 					info->result_var_type = IS_UNUSED;
 				} else {
@@ -463,10 +463,7 @@ static void merge_opcodes(
 				COPY_NODE(new_opline->op2, new_opline->op1);
 				new_opline->op1_type = IS_CV;
 				new_opline->op1.var = (zend_uintptr_t) ZEND_CALL_VAR_NUM(NULL, var_num);
-				new_opline->result_type = IS_VAR | EXT_TYPE_UNUSED;
-				new_opline->result.var = (zend_uintptr_t) ZEND_CALL_VAR_NUM(NULL,
-					merge->tmp_offset + op_array->last_var);
-				// TODO result.var: Currently simply picking U0
+				new_opline->result_type = IS_UNUSED;
 				OPT_STAT(inlining_arg_assigns)++;
 			}
 
@@ -510,10 +507,7 @@ static void merge_opcodes(
 					/* Convert RECV_INIT into ASSIGN */
 					new_opline->opcode = ZEND_ASSIGN;
 					COPY_NODE(new_opline->op1, new_opline->result);
-					new_opline->result_type = IS_VAR | EXT_TYPE_UNUSED;
-					new_opline->result.var = (zend_uintptr_t) ZEND_CALL_VAR_NUM(NULL,
-						merge->tmp_offset + op_array->last_var);
-					// TODO result.var: Currently simply picking U0
+					new_opline->result_type = IS_UNUSED;
 					OPT_STAT(inlining_arg_assigns)++;
 				} else if (new_opline->opcode == ZEND_RETURN) {
 					if (info->result_var_num != (uint32_t) -1) {
