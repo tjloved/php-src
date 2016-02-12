@@ -1327,7 +1327,7 @@ static void eliminate_dead_instructions(scp_ctx *ctx) {
 				/* Mark result unused, if possible */
 				if (ssa_op->result_def >= 0 && !var_used(&ssa->vars[ssa_op->result_def])) {
 					remove_result_def(ssa, ssa_op);
-					opline->result_type = IS_VAR | EXT_TYPE_UNUSED;
+					opline->result_type = IS_UNUSED;
 				}
 
 				/* Remove OP_DATA opcode */
