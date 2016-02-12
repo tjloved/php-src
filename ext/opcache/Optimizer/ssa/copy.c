@@ -206,8 +206,9 @@ void try_propagate_tmp_assignment(
 	if (lhs_var->phi_use_chain) {
 		return;
 	}
-	if (ssa->var_info[ssa_op->op2_use].type & MAY_HAVE_DTOR) {
-		/* Dropping the assignment might shorten the lifetime */
+
+	if (!ctx->reorder_dtor_effects && (ssa->var_info[ssa_op->op2_use].type & MAY_HAVE_DTOR)) {
+		/* Dropping the assignment might shorten the RHS lifetime */
 		return;
 	}
 
@@ -287,7 +288,12 @@ void ssa_optimize_copy(ssa_opt_ctx *ctx) {
 
 		if (opline->opcode == ZEND_ASSIGN) {
 			if (RETURN_VALUE_USED(opline) || opline->op1_type != IS_CV
-					|| (ssa->var_info[ssa_op->op1_def].type & MAY_BE_REF)) {
+					|| (ssa->var_info[ssa_op->op1_use].type & MAY_BE_REF)) {
+				continue;
+			}
+			if (!ctx->reorder_dtor_effects
+					&& (ssa->var_info[ssa_op->op1_use].type & MAY_HAVE_DTOR)) {
+				/* Removing the assignment may shorten LHS lifetime */
 				continue;
 			}
 			if (opline->op2_type == IS_CV

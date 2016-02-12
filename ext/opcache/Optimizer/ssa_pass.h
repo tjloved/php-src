@@ -11,6 +11,7 @@ typedef struct _ssa_opt_ctx {
 	struct _ssa_liveness *liveness;
 	zend_func_info *func_info;
 	zend_call_info **call_map;
+	unsigned reorder_dtor_effects : 1;
 } ssa_opt_ctx;
 
 void ssa_optimize_scp(ssa_opt_ctx *ctx);
