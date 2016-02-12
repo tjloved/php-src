@@ -42,9 +42,16 @@
 #define ZEND_OPTIMIZER_PASS_15		(1<<14)  /* Collect constants */
 #define ZEND_OPTIMIZER_PASS_16		(1<<15)  /* Inline functions */
 
+/* Allow changing the lifetime of an object in a way that might be observable if it
+ * has a destructor with side-effects. This is relevant only for uncommon patterns where
+ * an object is stored into variable at the start of a function, the variable is
+ * never used, and the behavior of the program relies on the fact that the object will
+ * only be destroyed at the very end of the function and no earlier. */
+#define ZEND_OPTIMIZER_REORDER_DTOR_EFFECTS (1 << 24)
+
 #define ZEND_OPTIMIZER_ALL_PASSES	0x7FFFFFFF
 
-#define DEFAULT_OPTIMIZATION_LEVEL  "0x7FFFBFFF"
+#define DEFAULT_OPTIMIZATION_LEVEL  "0x00FFBFFF"
 
 
 #define ZEND_DUMP_AFTER_PASS_1		ZEND_OPTIMIZER_PASS_1

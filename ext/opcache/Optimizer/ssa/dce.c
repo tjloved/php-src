@@ -13,10 +13,13 @@ typedef struct {
 	zend_bitset phi_worklist;
 	uint32_t instr_worklist_len;
 	uint32_t phi_worklist_len;
+	unsigned reorder_dtor_effects : 1;
 } context;
 
 static inline zend_bool may_have_side_effects(
-		zend_op_array *op_array, zend_ssa *ssa, zend_op *opline, zend_ssa_op *ssa_op) {
+		const context *ctx, const zend_op *opline, const zend_ssa_op *ssa_op) {
+	zend_op_array *op_array = ctx->op_array;
+	zend_ssa *ssa = ctx->ssa;
 	if (may_throw(op_array, ssa, opline, ssa_op)) {
 		return 1;
 	}
@@ -54,19 +57,41 @@ static inline zend_bool may_have_side_effects(
 		case ZEND_ASSIGN_REF:
 			return 1;
 		case ZEND_ASSIGN:
-			if (ssa_op->op1_def < 0 || (OP1_INFO() & (MAY_HAVE_DTOR|MAY_BE_REF))) {
-				/* DCE might result in dtor firing too late, or a reference assignment
-				 * being dropped */
+		{
+			uint32_t t1 = OP1_INFO();
+			if (ssa_op->op1_def < 0 || (t1 & MAY_BE_REF)) {
+				/* Variable not tracked by SSA or a reference. In both cases a missing assignment
+				 * may be (and probably is) observable. */
 				return 1;
 			}
-			if (opline->op2_type != IS_CONST && (OP2_INFO() & MAY_HAVE_DTOR)) {
-				/* DCE might result in dtor firing too early */
+			if (!ctx->reorder_dtor_effects) {
+				if (t1 & MAY_HAVE_DTOR) {
+					/* DCE might extend lifetime */
+					return 1;
+				}
+				if (opline->op2_type != IS_CONST && (OP2_INFO() & MAY_HAVE_DTOR)) {
+					/* DCE might shorten lifetime */
+					return 1;
+				}
+			}
+			return 0;
+		}
+		case ZEND_UNSET_VAR:
+		{
+			uint32_t t1 = OP1_INFO();
+			if (t1 & MAY_BE_REF) {
+				/* We don't consider uses as the LHS of an assignment as real uses during DCE, so
+				 * an unset may be considered dead even if there is a later assignment to the
+				 * variable. Removing the unset in this case would not be correct if the variable
+				 * is a reference, because unset breaks references. */
+				return 1;
+			}
+			if (!ctx->reorder_dtor_effects && (t1 & MAY_HAVE_DTOR)) {
+				/* DCE might extend lifetime */
 				return 1;
 			}
 			return 0;
-		case ZEND_UNSET_VAR:
-			/* DCE might result in dtor firing too late */
-			return (OP1_INFO() & MAY_HAVE_DTOR) != 0;
+		}
 		case ZEND_PRE_INC:
 		case ZEND_POST_INC:
 		case ZEND_PRE_DEC:
@@ -318,6 +343,7 @@ void ssa_optimize_dce(ssa_opt_ctx *ssa_ctx) {
 	zend_ssa *ssa = ssa_ctx->ssa;
 	int i;
 	zend_ssa_phi *phi;
+
 	/* DCE of CV operations may affect vararg functions. For now simply treat all instructions
 	 * as live if varargs in use and only collect dead phis. */
 	zend_bool has_varargs = (ZEND_FUNC_INFO(op_array)->flags & ZEND_FUNC_VARARG) != 0;
@@ -325,6 +351,7 @@ void ssa_optimize_dce(ssa_opt_ctx *ssa_ctx) {
 	context ctx;
 	ctx.ssa = ssa;
 	ctx.op_array = op_array;
+	ctx.reorder_dtor_effects = ssa_ctx->reorder_dtor_effects;
 
 	int j = 0;
 try_again:
@@ -345,8 +372,7 @@ try_again:
 
 	/* Mark instruction with side effects as live */
 	for (i = 0; i < op_array->last; ++i) {
-		if (may_have_side_effects(op_array, ssa, &op_array->opcodes[i], &ssa->ops[i])
-				|| has_varargs) {
+		if (may_have_side_effects(&ctx, &op_array->opcodes[i], &ssa->ops[i]) || has_varargs) {
 			zend_bitset_excl(ctx.instr_dead, i);
 			add_operands_to_worklists(&ctx, &op_array->opcodes[i], &ssa->ops[i]);
 		}
@@ -421,7 +447,7 @@ try_again:
 	for (i = 0; i < op_array->last; ++i) {
 		zend_ssa_op *ssa_op = &ssa->ops[i];
 		zend_op *opline = &op_array->opcodes[i];
-		if (!may_have_side_effects(op_array, ssa, opline, ssa_op)) {
+		if (!may_have_side_effects(ctx, opline, ssa_op)) {
 			continue;
 		}
 		if (ssa_op->op1_use < 0 && ssa_op->op2_use < 0 && ssa_op->result_use < 0) {

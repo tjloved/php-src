@@ -374,6 +374,8 @@ static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) 
 	ssa_ctx.cfg_info = &cfg_info;
 	ssa_ctx.liveness = &liveness;
 	ssa_ctx.call_map = compute_call_map(ctx, info, op_array);
+	ssa_ctx.reorder_dtor_effects =
+		(ctx->optimization_level & ZEND_OPTIMIZER_REORDER_DTOR_EFFECTS) != 0;
 
 	run_pass(&ssa_ctx, ssa_optimize_scp, "after SCP", 4);
 	/*if (zend_ssa_inference(&ctx->arena, op_array, ctx->script, &info->ssa) != SUCCESS) {
