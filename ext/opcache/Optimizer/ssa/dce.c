@@ -54,7 +54,9 @@ static inline zend_bool may_have_side_effects(
 		case ZEND_ASSIGN_REF:
 			return 1;
 		case ZEND_ASSIGN:
-			if (ssa_op->op1_def < 0 || (OP1_INFO() & MAY_BE_REF)) {
+			if (ssa_op->op1_def < 0 || (OP1_INFO() & (MAY_HAVE_DTOR|MAY_BE_REF))) {
+				/* DCE might result in dtor firing too late, or a reference assignment
+				 * being dropped */
 				return 1;
 			}
 			if (opline->op2_type != IS_CONST && (OP2_INFO() & MAY_HAVE_DTOR)) {
@@ -63,13 +65,8 @@ static inline zend_bool may_have_side_effects(
 			}
 			return 0;
 		case ZEND_UNSET_VAR:
-			/* We handle the case where op1 is a reference, or has a dtor effect in dce_instr().
-			 * The reason is that due to unreachable code elimination the reference/dtor case may
-			 * no longer exist, but the type information does not reflect it. If there is a
-			 * reference/dtor case, then there will be a live instruction generating it and the
-			 * unset will not be DCEd. As unset makes the result var a non-reference, there exist
-			 * no transitive reference effects (the same is *not* true of assign). */
-			return 0;
+			/* DCE might result in dtor firing too late */
+			return (OP1_INFO() & MAY_HAVE_DTOR) != 0;
 		case ZEND_PRE_INC:
 		case ZEND_POST_INC:
 		case ZEND_PRE_DEC:
@@ -139,11 +136,6 @@ static inline zend_bool is_var_dead(context *ctx, int var_num) {
 	}
 }
 
-static inline zend_bool may_have_dtor_effect(context *ctx, int var) {
-	return !is_var_dead(ctx, var)
-		&& (ctx->ssa->var_info[var].type & (MAY_BE_REF|MAY_HAVE_DTOR)) != 0;
-}
-
 /* Returns whether the instruction has been DCEd */
 static zend_bool dce_instr(context *ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 	zend_ssa *ssa = ctx->ssa;
@@ -156,14 +148,6 @@ static zend_bool dce_instr(context *ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 
 	/* We mark FREEs as dead, but they're only really dead if the destroyed var is dead */
 	if (opline->opcode == ZEND_FREE && !is_var_dead(ctx, ssa_op->op1_use)) {
-		return 0;
-	}
-
-	/* We cannot DCE unsets/assigns on variables which may have a dtor effect, as it might delay
-	 * its execution. We check this here rather than in may_have_side_effect(), because, if the
-	 * instruction generating the value can be DCEd, the assign/unset over it can be as well. */
-	// TODO This is still not quite precise enough due to SSA variable renaming
-	if (has_improper_op1_use(opline) && may_have_dtor_effect(ctx, ssa_op->op1_use)) {
 		return 0;
 	}
 

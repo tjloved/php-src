@@ -376,6 +376,9 @@ static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) 
 	ssa_ctx.call_map = compute_call_map(ctx, info, op_array);
 
 	run_pass(&ssa_ctx, ssa_optimize_scp, "after SCP", 4);
+	/*if (zend_ssa_inference(&ctx->arena, op_array, ctx->script, &info->ssa) != SUCCESS) {
+		return;
+	}*/
 	run_pass(&ssa_ctx, ssa_optimize_dce, "after DCE", 8);
 	run_pass(&ssa_ctx, ssa_optimize_copy, "after copy propagation", 16);
 	run_pass(&ssa_ctx, ssa_optimize_assign, "after assignment contraction", 32);
