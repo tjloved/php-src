@@ -3,6 +3,7 @@
 #include "Optimizer/zend_optimizer_internal.h"
 #include "Optimizer/ssa_pass.h"
 #include "Optimizer/ssa/instructions.h"
+#include "Optimizer/ssa/scdf.h"
 #include "Optimizer/statistics.h"
 
 #if 0
@@ -12,15 +13,10 @@
 #endif
 
 typedef struct _scp_ctx {
+	scdf_ctx scdf;
 	zend_op_array *op_array;
 	zend_ssa *ssa;
 	zend_call_info **call_map;
-	zend_bitset var_worklist;
-	zend_bitset block_worklist;
-	zend_bitset executable_blocks;
-	zend_bitset feasible_edges; /* Encoding: 2 bits per block, one for each successor */
-	uint32_t var_worklist_len;
-	uint32_t block_worklist_len;
 	zval *values;
 	zval top;
 	zval bot;
@@ -55,7 +51,7 @@ static void set_value(scp_ctx *ctx, int var, zval *new) {
 	if (IS_TOP(value) || IS_BOT(new)) {
 		zval_ptr_dtor_nogc(value);
 		ZVAL_COPY(value, new);
-		zend_bitset_incl(ctx->var_worklist, var);
+		scdf_add_to_worklist(&ctx->scdf, var);
 		return;
 	}
 #if ZEND_DEBUG
@@ -549,7 +545,8 @@ static inline int ct_eval_func_call(
 
 #define SKIP_IF_TOP(op) if (IS_TOP(op)) break;
 
-static void interp_instr(scp_ctx *ctx, zend_op *opline, zend_ssa_op *ssa_op) {
+static void visit_instr(void *void_ctx, zend_op *opline, zend_ssa_op *ssa_op) {
+	scp_ctx *ctx = (scp_ctx *) void_ctx;
 	zval *op1, *op2, zv; /* zv is a temporary to hold result values */
 
 	if (opline->opcode == ZEND_OP_DATA) {
@@ -954,20 +951,10 @@ static void interp_instr(scp_ctx *ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 
 /* Returns whether there is a successor */
 static zend_bool get_feasible_successors(
-		scp_ctx *ctx, zend_basic_block *block,
+		void *void_ctx, zend_basic_block *block,
 		zend_op *opline, zend_ssa_op *ssa_op, zend_bool *suc) {
+	scp_ctx *ctx = (scp_ctx *) void_ctx;
 	zval *op1;
-
-	/* Terminal block without sucessors */
-	if (block->successors[0] < 0) {
-		return 0;
-	}
-
-	/* Unconditional jump */
-	if (block->successors[1] < 0) {
-		suc[0] = 1;
-		return 1;
-	}
 
 	/* We can't determine the branch target at compile-time for these */
 	switch (opline->opcode) {
@@ -1040,20 +1027,8 @@ static void join_phi_values(zval *a, zval *b) {
 	}
 }
 
-static zend_bool is_edge_feasible(scp_ctx *ctx, int from, int to) {
-	zend_basic_block *block = &ctx->ssa->cfg.blocks[from];
-	int suc;
-	if (block->successors[0] == to) {
-		suc = 0;
-	} else if (block->successors[1] == to) {
-		suc = 1;
-	} else {
-		ZEND_ASSERT(0);
-	}
-	return zend_bitset_in(ctx->feasible_edges, 2 * from + suc);
-}
-
-static void handle_phi(scp_ctx *ctx, zend_ssa_phi *phi) {
+static void visit_phi(void *void_ctx, zend_ssa_phi *phi) {
+	scp_ctx *ctx = (scp_ctx *) void_ctx;
 	zend_ssa *ssa = ctx->ssa;
 	ZEND_ASSERT(phi->ssa_var >= 0);
 	if (!IS_BOT(&ctx->values[phi->ssa_var])) {
@@ -1065,12 +1040,13 @@ static void handle_phi(scp_ctx *ctx, zend_ssa_phi *phi) {
 		MAKE_TOP(&result);
 		SCP_DEBUG("Handling PHI(");
 		if (phi->pi >= 0) {
-			if (phi->sources[0] >= 0 && is_edge_feasible(ctx, phi->pi, phi->block)) {
+			if (phi->sources[0] >= 0 && scdf_is_edge_feasible(&ctx->scdf, phi->pi, phi->block)) {
 				join_phi_values(&result, &ctx->values[phi->sources[0]]);
 			}
 		} else {
 			for (i = 0; i < block->predecessors_count; i++) {
-				if (phi->sources[i] >= 0 && is_edge_feasible(ctx, predecessors[i], phi->block)) {
+				if (phi->sources[i] >= 0
+						&& scdf_is_edge_feasible(&ctx->scdf, predecessors[i], phi->block)) {
 					SCP_DEBUG("val, ");
 					join_phi_values(&result, &ctx->values[phi->sources[i]]);
 				} else {
@@ -1085,116 +1061,6 @@ static void handle_phi(scp_ctx *ctx, zend_ssa_phi *phi) {
 	}
 }
 
-static void mark_edge_feasible(scp_ctx *ctx, int from, int to, int suc_num) {
-	int edge = from * 2 + suc_num;
-	if (zend_bitset_in(ctx->feasible_edges, edge)) {
-		/* We already handled this edge */
-		return;
-	}
-
-	SCP_DEBUG("Marking edge %d->%d (successor %d) feasible\n", from, to, suc_num);
-	zend_bitset_incl(ctx->feasible_edges, edge);
-
-	if (!zend_bitset_in(ctx->executable_blocks, to)) {
-		SCP_DEBUG("Marking block %d executable\n", to);
-		zend_bitset_incl(ctx->executable_blocks, to);
-		zend_bitset_incl(ctx->block_worklist, to);
-	} else {
-		/* Block is already executable, only a new edge became feasible.
-		 * Reevaluate phi nodes to account for changed source operands. */
-		zend_ssa_block *ssa_block = &ctx->ssa->blocks[to];
-		zend_ssa_phi *phi;
-		for (phi = ssa_block->phis; phi; phi = phi->next) {
-			handle_phi(ctx, phi);
-		}
-	}
-}
-
-static void handle_instr(scp_ctx *ctx, int block_num, zend_op *opline, zend_ssa_op *ssa_op) {
-	zend_basic_block *block = &ctx->ssa->cfg.blocks[block_num];
-	interp_instr(ctx, opline, ssa_op);
-
-	if (block->end == opline - ctx->op_array->opcodes) {
-		zend_bool suc[2] = {0};
-		if (get_feasible_successors(ctx, block, opline, ssa_op, suc)) {
-			if (suc[0]) {
-				mark_edge_feasible(ctx, block_num, block->successors[0], 0);
-			}
-			if (suc[1]) {
-				mark_edge_feasible(ctx, block_num, block->successors[1], 1);
-			}
-		}
-	}
-}
-
-static void scp_solve(scp_ctx *ctx) {
-	zend_ssa *ssa = ctx->ssa;
-	SCP_DEBUG("Start SCP solve\n");
-	while (!zend_bitset_empty(ctx->var_worklist, ctx->var_worklist_len)
-		|| !zend_bitset_empty(ctx->block_worklist, ctx->block_worklist_len)
-	) {
-		int i;
-		while ((i = zend_bitset_pop_first(ctx->var_worklist, ctx->var_worklist_len)) >= 0) {
-			zend_ssa_var *var = &ssa->vars[i];
-
-#if 0
-			int k;
-			for (k = 0; k < ssa->vars_count; ++k) {
-				zval *value = &ctx->values[k];
-				if (Z_TYPE_P(value) == BOT) {
-					php_printf("BOT\n");
-				} else if (Z_TYPE_P(value) == TOP) {
-					php_printf("TOP\n");
-				} else {
-					zend_print_zval_r(value, 0);
-					php_printf("\n");
-				}
-			}
-			php_printf("--- on %d\n", i);
-#endif
-
-			{
-				int use;
-				FOREACH_USE(var, use) {
-					int block_num = ssa->cfg.map[use];
-					if (zend_bitset_in(ctx->executable_blocks, block_num)) {
-						handle_instr(ctx, block_num, &ctx->op_array->opcodes[use], &ssa->ops[use]);
-					}
-				} FOREACH_USE_END();
-			}
-
-			{
-				zend_ssa_phi *phi;
-				FOREACH_PHI_USE(var, phi) {
-					handle_phi(ctx, phi);
-				} FOREACH_PHI_USE_END();
-			}
-		}
-
-		while ((i = zend_bitset_pop_first(ctx->block_worklist, ctx->block_worklist_len)) >= 0) {
-			/* This block is now live. Interpret phis and instructions in it. */
-			zend_basic_block *block = &ssa->cfg.blocks[i];
-			zend_ssa_block *ssa_block = &ssa->blocks[i];
-
-			SCP_DEBUG("Pop block %d from worklist\n", i);
-
-			{
-				zend_ssa_phi *phi;
-				for (phi = ssa_block->phis; phi; phi = phi->next) {
-					handle_phi(ctx, phi);
-				}
-			}
-
-			{
-				int j;
-				for (j = block->start; j <= block->end; j++) {
-					handle_instr(ctx, i, &ctx->op_array->opcodes[j], &ssa->ops[j]);
-				}
-			}
-		}
-	}
-}
-
 /* Removes instructions inside dead blocks. We don't remove the actual blocks, as modifying the
  * CFG would be overly painful at this point. */
 static void eliminate_dead_blocks(scp_ctx *ctx) {
@@ -1202,7 +1068,7 @@ static void eliminate_dead_blocks(scp_ctx *ctx) {
 	zend_op_array *op_array = ctx->op_array;
 	int i;
 	for (i = 0; i < ssa->cfg.blocks_count; i++) {
-		if (!zend_bitset_in(ctx->executable_blocks, i)) {
+		if (!zend_bitset_in(ctx->scdf.executable_blocks, i)) {
 			zend_basic_block *block = &ssa->cfg.blocks[i];
 			zend_ssa_block *ssa_block = &ssa->blocks[i];
 			zend_ssa_phi *phi;
@@ -1352,33 +1218,17 @@ static void eliminate_dead_instructions(scp_ctx *ctx) {
 void ssa_optimize_scp(ssa_opt_ctx *ssa_ctx) {
 	zend_op_array *op_array = ssa_ctx->op_array;
 	zend_ssa *ssa = ssa_ctx->ssa;
-	int i, ssa_vars = ssa->vars_count;
+	int i;
 	
 	scp_ctx ctx;
 
 	ctx.op_array = op_array;
 	ctx.ssa = ssa;
 	ctx.call_map = ssa_ctx->call_map;
-	ctx.values = alloca(sizeof(zval) * ssa_vars);
+	ctx.values = alloca(sizeof(zval) * ssa->vars_count);
 
 	MAKE_TOP(&ctx.top);
 	MAKE_BOT(&ctx.bot);
-
-	ctx.var_worklist_len = zend_bitset_len(ssa_vars);
-	ctx.var_worklist = alloca(sizeof(zend_ulong) * ctx.var_worklist_len);
-	memset(ctx.var_worklist, 0, sizeof(zend_ulong) * ctx.var_worklist_len);
-
-	ctx.block_worklist_len = zend_bitset_len(ssa->cfg.blocks_count);
-	ctx.block_worklist = alloca(sizeof(zend_ulong) * ctx.block_worklist_len);
-	memset(ctx.block_worklist, 0, sizeof(zend_ulong) * ctx.block_worklist_len);
-
-	ctx.executable_blocks = alloca(sizeof(zend_ulong) * ctx.block_worklist_len);
-	memset(ctx.executable_blocks, 0, sizeof(zend_ulong) * ctx.block_worklist_len);
-	ctx.feasible_edges = alloca(sizeof(zend_ulong) * ctx.block_worklist_len * 2);
-	memset(ctx.feasible_edges, 0, sizeof(zend_ulong) * ctx.block_worklist_len * 2);
-
-	zend_bitset_incl(ctx.block_worklist, 0);
-	zend_bitset_incl(ctx.executable_blocks, 0);
 
 	i = 0;
 	for (; i < op_array->last_var; ++i) {
@@ -1386,16 +1236,22 @@ void ssa_optimize_scp(ssa_opt_ctx *ssa_ctx) {
 		 * Otherwise the undefined variable warning might not be preserved. */
 		MAKE_BOT(&ctx.values[i]);
 	}
-	for (; i < ssa_vars; ++i) {
+	for (; i < ssa->vars_count; ++i) {
 		MAKE_TOP(&ctx.values[i]);
 	}
 
-	scp_solve(&ctx);
+	ctx.scdf.handlers.visit_instr = visit_instr;
+	ctx.scdf.handlers.visit_phi = visit_phi;
+	ctx.scdf.handlers.get_feasible_successors = get_feasible_successors;
+
+	scdf_init(&ctx.scdf, op_array, ssa);
+	scdf_solve(&ctx.scdf, "SCCP");
 	eliminate_dead_blocks(&ctx);
 	replace_constant_operands(&ctx);
 	eliminate_dead_instructions(&ctx);
+	scdf_free(&ctx.scdf);
 
-	for (i = 0; i < ssa_vars; ++i) {
+	for (i = 0; i < ssa->vars_count; ++i) {
 		zval_ptr_dtor_nogc(&ctx.values[i]);
 	}
 }
