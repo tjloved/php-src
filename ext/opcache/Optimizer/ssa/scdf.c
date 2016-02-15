@@ -38,7 +38,7 @@ static void mark_edge_feasible(scdf_ctx *ctx, int from, int to, int suc_num) {
 static inline zend_bool get_feasible_successors(
 		scdf_ctx *ctx, zend_basic_block *block,
 		zend_op *opline, zend_ssa_op *ssa_op, zend_bool *suc) {
-	/* Terminal block without sucessors */
+	/* Terminal block without successors */
 	if (block->successors[0] < 0) {
 		return 0;
 	}
