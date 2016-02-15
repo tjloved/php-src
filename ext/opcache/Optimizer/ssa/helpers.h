@@ -65,6 +65,9 @@ void remove_op2_use(zend_ssa *ssa, zend_ssa_op *ssa_op);
 void remove_phi(zend_ssa *ssa, zend_ssa_phi *phi);
 void remove_uses_of_var(zend_ssa *ssa, int var_num);
 
+/* num_instr and num_phi are the number of removed instructions/phis, for statistical purposes */
+void remove_block(zend_ssa *ssa, int i, uint32_t *num_instr, uint32_t *num_phi);
+
 static inline void set_op1_use(zend_ssa *ssa, zend_ssa_op *ssa_op, int var_num) {
 	zend_ssa_var *var = &ssa->vars[var_num];
 	if (ssa_op->op1_use >= 0) {
