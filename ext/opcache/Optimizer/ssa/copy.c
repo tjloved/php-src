@@ -2,6 +2,7 @@
 #include "Optimizer/zend_optimizer_internal.h"
 #include "Optimizer/ssa_pass.h"
 #include "Optimizer/ssa/liveness.h"
+#include "Optimizer/ssa/scdf.h"
 #include "Optimizer/statistics.h"
 
 static inline zend_bool has_improper_op1_use(zend_op *opline) {
@@ -278,10 +279,217 @@ void try_propagate_tmp_assignment(
 	OPT_STAT(copy_propagated_tmp)++;
 }
 
+typedef struct _context {
+	scdf_ctx scdf;
+	int *copy;
+} context;
+
+#define TOP (-1)
+#define BOT (-2)
+
+static inline void set_copy(context *ctx, int var, int copy) {
+	if (ctx->copy[var] != copy) {
+		ctx->copy[var] = copy;
+		scdf_add_to_worklist(&ctx->scdf, var);
+	}
+}
+
+void visit_instr(void *void_ctx, zend_op *opline, zend_ssa_op *ssa_op) {
+	context *ctx = (context *) void_ctx;
+	if (opline->opcode == ZEND_ASSIGN && opline->op2_type == IS_CV && ssa_op->op1_def >= 0) {
+		set_copy(ctx, ssa_op->op1_def, ssa_op->op2_use);
+		return;
+	}
+
+	if (ssa_op->result_def >= 0) {
+		set_copy(ctx, ssa_op->result_def, BOT);
+	}
+	if (ssa_op->op1_def >= 0) {
+		set_copy(ctx, ssa_op->op1_def, BOT);
+	}
+	if (ssa_op->op2_def >= 0) {
+		set_copy(ctx, ssa_op->op2_def, BOT);
+	}
+}
+
+void visit_phi(void *void_ctx, zend_ssa_phi *phi) {
+	context *ctx = (context *) void_ctx;
+	zend_ssa *ssa = ctx->scdf.ssa;
+	if (ctx->copy[phi->ssa_var] == BOT) {
+		return;
+	}
+
+	if (phi->pi >= 0) {
+		if (phi->sources[0] >= 0 && scdf_is_edge_feasible(&ctx->scdf, phi->pi, phi->block)) {
+			set_copy(ctx, phi->ssa_var, ctx->copy[phi->sources[0]]);
+		}
+	} else {
+		zend_basic_block *block = &ssa->cfg.blocks[phi->block];
+		int *predecessors = &ssa->cfg.predecessors[block->predecessor_offset];
+		int i;
+		int result = TOP;
+		for (i = 0; i < block->predecessors_count; i++) {
+			if (phi->sources[i] >= 0
+					&& scdf_is_edge_feasible(&ctx->scdf, predecessors[i], phi->block)) {
+				int copy = ctx->copy[phi->sources[i]];
+				if (result == TOP) {
+					result = copy;
+				} else if (result != copy) {
+					result = BOT;
+				}
+			}
+		}
+		set_copy(ctx, phi->ssa_var, result);
+	}
+}
+
+static int is_cond_true(context *ctx, int var_num) {
+	zend_ssa_var *var = &ctx->scdf.ssa->vars[var_num];
+	zend_op *opline;
+	zend_ssa_op *ssa_op;
+	int copy1, copy2;
+	zend_bool invert;
+	if (var->definition < 0) {
+		return BOT;
+	}
+
+	opline = &ctx->scdf.op_array->opcodes[var->definition];
+	switch (opline->opcode) {
+		case ZEND_IS_EQUAL:
+		case ZEND_IS_IDENTICAL:
+			invert = 0;
+			break;
+		case ZEND_IS_NOT_EQUAL:
+		case ZEND_IS_NOT_IDENTICAL:
+			invert = 1;
+			break;
+		default:
+			return BOT;
+	}
+
+	ssa_op = &ctx->scdf.ssa->ops[var->definition];
+	copy1 = ctx->copy[ssa_op->op1_use];
+	copy2 = ctx->copy[ssa_op->op2_use];
+	if (copy1 == BOT || copy2 == BOT) {
+		return BOT;
+	}
+	if (copy1 == TOP || copy2 == TOP) {
+		return TOP;
+	}
+
+	if (copy1 == copy2) {
+		return !invert;
+	} else {
+		return invert;
+	}
+}
+
+/* Unconditional constant propagation */
+zend_bool get_feasible_successors(
+		void *void_ctx, zend_basic_block *block,
+		zend_op *opline, zend_ssa_op *ssa_op, zend_bool *suc) {
+	context *ctx = (context *) void_ctx;
+	int is_true;
+
+	/* We can't determine the branch target at compile-time for these */
+	switch (opline->opcode) {
+		case ZEND_ASSERT_CHECK:
+		case ZEND_CATCH:
+		case ZEND_DECLARE_ANON_CLASS:
+		case ZEND_DECLARE_ANON_INHERITED_CLASS:
+		case ZEND_FE_FETCH_R:
+		case ZEND_FE_FETCH_RW:
+		case ZEND_NEW:
+		case ZEND_COALESCE:
+		case ZEND_FE_RESET_R:
+		case ZEND_FE_RESET_RW:
+			suc[0] = 1;
+			suc[1] = 1;
+			return 1;
+	}
+
+	/* Constant op1 -- shouldn't exist at this point, don't bother */
+	if (ssa_op->op1_use < 0) {
+		suc[0] = 1;
+		suc[1] = 1;
+		return 1;
+	}
+
+	/* We can't statically determine the condition */
+	is_true = is_cond_true(ctx, ssa_op->op1_use);
+	if (is_true == BOT) {
+		suc[0] = 1;
+		suc[1] = 1;
+		return 1;
+	}
+	if (is_true == TOP) {
+		return 0;
+	}
+
+	switch (opline->opcode) {
+		case ZEND_JMPZ:
+		case ZEND_JMPZNZ:
+		case ZEND_JMPZ_EX:
+			suc[is_true] = 1;
+			break;
+		case ZEND_JMPNZ:
+		case ZEND_JMPNZ_EX:
+		case ZEND_JMP_SET:
+			suc[!is_true] = 1;
+			break;
+		EMPTY_SWITCH_DEFAULT_CASE()
+	}
+	return 1;
+}
+
+void scdf_copy_propagation(ssa_opt_ctx *ssa_ctx) {
+	zend_ssa *ssa = ssa_ctx->ssa;
+	zend_op_array *op_array = ssa_ctx->op_array;
+	int i;
+	context ctx;
+
+	ctx.scdf.handlers.visit_instr = visit_instr;
+	ctx.scdf.handlers.visit_phi = visit_phi;
+	ctx.scdf.handlers.get_feasible_successors = get_feasible_successors;
+
+	ctx.copy = alloca(sizeof(int) * ssa->vars_count);
+	for (i = 0; i < op_array->last_var; i++) {
+		ctx.copy[i] = BOT;
+	}
+	for (; i < ssa->vars_count; i++) {
+		if (ssa->var_info[i].type & MAY_BE_REF) {
+			ctx.copy[i] = BOT;
+		} else {
+			ctx.copy[i] = TOP;
+		}
+	}
+
+	scdf_init(&ctx.scdf, op_array, ssa);
+	scdf_solve(&ctx.scdf, "copy propagation");
+
+	for (i = 0; i < ssa->vars_count; i++) {
+		if (ctx.copy[i] != TOP && ctx.copy[i] != BOT && ctx.copy[i] != i) {
+			//OPT_STAT(tmp)++;
+		}
+	}
+
+	for (i = 0; i < ssa->cfg.blocks_count; i++) {
+		if (!(ssa->cfg.blocks[i].flags & ZEND_BB_REACHABLE)) {
+			continue;
+		}
+		if (!zend_bitset_in(ctx.scdf.executable_blocks, i)) {
+			OPT_STAT(tmp)++;
+		}
+	}
+
+	scdf_free(&ctx.scdf);
+}
+
 void ssa_optimize_copy(ssa_opt_ctx *ctx) {
 	zend_op_array *op_array = ctx->op_array;
 	zend_ssa *ssa = ctx->ssa;
 	int i;
+	scdf_copy_propagation(ctx);
 	for (i = 0; i < op_array->last; i++) {
 		zend_op *opline = &op_array->opcodes[i];
 		zend_ssa_op *ssa_op = &ssa->ops[i];
