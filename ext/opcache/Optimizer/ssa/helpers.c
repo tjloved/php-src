@@ -259,3 +259,27 @@ void remove_uses_of_var(zend_ssa *ssa, int var_num) {
 	var->use_chain = -1;
 }
 
+void remove_block(zend_ssa *ssa, int i, uint32_t *num_instr, uint32_t *num_phi) {
+	zend_op_array *op_array = ssa->op_array;
+	zend_basic_block *block = &ssa->cfg.blocks[i];
+	zend_ssa_block *ssa_block = &ssa->blocks[i];
+	zend_ssa_phi *phi;
+	int j;
+
+	block->flags &= ~ZEND_BB_REACHABLE;
+	for (phi = ssa_block->phis; phi; phi = phi->next) {
+		remove_uses_of_var(ssa, phi->ssa_var);
+		remove_phi(ssa, phi);
+		(*num_phi)++;
+	}
+	for (j = block->start; j <= block->end; j++) {
+		if (op_array->opcodes[j].opcode == ZEND_NOP) {
+			continue;
+		}
+
+		remove_defs_of_instr(ssa, &ssa->ops[j]);
+		remove_instr(ssa, &op_array->opcodes[j], &ssa->ops[j]);
+		(*num_instr)++;
+	}
+}
+

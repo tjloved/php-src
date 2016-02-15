@@ -1065,31 +1065,12 @@ static void visit_phi(void *void_ctx, zend_ssa_phi *phi) {
  * CFG would be overly painful at this point. */
 static void eliminate_dead_blocks(scp_ctx *ctx) {
 	zend_ssa *ssa = ctx->ssa;
-	zend_op_array *op_array = ctx->op_array;
 	int i;
 	for (i = 0; i < ssa->cfg.blocks_count; i++) {
 		if (!zend_bitset_in(ctx->scdf.executable_blocks, i)) {
-			zend_basic_block *block = &ssa->cfg.blocks[i];
-			zend_ssa_block *ssa_block = &ssa->blocks[i];
-			zend_ssa_phi *phi;
-			int j;
-
 			OPT_STAT(scp_dead_blocks)++;
-			block->flags &= ~ZEND_BB_REACHABLE;
-			for (phi = ssa_block->phis; phi; phi = phi->next) {
-				remove_uses_of_var(ssa, phi->ssa_var);
-				remove_phi(ssa, phi);
-				OPT_STAT(scp_dead_blocks_phis)++;
-			}
-			for (j = block->start; j <= block->end; j++) {
-				if (op_array->opcodes[j].opcode == ZEND_NOP) {
-					continue;
-				}
-
-				OPT_STAT(scp_dead_blocks_instrs)++;
-				remove_defs_of_instr(ssa, &ssa->ops[j]);
-				remove_instr(ssa, &op_array->opcodes[j], &ssa->ops[j]);
-			}
+			remove_block(ssa, i,
+				&OPT_STAT(scp_dead_blocks_instrs), &OPT_STAT(scp_dead_blocks_phis));
 		}
 	}
 }

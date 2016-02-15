@@ -368,6 +368,10 @@ static int is_cond_true(context *ctx, int var_num) {
 	}
 
 	ssa_op = &ctx->scdf.ssa->ops[var->definition];
+	if (ssa_op->op1_use < 0 || ssa_op->op2_use < 0) {
+		return BOT;
+	}
+
 	copy1 = ctx->copy[ssa_op->op1_use];
 	copy2 = ctx->copy[ssa_op->op2_use];
 	if (copy1 == BOT || copy2 == BOT) {
@@ -478,6 +482,7 @@ void scdf_copy_propagation(ssa_opt_ctx *ssa_ctx) {
 			continue;
 		}
 		if (!zend_bitset_in(ctx.scdf.executable_blocks, i)) {
+			//remove_block(ssa, i, &OPT_STAT(tmp), &OPT_STAT(tmp));
 			OPT_STAT(tmp)++;
 		}
 	}
