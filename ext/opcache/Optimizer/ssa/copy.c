@@ -288,7 +288,8 @@ typedef struct _context {
 #define BOT (-2)
 
 static inline void set_copy(context *ctx, int var, int copy) {
-	if (ctx->copy[var] != copy) {
+	/* The result var can be BOT here if it is a reference */
+	if (ctx->copy[var] != BOT && ctx->copy[var] != copy) {
 		ctx->copy[var] = copy;
 		scdf_add_to_worklist(&ctx->scdf, var);
 	}
@@ -297,18 +298,22 @@ static inline void set_copy(context *ctx, int var, int copy) {
 void visit_instr(void *void_ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 	context *ctx = (context *) void_ctx;
 	if (opline->opcode == ZEND_ASSIGN && opline->op2_type == IS_CV && ssa_op->op1_def >= 0) {
-		set_copy(ctx, ssa_op->op1_def, ssa_op->op2_use);
+		if (ctx->copy[ssa_op->op2_use] == BOT) {
+			set_copy(ctx, ssa_op->op1_def, ssa_op->op1_def);
+		} else {
+			set_copy(ctx, ssa_op->op1_def, ctx->copy[ssa_op->op2_use]);
+		}
 		return;
 	}
 
 	if (ssa_op->result_def >= 0) {
-		set_copy(ctx, ssa_op->result_def, BOT);
+		set_copy(ctx, ssa_op->result_def, ssa_op->result_def);
 	}
 	if (ssa_op->op1_def >= 0) {
-		set_copy(ctx, ssa_op->op1_def, BOT);
+		set_copy(ctx, ssa_op->op1_def, ssa_op->op1_def);
 	}
 	if (ssa_op->op2_def >= 0) {
-		set_copy(ctx, ssa_op->op2_def, BOT);
+		set_copy(ctx, ssa_op->op2_def, ssa_op->op2_def);
 	}
 }
 
@@ -332,10 +337,12 @@ void visit_phi(void *void_ctx, zend_ssa_phi *phi) {
 			if (phi->sources[i] >= 0
 					&& scdf_is_edge_feasible(&ctx->scdf, predecessors[i], phi->block)) {
 				int copy = ctx->copy[phi->sources[i]];
-				if (result == TOP) {
+				if (copy == BOT) {
+					result = BOT;
+				} else if (result == TOP) {
 					result = copy;
 				} else if (result != copy) {
-					result = BOT;
+					result = phi->ssa_var;
 				}
 			}
 		}
@@ -380,12 +387,11 @@ static int is_cond_true(context *ctx, int var_num) {
 	if (copy1 == TOP || copy2 == TOP) {
 		return TOP;
 	}
-
-	if (copy1 == copy2) {
-		return !invert;
-	} else {
-		return invert;
+	if (copy1 != copy2) {
+		return BOT;
 	}
+
+	return !invert;
 }
 
 /* Unconditional constant propagation */
@@ -473,7 +479,7 @@ void scdf_copy_propagation(ssa_opt_ctx *ssa_ctx) {
 
 	for (i = 0; i < ssa->vars_count; i++) {
 		if (ctx.copy[i] != TOP && ctx.copy[i] != BOT && ctx.copy[i] != i) {
-			//OPT_STAT(tmp)++;
+			OPT_STAT(tmp)++;
 		}
 	}
 
@@ -482,8 +488,8 @@ void scdf_copy_propagation(ssa_opt_ctx *ssa_ctx) {
 			continue;
 		}
 		if (!zend_bitset_in(ctx.scdf.executable_blocks, i)) {
-			//remove_block(ssa, i, &OPT_STAT(tmp), &OPT_STAT(tmp));
-			OPT_STAT(tmp)++;
+			remove_block(ssa, i, &OPT_STAT(tmp), &OPT_STAT(tmp));
+			//OPT_STAT(tmp)++;
 		}
 	}
 
