@@ -11,8 +11,11 @@ typedef struct {
 
 typedef struct {
 	zend_ssa *ssa;
+	const cfg_info *info;
+	const ssa_liveness *liveness;
 	int *predom;
 	group *groups;
+	zend_stack stack;
 } context;
 
 static zend_bool interfere_dominating(const ssa_liveness *liveness, int a, zend_ssa_var *var_b) {
@@ -120,16 +123,49 @@ static void merge_groups(context *ctx, int var1, int var2) {
 	}
 }
 
+static inline zend_bool group_has_interference(context *ctx, int var) {
+	const zend_ssa *ssa = ctx->ssa;
+	const group *groups = ctx->groups;
+	int other;
+	ZEND_ASSERT(groups[var].min == var);
+
+	do {
+		zend_ssa_var *ssa_var = &ssa->vars[var];
+		int *top = zend_stack_top(&ctx->stack);
+		other = top ? *top : -1;
+		while (other != -1 && var_dominates(ctx->ssa, ctx->info, &ssa->vars[other], ssa_var)) {
+			zend_stack_del_top(&ctx->stack);
+			top = zend_stack_top(&ctx->stack);
+			other = top ? *top : -1;
+		}
+
+		if (other != -1 && interfere_dominating(ctx->liveness, other, ssa_var)) {
+			ctx->stack.top = ctx->stack.max = 0;
+			return 1;
+		}
+
+		zend_stack_push(&ctx->stack, &var);
+		var = groups[var].next;
+	} while (var != -1);
+
+	ctx->stack.top = ctx->stack.max = 0;
+	return 0;
+}
+
 static void group_stuff(ssa_opt_ctx *ssa_ctx) {
 	zend_ssa *ssa = ssa_ctx->ssa;
+	zend_op_array *op_array = ssa_ctx->op_array;
 	zend_ssa_phi *phi;
 	int i;
 
 	context ctx;
 	ctx.ssa = ssa;
+	ctx.info = ssa_ctx->cfg_info;
+	ctx.liveness = ssa_ctx->liveness;
 	ctx.predom = zend_arena_alloc(&ssa_ctx->opt_ctx->arena, sizeof(int) * ssa->vars_count);
 	ctx.groups = zend_arena_alloc(&ssa_ctx->opt_ctx->arena, sizeof(group) * ssa->vars_count);
 	compute_dominance_preorder(&ctx, ssa_ctx);
+	zend_stack_init(&ctx.stack, sizeof(int));
 
 	/* Start with identity groups */
 	for (i = 0; i < ssa->vars_count; i++) {
@@ -148,6 +184,31 @@ static void group_stuff(ssa_opt_ctx *ssa_ctx) {
 			merge_groups(&ctx, phi->ssa_var, source);
 		} FOREACH_PHI_SOURCE_END();
 	} FOREACH_PHI_END();
+
+	for (i = 0; i < op_array->last; i++) {
+		zend_ssa_op *ssa_op = &ssa->ops[i];
+		if (ssa_op->result_use >= 0 && ssa_op->result_def >= 0) {
+			merge_groups(&ctx, ssa_op->result_use, ssa_op->result_def);
+		}
+		if (ssa_op->op1_use >= 0 && ssa_op->op1_def >= 0) {
+			merge_groups(&ctx, ssa_op->op1_use, ssa_op->op1_def);
+		}
+		if (ssa_op->op2_use >= 0 && ssa_op->op2_def >= 0) {
+			merge_groups(&ctx, ssa_op->op2_use, ssa_op->op2_def);
+		}
+	}
+
+	for (i = 0; i < ssa->vars_count; i++) {
+		if (ctx.groups[i].min != i) {
+			continue;
+		}
+
+		if (group_has_interference(&ctx, i)) {
+			fprintf(stderr, "Interference in group %d\n", i);
+		}
+	}
+
+	zend_stack_destroy(&ctx.stack);
 }
 
 static void check_interferences(ssa_opt_ctx *ssa_ctx) {
