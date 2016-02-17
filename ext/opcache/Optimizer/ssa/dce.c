@@ -319,7 +319,7 @@ static inline int get_common_phi_source(zend_ssa *ssa, zend_ssa_phi *phi) {
 	FOREACH_PHI_SOURCE(phi, source) {
 		if (common_source == -1) {
 			common_source = source;
-		} else if (common_source != source) {
+		} else if (common_source != source && source != phi->ssa_var) {
 			return -1;
 		}
 	} FOREACH_PHI_SOURCE_END();
@@ -329,12 +329,22 @@ static inline int get_common_phi_source(zend_ssa *ssa, zend_ssa_phi *phi) {
 static void try_remove_trivial_phi(context *ctx, zend_ssa_phi *phi) {
 	zend_ssa *ssa = ctx->ssa;
 	if (phi->pi < 0) {
+		/* Phi assignment with identical source operands */
 		int common_source = get_common_phi_source(ssa, phi);
 		if (common_source >= 0) {
 			rename_var_uses(ssa, phi->ssa_var, common_source);
 			remove_phi(ssa, phi);
 			OPT_STAT(dce_dead_phis)++;
 		}
+	} else {
+		/* Pi assignment that is only used in Phi/Pi assignments */
+		// TODO What if we want to rerun type inference after DCE? Maybe separate this?
+		/*ZEND_ASSERT(phi->sources[0] != -1);
+		if (ssa->vars[phi->ssa_var].use_chain < 0) {
+			rename_var_uses_keep_types(ssa, phi->ssa_var, phi->sources[0]);
+			remove_phi(ssa, phi);
+			OPT_STAT(dce_dead_phis)++;
+		}*/
 	}
 }
 
