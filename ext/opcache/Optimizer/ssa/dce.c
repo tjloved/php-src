@@ -102,11 +102,6 @@ static inline zend_bool may_have_side_effects(
 	return 0;
 }
 
-static inline zend_bool has_improper_op1_use(zend_op *opline) {
-	return opline->opcode == ZEND_ASSIGN
-		|| (opline->opcode == ZEND_UNSET_VAR && opline->extended_value & ZEND_QUICK_SET);
-}
-
 static inline void add_to_worklists(context *ctx, int var_num) {
 	zend_ssa_var *var = &ctx->ssa->vars[var_num];
 	if (var->definition >= 0) {
