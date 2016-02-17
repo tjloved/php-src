@@ -123,16 +123,15 @@ static void merge_groups(context *ctx, int var1, int var2) {
 	}
 }
 
-static inline zend_bool group_has_interference(context *ctx, int var) {
+static zend_bool group_has_interference(context *ctx, int var) {
 	const zend_ssa *ssa = ctx->ssa;
 	const group *groups = ctx->groups;
-	int other;
 	ZEND_ASSERT(groups[var].min == var);
 
 	do {
 		zend_ssa_var *ssa_var = &ssa->vars[var];
 		int *top = zend_stack_top(&ctx->stack);
-		other = top ? *top : -1;
+		int other = top ? *top : -1;
 		while (other != -1 && var_dominates(ctx->ssa, ctx->info, &ssa->vars[other], ssa_var)) {
 			zend_stack_del_top(&ctx->stack);
 			top = zend_stack_top(&ctx->stack);
@@ -150,6 +149,61 @@ static inline zend_bool group_has_interference(context *ctx, int var) {
 
 	ctx->stack.top = ctx->stack.max = 0;
 	return 0;
+}
+
+static zend_bool groups_interfere(context *ctx, int var_a, int var_b) {
+	const zend_ssa *ssa = ctx->ssa;
+	const group *groups = ctx->groups;
+
+	ZEND_ASSERT(var_a >= 0 && var_b >= 0);
+	ZEND_ASSERT(groups[var_a].min == var_a);
+	ZEND_ASSERT(groups[var_b].min == var_b);
+
+	do {
+		int current;
+		zend_ssa_var *current_var;
+		int *top = zend_stack_top(&ctx->stack);
+		int other = top ? *top : -1;
+
+		if (var_a == -1 || (var_b != -1 && ctx->predom[var_b] < ctx->predom[var_a])) {
+			current = var_b;
+			var_b = groups[var_b].next;
+		} else {
+			current = var_a;
+			var_a = groups[var_a].next;
+		}
+		current_var = &ssa->vars[current];
+
+		while (other != -1 && var_dominates(ctx->ssa, ctx->info, &ssa->vars[other], current_var)) {
+			zend_stack_del_top(&ctx->stack);
+			top = zend_stack_top(&ctx->stack);
+			other = top ? *top : -1;
+		}
+
+		if (other != -1 && interfere_dominating(ctx->liveness, other, current_var)) {
+			ctx->stack.top = ctx->stack.max = 0;
+			return 1;
+		}
+
+		zend_stack_push(&ctx->stack, &current);
+	} while (var_a != -1 || var_b != -1);
+
+	ctx->stack.top = ctx->stack.max = 0;
+	return 0;
+}
+
+static inline void try_merge(context *ctx, int a, int b) {
+	a = ctx->groups[a].min;
+	b = ctx->groups[b].min;
+	if (a == -1 || b == -1 || a == b) {
+		return;
+	}
+	if (groups_interfere(ctx, a, b)) {
+		fprintf(stderr, "Groups %d and %d interfere\n", a, b);
+		return;
+	}
+
+	merge_groups(ctx, a, b);
 }
 
 static void group_stuff(ssa_opt_ctx *ssa_ctx) {
@@ -181,20 +235,20 @@ static void group_stuff(ssa_opt_ctx *ssa_ctx) {
 	FOREACH_PHI(phi) {
 		int source;
 		FOREACH_PHI_SOURCE(phi, source) {
-			merge_groups(&ctx, phi->ssa_var, source);
+			try_merge(&ctx, phi->ssa_var, source);
 		} FOREACH_PHI_SOURCE_END();
 	} FOREACH_PHI_END();
 
 	for (i = 0; i < op_array->last; i++) {
 		zend_ssa_op *ssa_op = &ssa->ops[i];
 		if (ssa_op->result_use >= 0 && ssa_op->result_def >= 0) {
-			merge_groups(&ctx, ssa_op->result_use, ssa_op->result_def);
+			try_merge(&ctx, ssa_op->result_use, ssa_op->result_def);
 		}
 		if (ssa_op->op1_use >= 0 && ssa_op->op1_def >= 0) {
-			merge_groups(&ctx, ssa_op->op1_use, ssa_op->op1_def);
+			try_merge(&ctx, ssa_op->op1_use, ssa_op->op1_def);
 		}
 		if (ssa_op->op2_use >= 0 && ssa_op->op2_def >= 0) {
-			merge_groups(&ctx, ssa_op->op2_use, ssa_op->op2_def);
+			try_merge(&ctx, ssa_op->op2_use, ssa_op->op2_def);
 		}
 	}
 
