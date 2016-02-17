@@ -3,6 +3,7 @@
 #include "Optimizer/ssa_pass.h"
 #include "Optimizer/ssa/cfg_info.h"
 #include "Optimizer/ssa/instructions.h"
+#include "Optimizer/ssa/liveness.h"
 #include "Optimizer/statistics.h"
 
 /* GVN instruction encoding:
@@ -34,6 +35,7 @@ typedef struct _context {
 	zend_op_array *op_array;
 	zend_ssa *ssa;
 	const cfg_info *info;
+	const ssa_liveness *liveness;
 	HashTable hash;
 
 	uint32_t *valnums;
@@ -393,12 +395,26 @@ static void remove_redundancies(context *ctx) {
 			/* We only simplify operations on CVs for now */
 			continue;
 		}
-		//if (valnum < op_array->last_var) {
-		uint32_t cv_num = find_cv_num(ctx, valnum, i);
-		if (cv_num != INVALID) {
-			OPT_STAT(tmp)++;
-			//fprintf(stderr, "%d -> %d\n", i, ctx->valnums[i]);
+		if (ssa->vars[i].definition >= 0) {
+			/* For now, we're only interested in real instructions */
+			continue;
 		}
+
+		uint32_t cv_num = find_cv_num(ctx, valnum, i);
+		if (cv_num == INVALID) {
+			continue;
+		}
+
+		if (ssa->vars[cv_num].phi_use_chain) {
+			continue;
+		}
+
+		if (!var_dominates(ssa, ctx->info, &ssa->vars[cv_num], &ssa->vars[i])) {
+			continue;
+		}
+
+		OPT_STAT(tmp)++;
+		//fprintf(stderr, "%d -> %d\n", i, ctx->valnums[i]);
 	}
 }
 
@@ -416,6 +432,7 @@ void ssa_optimize_gvn(ssa_opt_ctx *ssa_ctx) {
 	ctx.op_array = ssa_ctx->op_array;
 	ctx.ssa = ssa;
 	ctx.info = ssa_ctx->cfg_info;
+	ctx.liveness = ssa_ctx->liveness;
 	ctx.valnums = zend_arena_alloc(&ctx.arena, sizeof(int32_t) * ssa->vars_count);
 	zend_hash_init(&ctx.hash, 0, NULL, NULL, 0); // TODO size estimate
 
