@@ -547,7 +547,7 @@ static void merge_opcodes(
 			new_opline->opcode = ZEND_UNSET_VAR;
 			new_opline->op1_type = IS_CV;
 			new_opline->op1.var = (zend_uintptr_t) ZEND_CALL_VAR_NUM(NULL, cv_offset + i);
-			new_opline->extended_value = ZEND_QUICK_SET;
+			new_opline->extended_value = ZEND_FETCH_LOCAL | ZEND_QUICK_SET;
 			new_opline++;
 		}
 
