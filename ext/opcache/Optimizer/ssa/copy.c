@@ -483,7 +483,7 @@ void scdf_copy_propagation(ssa_opt_ctx *ssa_ctx) {
 			if (ssa->vars[i].definition_phi && ssa->vars[i].definition_phi->pi < 0) {
 				/*rename_var_uses(ssa, i, ctx.copy[i]);
 				remove_phi(ssa, ssa->vars[i].definition_phi);*/
-				OPT_STAT(tmp)++;
+				//OPT_STAT(tmp)++;
 			}
 		}
 	}

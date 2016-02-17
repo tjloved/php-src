@@ -68,6 +68,10 @@ void remove_uses_of_var(zend_ssa *ssa, int var_num);
 /* num_instr and num_phi are the number of removed instructions/phis, for statistical purposes */
 void remove_block(zend_ssa *ssa, int i, uint32_t *num_instr, uint32_t *num_phi);
 
+struct _cfg_info;
+zend_bool var_dominates(
+	const zend_ssa *ssa, const struct _cfg_info *info, zend_ssa_var *var_a, zend_ssa_var *var_b);
+
 static inline void rename_var_uses(zend_ssa *ssa, int old, int new) {
 	rename_var_uses_ex(ssa, old, new, 1);
 }
@@ -179,6 +183,17 @@ static inline void remove_instr(zend_ssa *ssa, zend_op *opline, zend_ssa_op *ssa
 	ZEND_ASSERT(ssa_op->op2_def == -1);
 
 	MAKE_NOP(opline);
+}
+
+static inline uint32_t get_def_block(const zend_ssa *ssa, const zend_ssa_var *var) {
+	if (var->definition >= 0) {
+		return ssa->cfg.map[var->definition];
+	} else if (var->definition_phi) {
+		return var->definition_phi->block;
+	} else {
+		/* Implicit define at start of start block */
+		return 0;
+	}
 }
 
 static inline int zend_bitset_pop_first(zend_bitset set, uint32_t len) {

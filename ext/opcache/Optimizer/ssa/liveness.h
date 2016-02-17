@@ -5,11 +5,10 @@
 
 typedef struct _ssa_liveness {
 	zend_ssa *ssa;
+	const cfg_info *info;
 	uint32_t block_set_len;
 	zend_bitset reduced_reachable;
 	zend_bitset targets;
-	zend_bitset sdom;
-	zend_bitset backedge_targets;
 } ssa_liveness;
 
 void ssa_liveness_precompute(

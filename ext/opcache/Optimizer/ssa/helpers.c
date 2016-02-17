@@ -1,5 +1,7 @@
 #include "ZendAccelerator.h"
+#include "Optimizer/zend_optimizer_internal.h"
 #include "Optimizer/ssa/helpers.h"
+#include "Optimizer/ssa/cfg_info.h"
 
 static void propagate_phi_type_widening(zend_ssa *ssa, int var) {
 	zend_ssa_phi *phi;
@@ -281,5 +283,50 @@ void remove_block(zend_ssa *ssa, int i, uint32_t *num_instr, uint32_t *num_phi) 
 		remove_instr(ssa, &op_array->opcodes[j], &ssa->ops[j]);
 		(*num_instr)++;
 	}
+}
+
+zend_bool var_dominates(
+		const zend_ssa *ssa, const cfg_info *info,
+		zend_ssa_var *var_a, zend_ssa_var *var_b) {
+	int block_a = get_def_block(ssa, var_a);
+	int block_b = get_def_block(ssa, var_b);
+	ZEND_ASSERT(var_a != var_b);
+	if (block_a == block_b) {
+		if (var_a->definition_phi) {
+			/* Earlier phi dominates later phi -- normally it wouldn't matter and any phi on a
+			 * block could dominate any other, but this is important for pi nodes. */
+			if (var_b->definition_phi) {
+				zend_ssa_phi *cur = ssa->blocks[block_a].phis;
+				for (; cur; cur = cur->next) {
+					if (cur == var_a->definition_phi) {
+						return 1;
+					}
+					if (cur == var_b->definition_phi) {
+						return 0;
+					}
+				}
+				ZEND_ASSERT(0);
+			}
+			return 1;
+		}
+		if (var_b->definition_phi) {
+			return 0;
+		}
+		if (var_a->definition == var_b->definition) {
+			/* Very crazy case where one op defines the same variable twice -- in this case the
+			 * second definition wins */
+			zend_ssa_op *ssa_op = &ssa->ops[var_a->definition];
+			if (ssa_op->op1_def == var_a - ssa->vars) {
+				ZEND_ASSERT(ssa_op->op2_def == var_b - ssa->vars);
+				return 1;
+			} else {
+				ZEND_ASSERT(ssa_op->op1_def == var_b - ssa->vars);
+				ZEND_ASSERT(ssa_op->op2_def == var_a - ssa->vars);
+				return 0;
+			}
+		}
+		return var_a->definition < var_b->definition;
+	}
+	return block_dominates(info, block_a, block_b);
 }
 

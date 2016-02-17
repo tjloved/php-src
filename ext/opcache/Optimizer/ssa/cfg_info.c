@@ -3,6 +3,8 @@
 #include "Optimizer/ssa/helpers.h"
 #include "Optimizer/ssa/cfg_info.h"
 
+#define SDOM(block) (info->sdom + (block) * info->block_set_len)
+
 typedef struct context {
 	zend_bitset active;
 	zend_bitset finished;
@@ -41,6 +43,15 @@ static void compute_cfg_info_recursive(
 	zend_bitset_incl(state->finished, block_num);
 }
 
+static void compute_sdom_recursive(cfg_info *info, const zend_cfg *cfg, int block_num) {
+	int i;
+	for (i = cfg->blocks[block_num].children; i >= 0; i = cfg->blocks[i].next_child) {
+		compute_sdom_recursive(info, cfg, i);
+		zend_bitset_union(SDOM(block_num), SDOM(i), info->block_set_len);
+		zend_bitset_incl(SDOM(block_num), i);
+	}
+}
+
 void compute_cfg_info(cfg_info *info, zend_optimizer_ctx *opt_ctx, const zend_cfg *cfg) {
 	ALLOCA_FLAG(use_heap_active);
 	ALLOCA_FLAG(use_heap_finished);
@@ -59,10 +70,15 @@ void compute_cfg_info(cfg_info *info, zend_optimizer_ctx *opt_ctx, const zend_cf
 		&opt_ctx->arena, zend_bitset_len(2 * cfg->blocks_count), sizeof(zend_ulong));
 	info->backedge_targets = state.backedge_targets = zend_arena_calloc(
 		&opt_ctx->arena, block_set_len, sizeof(zend_ulong));
-	info->backedge_sources = state.backedge_sources =  zend_arena_calloc(
+	info->backedge_sources = state.backedge_sources = zend_arena_calloc(
 		&opt_ctx->arena, block_set_len, sizeof(zend_ulong));
 
+	info->block_set_len = block_set_len;
+	info->sdom = zend_arena_calloc(&opt_ctx->arena,
+		block_set_len * sizeof(zend_ulong), cfg->blocks_count);
+
 	compute_cfg_info_recursive(&state, cfg, 0);
+	compute_sdom_recursive(info, cfg, 0);
 
 	free_alloca(state.active, use_heap_active);
 	free_alloca(state.finished, use_heap_finished);

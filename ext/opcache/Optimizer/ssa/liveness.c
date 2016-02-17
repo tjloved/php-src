@@ -27,7 +27,6 @@ static void zend_bitset_dump(zend_bitset bitset, uint32_t len, uint32_t count) {
 
 #define REDUCED_REACHABLE(block) (liveness->reduced_reachable + (block) * liveness->block_set_len)
 #define TARGETS(block) (liveness->targets + (block) * liveness->block_set_len)
-#define SDOM(block) (liveness->sdom + (block) * liveness->block_set_len)
 
 static void compute_reduced_reachable(
 		zend_optimizer_ctx *opt_ctx, ssa_liveness *liveness,
@@ -113,35 +112,20 @@ static void compute_targets(
 	free_alloca(tmp, use_heap);
 }
 
-/* Compute bitset of strictly dominated nodes */
-// TODO The paper suggests totally ordering blocks by domination, so sdom is just a start + end
-// offset
-static void compute_sdom_recursive(ssa_liveness *liveness, const zend_cfg *cfg, int block_num) {
-	int i;
-	for (i = cfg->blocks[block_num].children; i >= 0; i = cfg->blocks[i].next_child) {
-		compute_sdom_recursive(liveness, cfg, i);
-		zend_bitset_union(SDOM(block_num), SDOM(i), liveness->block_set_len);
-		zend_bitset_incl(SDOM(block_num), i);
-	}
-}
-
 void ssa_liveness_precompute(
 		zend_optimizer_ctx *opt_ctx, ssa_liveness *liveness, zend_ssa *ssa, cfg_info *info) {
 	zend_cfg *cfg = &ssa->cfg;
 
 	liveness->ssa = ssa;
+	liveness->info = info;
 	liveness->block_set_len = zend_bitset_len(cfg->blocks_count);
 	liveness->reduced_reachable = zend_arena_calloc(&opt_ctx->arena,
 		liveness->block_set_len * sizeof(zend_ulong), cfg->blocks_count);
 	liveness->targets = zend_arena_calloc(&opt_ctx->arena,
 		liveness->block_set_len * sizeof(zend_ulong), cfg->blocks_count);
-	liveness->sdom = zend_arena_calloc(&opt_ctx->arena,
-		liveness->block_set_len * sizeof(zend_ulong), cfg->blocks_count);
 
 	compute_reduced_reachable(opt_ctx, liveness, cfg, info);
 	compute_targets(opt_ctx, liveness, cfg, info);
-	compute_sdom_recursive(liveness, cfg, 0);
-	liveness->backedge_targets = info->backedge_targets;
 	
 #if LIVENESS_DEBUG
 	int i;
@@ -168,19 +152,8 @@ void ssa_liveness_precompute(
 	fprintf(stderr, "Targets:\n");
 	zend_bitset_dump(liveness->targets, liveness->block_set_len, cfg->blocks_count);
 	fprintf(stderr, "Strictly dominated:\n");
-	zend_bitset_dump(liveness->sdom, liveness->block_set_len, cfg->blocks_count);
+	zend_bitset_dump(liveness->info->sdom, liveness->block_set_len, cfg->blocks_count);
 #endif
-}
-
-static uint32_t get_def_block(const zend_ssa *ssa, const zend_ssa_var *var) {
-	if (var->definition >= 0) {
-		return ssa->cfg.map[var->definition];
-	} else if (var->definition_phi) {
-		return var->definition_phi->block;
-	} else {
-		/* Implicit define at start of start block */
-		return 0;
-	}
 }
 
 static zend_bool phi_use_reachable(
@@ -227,7 +200,7 @@ zend_bool ssa_is_live_in_at_block(const ssa_liveness *liveness, int var_num, int
 		return 0;
 	}
 	while ((i = zend_bitset_next(TARGETS(block), liveness->block_set_len, i)) >= 0) {
-		if (zend_bitset_in(SDOM(def_block), i)) {
+		if (block_strictly_dominates(liveness->info, def_block, i)) {
 			int use;
 			zend_ssa_phi *phi;
 			FOREACH_USE(var, use) {
@@ -303,7 +276,7 @@ static inline zend_bool ssa_is_live_at_op(
 	} else {
 		int i = 0;
 		while ((i = zend_bitset_next(TARGETS(block), liveness->block_set_len, i)) >= 0) {
-			if (zend_bitset_in(SDOM(def_block), i)) {
+			if (block_strictly_dominates(liveness->info, def_block, i)) {
 				int use;
 				zend_ssa_phi *phi;
 				FOREACH_USE(var, use) {
@@ -312,7 +285,7 @@ static inline zend_bool ssa_is_live_at_op(
 						use--;
 					}
 					if (use_block == block && use + live_in <= op
-							&& !zend_bitset_in(liveness->backedge_targets, block)) {
+							&& !block_is_backedge_target(liveness->info, block)) {
 						continue;
 					}
 					if (zend_bitset_in(REDUCED_REACHABLE(i), use_block)) {
