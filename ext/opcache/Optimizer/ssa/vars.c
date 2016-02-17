@@ -4,6 +4,17 @@
 #include "Optimizer/statistics.h"
 #include "Optimizer/ssa/liveness.h"
 
+typedef struct {
+	int min;
+	int next;
+} group;
+
+typedef struct {
+	zend_ssa *ssa;
+	int *predom;
+	group *groups;
+} context;
+
 static zend_bool interfere_dominating(const ssa_liveness *liveness, int a, zend_ssa_var *var_b) {
 	if (var_b->definition >= 0) {
 		return ssa_is_live_out_at_op(liveness, a, var_b->definition);
@@ -26,10 +37,61 @@ static zend_bool interfere(const zend_ssa *ssa, const ssa_liveness *liveness, in
 	}
 }
 
-static void check_interferences(ssa_opt_ctx *ctx) {
+static void merge_groups(context *ctx, int i, int j) {
+}
+
+/* Compute preorder numbering of SSA vars over dominance relationship */
+static int compute_dominance_preorder_recursive(context *ctx, int num, int block_num) {
 	zend_ssa *ssa = ctx->ssa;
-	int last_var = ctx->op_array->last_var;
+	zend_basic_block *block = &ssa->cfg.blocks[block_num];
+	zend_ssa_block *ssa_block = &ssa->blocks[block_num];
+	zend_ssa_phi *phi;
+	int i;
+	for (phi = ssa_block->phis; phi; phi = phi->next) {
+		ctx->predom[phi->ssa_var] = num++;
+	}
+	for (i = block->start; i <= block->end; i++) {
+		zend_ssa_op *ssa_op = &ssa->ops[i];
+		if (ssa_op->result_def >= 0) {
+			ctx->predom[ssa_op->result_def] = num++;
+		}
+		if (ssa_op->op1_def >= 0) {
+			ctx->predom[ssa_op->op1_def] = num++;
+		}
+		if (ssa_op->op2_def >= 0) {
+			ctx->predom[ssa_op->op2_def] = num++;
+		}
+	}
+
+	for (i = block->children; i >= 0; i = ssa->cfg.blocks[i].next_child) {
+		num = compute_dominance_preorder_recursive(ctx, num, i);
+	}
+	return num;
+}
+static void compute_dominance_preorder(context *ctx, ssa_opt_ctx *ssa_ctx) {
+	int i;
+	for (i = 0; i < ssa_ctx->op_array->last_var; i++) {
+		ctx->predom[i] = i;
+	}
+	compute_dominance_preorder_recursive(ctx, i, 0);
+}
+
+static void check_interferences(ssa_opt_ctx *ssa_ctx) {
+	zend_ssa *ssa = ssa_ctx->ssa;
+	ssa_liveness *liveness = ssa_ctx->liveness;
+	int last_var = ssa_ctx->op_array->last_var;
 	int i, j;
+
+	context ctx;
+	ctx.ssa = ssa;
+	ctx.predom = zend_arena_alloc(&ssa_ctx->opt_ctx->arena, sizeof(int) * ssa->vars_count);
+	ctx.groups = zend_arena_alloc(&ssa_ctx->opt_ctx->arena, sizeof(group) * ssa->vars_count);
+	compute_dominance_preorder(&ctx, ssa_ctx);
+	for (i = 0; i < ssa->vars_count; i++) {
+		ctx.groups[i].min = i;
+		ctx.groups[i].next = -1;
+	}
+
 	for (i = 0; i < ssa->vars_count; i++) {
 		zend_ssa_var *var_i = &ssa->vars[i];
 		int var = var_i->var;
@@ -43,10 +105,10 @@ static void check_interferences(ssa_opt_ctx *ctx) {
 				continue;
 			}
 
-			if (interfere(ssa, ctx->liveness, i, j)) {
+			if (interfere(ssa, liveness, i, j)) {
 				fprintf(stderr,
 					"%d and %d for var %d ($%s) interfere\n",
-					i, j, var, ZSTR_VAL(ctx->op_array->vars[var]));
+					i, j, var, ZSTR_VAL(ssa_ctx->op_array->vars[var]));
 			}
 		}
 	}
