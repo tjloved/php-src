@@ -504,6 +504,7 @@ static void remove_redundancies(context *ctx) {
 		OPT_STAT(tmp)++;
 		//fprintf(stderr, "%d -> %d %s\n", i, ctx->valnums[i], zend_get_opcode_name(def_opline->opcode));
 		
+#if 0
 		/* Rename CV operands in uses */
 		int use;
 		FOREACH_USE(var, use) {
@@ -521,14 +522,8 @@ static void remove_redundancies(context *ctx) {
 			}
 		} FOREACH_USE_END();
 
-		/* Remove assignment instruction */
 		rename_var_uses(ssa, i, leader_num);
-		/*if (opline->opcode == ZEND_ASSIGN) {
-			remove_op1_def(ssa, ssa_op);
-		} else {
-			remove_result_def(ssa, ssa_op);
-		}
-		remove_instr(ssa, opline, ssa_op);*/
+#endif
 	}
 }
 
