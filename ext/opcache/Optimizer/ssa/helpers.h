@@ -58,7 +58,7 @@
 	} \
 } while (0)
 
-void rename_var_uses(zend_ssa *ssa, int old, int new);
+void rename_var_uses_ex(zend_ssa *ssa, int old, int new, zend_bool update_types);
 void remove_result_use(zend_ssa *ssa, zend_ssa_op *ssa_op);
 void remove_op1_use(zend_ssa *ssa, zend_ssa_op *ssa_op);
 void remove_op2_use(zend_ssa *ssa, zend_ssa_op *ssa_op);
@@ -67,6 +67,15 @@ void remove_uses_of_var(zend_ssa *ssa, int var_num);
 
 /* num_instr and num_phi are the number of removed instructions/phis, for statistical purposes */
 void remove_block(zend_ssa *ssa, int i, uint32_t *num_instr, uint32_t *num_phi);
+
+static inline void rename_var_uses(zend_ssa *ssa, int old, int new) {
+	rename_var_uses_ex(ssa, old, new, 1);
+}
+
+/* Don't widen types of phi variables old is used in */
+static inline void rename_var_uses_keep_types(zend_ssa *ssa, int old, int new) {
+	rename_var_uses_ex(ssa, old, new, 0);
+}
 
 static inline void set_op1_use(zend_ssa *ssa, zend_ssa_op *ssa_op, int var_num) {
 	zend_ssa_var *var = &ssa->vars[var_num];

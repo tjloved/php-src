@@ -297,14 +297,14 @@ static inline void set_copy(context *ctx, int var, int copy) {
 
 void visit_instr(void *void_ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 	context *ctx = (context *) void_ctx;
-	if (opline->opcode == ZEND_ASSIGN && opline->op2_type == IS_CV && ssa_op->op1_def >= 0) {
+	/*if (opline->opcode == ZEND_ASSIGN && opline->op2_type == IS_CV && ssa_op->op1_def >= 0) {
 		if (ctx->copy[ssa_op->op2_use] == BOT) {
 			set_copy(ctx, ssa_op->op1_def, ssa_op->op1_def);
 		} else {
 			set_copy(ctx, ssa_op->op1_def, ctx->copy[ssa_op->op2_use]);
 		}
 		return;
-	}
+	}*/
 
 	if (ssa_op->result_def >= 0) {
 		set_copy(ctx, ssa_op->result_def, ssa_op->result_def);
@@ -326,7 +326,10 @@ void visit_phi(void *void_ctx, zend_ssa_phi *phi) {
 
 	if (phi->pi >= 0) {
 		if (phi->sources[0] >= 0 && scdf_is_edge_feasible(&ctx->scdf, phi->pi, phi->block)) {
-			set_copy(ctx, phi->ssa_var, ctx->copy[phi->sources[0]]);
+			if (ctx->copy[phi->sources[0]] != BOT) {
+				//set_copy(ctx, phi->ssa_var, ctx->copy[phi->sources[0]]);
+				set_copy(ctx, phi->ssa_var, phi->sources[0]);
+			}
 		}
 	} else {
 		zend_basic_block *block = &ssa->cfg.blocks[phi->block];
@@ -337,9 +340,7 @@ void visit_phi(void *void_ctx, zend_ssa_phi *phi) {
 			if (phi->sources[i] >= 0
 					&& scdf_is_edge_feasible(&ctx->scdf, predecessors[i], phi->block)) {
 				int copy = ctx->copy[phi->sources[i]];
-				if (copy == BOT) {
-					result = BOT;
-				} else if (result == TOP) {
+				if (result == TOP) {
 					result = copy;
 				} else if (result != copy) {
 					result = phi->ssa_var;
@@ -479,7 +480,11 @@ void scdf_copy_propagation(ssa_opt_ctx *ssa_ctx) {
 
 	for (i = 0; i < ssa->vars_count; i++) {
 		if (ctx.copy[i] != TOP && ctx.copy[i] != BOT && ctx.copy[i] != i) {
-			OPT_STAT(tmp)++;
+			if (ssa->vars[i].definition_phi && ssa->vars[i].definition_phi->pi < 0) {
+				/*rename_var_uses(ssa, i, ctx.copy[i]);
+				remove_phi(ssa, ssa->vars[i].definition_phi);*/
+				OPT_STAT(tmp)++;
+			}
 		}
 	}
 
