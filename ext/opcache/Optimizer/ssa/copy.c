@@ -141,13 +141,6 @@ static int try_propagate_cv_assignment(ssa_opt_ctx *ctx, zend_op *opline, zend_s
 	return SUCCESS;
 }
 
-static zend_bool is_ordinary_assign_use(
-		zend_ssa *ssa, zend_ssa_var *var, zend_ssa_op *ssa_op, int i) {
-	return var->definition >= 0 && var->definition+1 == i
-			&& var->use_chain == i && ssa_op->op2_use_chain < 0 && !var->phi_use_chain
-			&& !(ssa->var_info[ssa_op->op2_use].type & MAY_BE_REF);
-}
-
 static inline zend_bool can_tmpvar_op1(zend_op *opline) {
 	switch (opline->opcode) {
 		case ZEND_ISSET_ISEMPTY_VAR:
@@ -212,6 +205,12 @@ static inline zend_bool can_tmpvar_op2(zend_op *opline) {
 	return 1;
 }
 
+static inline zend_bool is_ordinary_assign_use(
+		zend_ssa *ssa, zend_ssa_var *var, zend_ssa_op *ssa_op, int i) {
+	return var->definition >= 0
+			&& var->use_chain == i && ssa_op->op2_use_chain < 0 && !var->phi_use_chain;
+}
+
 /* Propagates assignments of type ASSIGN CV_i, TMP_j where CV_i is used (properly) only once in
  * the same basic block and TMP_j has no dtor effect. */
 void try_propagate_cv_tmp_assignment(
@@ -225,10 +224,16 @@ void try_propagate_cv_tmp_assignment(
 	zend_basic_block *block;
 	zend_bool found_use = 0;
 
+	if (lhs_var->phi_use_chain) {
+		return;
+	}
+
 	if (!is_ordinary_assign_use(ssa, rhs_var, ssa_op, op_num)) {
 		return;
 	}
-	if (lhs_var->phi_use_chain) {
+
+	if (ssa->var_info[ssa_op->op2_use].type & MAY_BE_REF) {
+		/* The assignment will deref the value. */
 		return;
 	}
 
