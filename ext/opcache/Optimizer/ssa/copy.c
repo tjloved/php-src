@@ -205,14 +205,13 @@ static inline zend_bool can_tmpvar_op2(zend_op *opline) {
 	return 1;
 }
 
-static inline zend_bool is_ordinary_assign_use(
+static inline zend_bool is_used_only_in(
 		zend_ssa *ssa, zend_ssa_var *var, zend_ssa_op *ssa_op, int i) {
-	return var->definition >= 0
-			&& var->use_chain == i && ssa_op->op2_use_chain < 0 && !var->phi_use_chain;
+	return var->use_chain == i && ssa_op->op2_use_chain < 0 && !var->phi_use_chain;
 }
 
 /* Propagates assignments of type ASSIGN CV_i, TMP_j where CV_i is used (properly) only once in
- * the same basic block and TMP_j has no dtor effect. */
+ * the same basic block, the use supports TMPs and TMP_j has no dtor effect. */
 void try_propagate_cv_tmp_assignment(
 		ssa_opt_ctx *ctx, zend_op *opline, zend_ssa_op *ssa_op, int op_num) {
 	zend_ssa *ssa = ctx->ssa;
@@ -228,7 +227,7 @@ void try_propagate_cv_tmp_assignment(
 		return;
 	}
 
-	if (!is_ordinary_assign_use(ssa, rhs_var, ssa_op, op_num)) {
+	if (!is_used_only_in(ssa, rhs_var, ssa_op, op_num)) {
 		return;
 	}
 
