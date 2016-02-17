@@ -382,39 +382,153 @@ static uint32_t find_cv_num(context *ctx, uint32_t num, uint32_t skip) {
 	return INVALID;
 }
 
+static zend_bool var_has_proper_writes(
+		zend_ssa *ssa, zend_op_array *op_array, zend_ssa_var *var) {
+	/* Check if LHS is written to */
+	int use;
+	int var_num = var - ssa->vars;
+	FOREACH_USE(var, use) {
+		zend_op *use_opline = &op_array->opcodes[use];
+		zend_ssa_op *use_op = &ssa->ops[use];
+		if (use_opline->opcode == ZEND_BIND_LEXICAL) {
+			// TODO allow if same name?
+			return 1;
+		}
+		if (has_improper_op1_use(use_opline)) {
+			continue;
+		}
+		if ((use_op->op1_use == var_num && use_op->op1_def >= 0)
+				|| (use_op->op2_use == var_num && use_op->op2_def >= 0)
+				|| (use_op->result_use == var_num && use_op->result_def >= 0)) {
+			return 1;
+		}
+	} FOREACH_USE_END();
+	return 0;
+}
+
+static inline zend_bool var_written_while_live(
+		zend_ssa *ssa, const ssa_liveness *liveness,
+		const zend_ssa_var *check_var, const zend_ssa_var *live_var) {
+	int check_var_num = check_var - ssa->vars;
+	int live_var_num = live_var - ssa->vars;
+
+	int use;
+	zend_ssa_phi *phi;
+
+	/* Check if there is an assignment to check_var while live_var is live */
+	FOREACH_USE(check_var, use) {
+		zend_ssa_op *use_op = &ssa->ops[use];
+		if ((use_op->op1_use == check_var_num && use_op->op1_def >= 0)
+				|| (use_op->op2_use == check_var_num && use_op->op2_def >= 0)
+				|| (use_op->result_use == check_var_num && use_op->result_def >= 0)) {
+			if (ssa_is_live_out_at_op(liveness, live_var_num, use)) {
+				return 1;
+			}
+		}
+	} FOREACH_USE_END();
+
+	/* Use in phi *might* lead to an assignment, pessimistically assume it does */
+	FOREACH_PHI_USE(check_var, phi) {
+		if (ssa_is_live_in_at_block(liveness, live_var_num, phi->block)) {
+			return 1;
+		}
+	} FOREACH_PHI_USE_END();
+
+	return 0;
+}
+
+static void rename_improper_use(
+		zend_ssa *ssa, zend_op *use_opline, zend_ssa_op *use_op,
+		int old_lhs_var_num, int lhs_var_num) {
+	if (use_opline->opcode == ZEND_UNSET_VAR && (use_opline->extended_value & ZEND_QUICK_SET)) {
+		rename_var_uses(ssa, use_op->op1_def, old_lhs_var_num);
+		remove_op1_def(ssa, use_op);
+		remove_instr(ssa, use_opline, use_op);
+	} else if (use_opline->opcode == ZEND_ASSIGN && use_op->op1_use == lhs_var_num) {
+		set_op1_use(ssa, use_op, old_lhs_var_num);
+	}
+}
+
 static void remove_redundancies(context *ctx) {
 	zend_ssa *ssa = ctx->ssa;
 	zend_op_array *op_array = ctx->op_array;
 	int i;
 	for (i = 0; i < ssa->vars_count; i++) {
 		uint32_t valnum = ctx->valnums[i];
+		zend_ssa_var *var = &ssa->vars[i];
 		if (valnum == INVALID || valnum == TOP || valnum == i) {
 			continue;
 		}
-		if (ssa->vars[i].var >= op_array->last_var) {
+		if (var->var >= op_array->last_var) {
 			/* We only simplify operations on CVs for now */
 			continue;
 		}
-		if (ssa->vars[i].definition >= 0) {
+		if (var->definition < 0) {
 			/* For now, we're only interested in real instructions */
 			continue;
 		}
 
-		uint32_t cv_num = find_cv_num(ctx, valnum, i);
-		if (cv_num == INVALID) {
+		uint32_t leader_num = find_cv_num(ctx, valnum, i);
+		if (leader_num == INVALID) {
 			continue;
 		}
 
-		if (ssa->vars[cv_num].phi_use_chain) {
+		zend_ssa_var *leader_var = &ssa->vars[leader_num];
+		if (!var_dominates(ssa, ctx->info, leader_var, var)) {
 			continue;
 		}
 
-		if (!var_dominates(ssa, ctx->info, &ssa->vars[cv_num], &ssa->vars[i])) {
+		if (leader_var->phi_use_chain) {
 			continue;
+		}
+
+		if (var_has_proper_writes(ssa, op_array, var)) {
+			continue;
+		}
+
+		if (var_written_while_live(ssa, ctx->liveness, leader_var, var)) {
+			continue;
+		}
+
+		zend_ssa_op *def_op = &ssa->ops[var->definition];
+		zend_op *def_opline = &op_array->opcodes[var->definition];
+		int prev_var_num;
+		if (def_op->op2_def == i) {
+			prev_var_num = def_op->op2_use;
+		} else if (def_op->op1_def == i) {
+			prev_var_num = def_op->op1_use;
+		} else {
+			prev_var_num = def_op->result_use;
 		}
 
 		OPT_STAT(tmp)++;
-		//fprintf(stderr, "%d -> %d\n", i, ctx->valnums[i]);
+		//fprintf(stderr, "%d -> %d %s\n", i, ctx->valnums[i], zend_get_opcode_name(def_opline->opcode));
+		
+		/* Rename CV operands in uses */
+		int use;
+		FOREACH_USE(var, use) {
+			zend_op *use_opline = &op_array->opcodes[use];
+			zend_ssa_op *use_op = &ssa->ops[use];
+			rename_improper_use(ssa, use_opline, use_op, prev_var_num, i);
+			if (use_op->op1_use == i) {
+				use_opline->op1.var = NUM_VAR(leader_var->var);
+			}
+			if (use_op->op2_use == i) {
+				use_opline->op2.var = NUM_VAR(leader_var->var);
+			}
+			if (use_op->result_use == i) {
+				use_opline->result.var = NUM_VAR(leader_var->var);
+			}
+		} FOREACH_USE_END();
+
+		/* Remove assignment instruction */
+		rename_var_uses(ssa, i, leader_num);
+		/*if (opline->opcode == ZEND_ASSIGN) {
+			remove_op1_def(ssa, ssa_op);
+		} else {
+			remove_result_def(ssa, ssa_op);
+		}
+		remove_instr(ssa, opline, ssa_op);*/
 	}
 }
 

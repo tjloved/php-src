@@ -196,6 +196,11 @@ static inline uint32_t get_def_block(const zend_ssa *ssa, const zend_ssa_var *va
 	}
 }
 
+static inline zend_bool has_improper_op1_use(zend_op *opline) {
+	return opline->opcode == ZEND_ASSIGN
+		|| (opline->opcode == ZEND_UNSET_VAR && opline->extended_value & ZEND_QUICK_SET);
+}
+
 static inline int zend_bitset_pop_first(zend_bitset set, uint32_t len) {
 	int i = zend_bitset_first(set, len);
 	if (i >= 0) {

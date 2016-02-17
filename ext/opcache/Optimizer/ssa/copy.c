@@ -5,11 +5,6 @@
 #include "Optimizer/ssa/scdf.h"
 #include "Optimizer/statistics.h"
 
-static inline zend_bool has_improper_op1_use(zend_op *opline) {
-	return opline->opcode == ZEND_ASSIGN
-		|| (opline->opcode == ZEND_UNSET_VAR && opline->extended_value & ZEND_QUICK_SET);
-}
-
 static void rename_improper_use(
 		zend_ssa *ssa, zend_op *use_opline, zend_ssa_op *use_op,
 		int old_lhs_var_num, int lhs_var_num) {
@@ -22,13 +17,66 @@ static void rename_improper_use(
 	}
 }
 
+static inline zend_bool var_has_proper_writes(
+		const zend_ssa *ssa, const zend_op_array *op_array, const zend_ssa_var *var) {
+	int use;
+	int var_num = var - ssa->vars;
+	FOREACH_USE(var, use) {
+		zend_op *use_opline = &op_array->opcodes[use];
+		zend_ssa_op *use_op = &ssa->ops[use];
+		if (use_opline->opcode == ZEND_BIND_LEXICAL) {
+			// TODO allow if same name?
+			return 1;
+		}
+		if (has_improper_op1_use(use_opline)) {
+			continue;
+		}
+		if ((use_op->op1_use == var_num && use_op->op1_def >= 0)
+				|| (use_op->op2_use == var_num && use_op->op2_def >= 0)
+				|| (use_op->result_use == var_num && use_op->result_def >= 0)) {
+			return 1;
+		}
+	} FOREACH_USE_END();
+	return 0;
+}
+
+static inline zend_bool var_written_while_live(
+		zend_ssa *ssa, const ssa_liveness *liveness,
+		const zend_ssa_var *check_var, const zend_ssa_var *live_var) {
+	int check_var_num = check_var - ssa->vars;
+	int live_var_num = live_var - ssa->vars;
+
+	int use;
+	zend_ssa_phi *phi;
+
+	/* Check if there is an assignment to check_var while live_var is live */
+	FOREACH_USE(check_var, use) {
+		zend_ssa_op *use_op = &ssa->ops[use];
+		if ((use_op->op1_use == check_var_num && use_op->op1_def >= 0)
+				|| (use_op->op2_use == check_var_num && use_op->op2_def >= 0)
+				|| (use_op->result_use == check_var_num && use_op->result_def >= 0)) {
+			if (ssa_is_live_out_at_op(liveness, live_var_num, use)) {
+				return 1;
+			}
+		}
+	} FOREACH_USE_END();
+
+	/* Use in phi *might* lead to an assignment, pessimistically assume it does */
+	FOREACH_PHI_USE(check_var, phi) {
+		if (ssa_is_live_in_at_block(liveness, live_var_num, phi->block)) {
+			return 1;
+		}
+	} FOREACH_PHI_USE_END();
+
+	return 0;
+}
+
 static int try_propagate_cv_assignment(ssa_opt_ctx *ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 	zend_op_array *op_array = ctx->op_array;
 	zend_ssa *ssa = ctx->ssa;
 	int lhs_var_num, rhs_var_num, old_lhs_var_num;
 	zend_ssa_var *lhs_var, *rhs_var;
 	int use;
-	zend_ssa_phi *phi;
 
 	if (opline->opcode == ZEND_ASSIGN) {
 		lhs_var_num = ssa_op->op1_def;
@@ -52,41 +100,14 @@ static int try_propagate_cv_assignment(ssa_opt_ctx *ctx, zend_op *opline, zend_s
 	}
 
 	/* Check if LHS is written to */
-	FOREACH_USE(lhs_var, use) {
-		zend_op *use_opline = &op_array->opcodes[use];
-		zend_ssa_op *use_op = &ssa->ops[use];
-		if (use_opline->opcode == ZEND_BIND_LEXICAL) {
-			// TODO allow if same name?
-			return FAILURE;
-		}
-		if (has_improper_op1_use(use_opline)) {
-			continue;
-		}
-		if ((use_op->op1_use == lhs_var_num && use_op->op1_def >= 0)
-				|| (use_op->op2_use == lhs_var_num && use_op->op2_def >= 0)
-				|| (use_op->result_use == lhs_var_num && use_op->result_def >= 0)) {
-			return FAILURE;
-		}
-	} FOREACH_USE_END();
+	if (var_has_proper_writes(ssa, op_array, lhs_var)) {
+		return FAILURE;
+	}
 
 	/* Check if there is an assignment to the RHS at which the LHS is live */
-	FOREACH_USE(rhs_var, use) {
-		zend_ssa_op *use_op = &ssa->ops[use];
-		if ((use_op->op1_use == rhs_var_num && use_op->op1_def >= 0)
-				|| (use_op->op2_use == rhs_var_num && use_op->op2_def >= 0)
-				|| (use_op->result_use == rhs_var_num && use_op->result_def >= 0)) {
-			if (ssa_is_live_out_at_op(ctx->liveness, lhs_var_num, use)) {
-				return FAILURE;
-			}
-		}
-	} FOREACH_USE_END();
-
-	/* Use in phi *might* lead to an assignment, pessimistically assume it does */
-	FOREACH_PHI_USE(rhs_var, phi) {
-		if (ssa_is_live_in_at_block(ctx->liveness, lhs_var_num, phi->block)) {
-			return FAILURE;
-		}
-	} FOREACH_PHI_USE_END();
+	if (var_written_while_live(ssa, ctx->liveness, rhs_var, lhs_var)) {
+		return FAILURE;
+	}
 
 	/* Rename CV operands in uses */
 	FOREACH_USE(lhs_var, use) {
