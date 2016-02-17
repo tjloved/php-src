@@ -37,9 +37,6 @@ static zend_bool interfere(const zend_ssa *ssa, const ssa_liveness *liveness, in
 	}
 }
 
-static void merge_groups(context *ctx, int i, int j) {
-}
-
 /* Compute preorder numbering of SSA vars over dominance relationship */
 static int compute_dominance_preorder_recursive(context *ctx, int num, int block_num) {
 	zend_ssa *ssa = ctx->ssa;
@@ -76,21 +73,90 @@ static void compute_dominance_preorder(context *ctx, ssa_opt_ctx *ssa_ctx) {
 	compute_dominance_preorder_recursive(ctx, i, 0);
 }
 
-static void check_interferences(ssa_opt_ctx *ssa_ctx) {
+static void merge_groups(context *ctx, int var1, int var2) {
+	group *groups = ctx->groups;
+	int i;
+
+	ZEND_ASSERT(var1 >= 0 && var2 >= 0);
+	var1 = groups[var1].min;
+	var2 = groups[var2].min;
+
+	/* At least one variable does not participate */
+	if (var1 < 0 || var2 < 0) {
+		return;
+	}
+
+	/* Already in the same group */
+	if (var1 == var2) {
+		return;
+	}
+
+	/* Make sure var1 < var2 */
+	if (ctx->predom[var1] > ctx->predom[var2]) {
+		int tmp = var1;
+		var1 = var2;
+		var2 = tmp;
+	}
+
+	/* Set min of var2 group to var1 */
+	for (i = var2; i != -1; i = groups[i].next) {
+		groups[i].min = var1;
+	}
+
+	/* Merge lists while keeping predom order */
+	i = groups[var1].next;
+	while (i != -1 && var2 != -1) {
+		if (ctx->predom[i] > ctx->predom[var2]) {
+			groups[var1].next = var2;
+			var1 = var2;
+			var2 = i;
+		} else {
+			var1 = i;
+		}
+		i = groups[var1].next;
+	}
+	if (i == -1) {
+		groups[var1].next = var2;
+	}
+}
+
+static void group_stuff(ssa_opt_ctx *ssa_ctx) {
 	zend_ssa *ssa = ssa_ctx->ssa;
-	ssa_liveness *liveness = ssa_ctx->liveness;
-	int last_var = ssa_ctx->op_array->last_var;
-	int i, j;
+	zend_ssa_phi *phi;
+	int i;
 
 	context ctx;
 	ctx.ssa = ssa;
 	ctx.predom = zend_arena_alloc(&ssa_ctx->opt_ctx->arena, sizeof(int) * ssa->vars_count);
 	ctx.groups = zend_arena_alloc(&ssa_ctx->opt_ctx->arena, sizeof(group) * ssa->vars_count);
 	compute_dominance_preorder(&ctx, ssa_ctx);
+
+	/* Start with identity groups */
 	for (i = 0; i < ssa->vars_count; i++) {
-		ctx.groups[i].min = i;
+		zend_ssa_var *var = &ssa->vars[i];
 		ctx.groups[i].next = -1;
+		if (var->definition >= 0 || var->definition_phi) {
+			ctx.groups[i].min = i;
+		} else {
+			ctx.groups[i].min = -1;
+		}
 	}
+
+	FOREACH_PHI(phi) {
+		int source;
+		FOREACH_PHI_SOURCE(phi, source) {
+			merge_groups(&ctx, phi->ssa_var, source);
+		} FOREACH_PHI_SOURCE_END();
+	} FOREACH_PHI_END();
+}
+
+static void check_interferences(ssa_opt_ctx *ssa_ctx) {
+	zend_ssa *ssa = ssa_ctx->ssa;
+	ssa_liveness *liveness = ssa_ctx->liveness;
+	int last_var = ssa_ctx->op_array->last_var;
+	int i, j;
+
+	group_stuff(ssa_ctx);
 
 	for (i = 0; i < ssa->vars_count; i++) {
 		zend_ssa_var *var_i = &ssa->vars[i];
