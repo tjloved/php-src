@@ -141,33 +141,33 @@ int(3)
 
  -- Iteration 10 --
 
-Notice: Array to string conversion in %s on line %d
-Array
-int(5)
+Warning: vprintf() expects parameter 1 to be string, array given in %s on line %d
+
+NULL
 
  -- Iteration 11 --
 
-Notice: Array to string conversion in %s on line %d
-Array
-int(5)
+Warning: vprintf() expects parameter 1 to be string, array given in %s on line %d
+
+NULL
 
  -- Iteration 12 --
 
-Notice: Array to string conversion in %s on line %d
-Array
-int(5)
+Warning: vprintf() expects parameter 1 to be string, array given in %s on line %d
+
+NULL
 
  -- Iteration 13 --
 
-Notice: Array to string conversion in %s on line %d
-Array
-int(5)
+Warning: vprintf() expects parameter 1 to be string, array given in %s on line %d
+
+NULL
 
  -- Iteration 14 --
 
-Notice: Array to string conversion in %s on line %d
-Array
-int(5)
+Warning: vprintf() expects parameter 1 to be string, array given in %s on line %d
+
+NULL
 
  -- Iteration 15 --
 
@@ -214,6 +214,8 @@ int(0)
 int(0)
 
  -- Iteration 26 --
-Resource id #%d
-int(%d)
+
+Warning: vprintf() expects parameter 1 to be string, resource given in %s on line %d
+
+NULL
 ===DONE===

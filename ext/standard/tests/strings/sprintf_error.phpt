@@ -40,7 +40,7 @@ echo "Done";
 -- Testing sprintf() function with Zero arguments --
 
 Warning: sprintf() expects at least %d parameter, %d given in %s on line %d
-bool(false)
+NULL
 
 -- Testing sprintf() function with less than expected no. of arguments --
 

@@ -106,46 +106,82 @@ unlink($data_file);
 --EXPECTF--
 *** Testing vfprintf() : with unexpected values for args argument ***
 
-Warning: vfprintf(): Too few arguments in %s on line %d
+Warning: vfprintf() expects parameter 3 to be array, integer given in %s on line %d
 
-Warning: vfprintf(): Too few arguments in %s on line %d
+Warning: vfprintf() expects parameter 3 to be array, integer given in %s on line %d
 
-Warning: vfprintf(): Too few arguments in %s on line %d
+Warning: vfprintf() expects parameter 3 to be array, integer given in %s on line %d
 
-Warning: vfprintf(): Too few arguments in %s on line %d
+Warning: vfprintf() expects parameter 3 to be array, integer given in %s on line %d
 
-Warning: vfprintf(): Too few arguments in %s on line %d
+Warning: vfprintf() expects parameter 3 to be array, float given in %s on line %d
+
+Warning: vfprintf() expects parameter 3 to be array, float given in %s on line %d
+
+Warning: vfprintf() expects parameter 3 to be array, float given in %s on line %d
+
+Warning: vfprintf() expects parameter 3 to be array, float given in %s on line %d
+
+Warning: vfprintf() expects parameter 3 to be array, float given in %s on line %d
+
+Warning: vfprintf() expects parameter 3 to be array, null given in %s on line %d
+
+Warning: vfprintf() expects parameter 3 to be array, null given in %s on line %d
+
+Warning: vfprintf() expects parameter 3 to be array, boolean given in %s on line %d
+
+Warning: vfprintf() expects parameter 3 to be array, boolean given in %s on line %d
+
+Warning: vfprintf() expects parameter 3 to be array, boolean given in %s on line %d
+
+Warning: vfprintf() expects parameter 3 to be array, boolean given in %s on line %d
+
+Warning: vfprintf() expects parameter 3 to be array, string given in %s on line %d
+
+Warning: vfprintf() expects parameter 3 to be array, string given in %s on line %d
+
+Warning: vfprintf() expects parameter 3 to be array, string given in %s on line %d
+
+Warning: vfprintf() expects parameter 3 to be array, string given in %s on line %d
+
+Warning: vfprintf() expects parameter 3 to be array, object given in %s on line %d
+
+Warning: vfprintf() expects parameter 3 to be array, null given in %s on line %d
+
+Warning: vfprintf() expects parameter 3 to be array, null given in %s on line %d
+
+Warning: vfprintf() expects parameter 3 to be array, resource given in %s on line %d
 
 *** Testing vprintf() with unexpected values for args argument ***
 
 -- Iteration 1 --
-0
+
 -- Iteration 2 --
-1
+
 -- Iteration 3 --
-12345
+
 -- Iteration 4 --
--2345
+
 -- Iteration 5 --
-10.5
+
 -- Iteration 6 --
--10.5
+
 -- Iteration 7 --
-101234567000
+
 -- Iteration 8 --
-1.07654321E-9
+
 -- Iteration 9 --
-0.5
+
 -- Iteration 10 --
 
 -- Iteration 11 --
 
 -- Iteration 12 --
-1
+
 -- Iteration 13 --
 
 -- Iteration 14 --
-1
+
 -- Iteration 15 --
 
 -- Iteration 16 --
@@ -153,9 +189,9 @@ Warning: vfprintf(): Too few arguments in %s on line %d
 -- Iteration 17 --
 
 -- Iteration 18 --
-string
+
 -- Iteration 19 --
-string
+
 -- Iteration 20 --
 
 -- Iteration 21 --
@@ -163,6 +199,6 @@ string
 -- Iteration 22 --
 
 -- Iteration 23 --
-Resource id #%d
+
 ===DONE===
 

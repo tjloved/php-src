@@ -99,104 +99,140 @@ fclose($file_handle);
 *** Testing vprintf() : with unexpected values for args argument ***
 
 -- Iteration 1 --
-0
-int(1)
+
+Warning: vprintf() expects parameter 2 to be array, integer given in %s on line %d
+
+NULL
 
 -- Iteration 2 --
-1
-int(1)
+
+Warning: vprintf() expects parameter 2 to be array, integer given in %s on line %d
+
+NULL
 
 -- Iteration 3 --
-12345
-int(5)
+
+Warning: vprintf() expects parameter 2 to be array, integer given in %s on line %d
+
+NULL
 
 -- Iteration 4 --
--2345
-int(5)
+
+Warning: vprintf() expects parameter 2 to be array, integer given in %s on line %d
+
+NULL
 
 -- Iteration 5 --
-10.5
-int(4)
+
+Warning: vprintf() expects parameter 2 to be array, float given in %s on line %d
+
+NULL
 
 -- Iteration 6 --
--10.5
-int(5)
+
+Warning: vprintf() expects parameter 2 to be array, float given in %s on line %d
+
+NULL
 
 -- Iteration 7 --
-101234567000
-int(12)
+
+Warning: vprintf() expects parameter 2 to be array, float given in %s on line %d
+
+NULL
 
 -- Iteration 8 --
-1.07654321E-9
-int(13)
+
+Warning: vprintf() expects parameter 2 to be array, float given in %s on line %d
+
+NULL
 
 -- Iteration 9 --
-0.5
-int(3)
+
+Warning: vprintf() expects parameter 2 to be array, float given in %s on line %d
+
+NULL
 
 -- Iteration 10 --
 
-Warning: vprintf(): Too few arguments in %s on line %d
+Warning: vprintf() expects parameter 2 to be array, null given in %s on line %d
 
-bool(false)
+NULL
 
 -- Iteration 11 --
 
-Warning: vprintf(): Too few arguments in %s on line %d
+Warning: vprintf() expects parameter 2 to be array, null given in %s on line %d
 
-bool(false)
+NULL
 
 -- Iteration 12 --
-1
-int(1)
+
+Warning: vprintf() expects parameter 2 to be array, boolean given in %s on line %d
+
+NULL
 
 -- Iteration 13 --
 
-int(0)
+Warning: vprintf() expects parameter 2 to be array, boolean given in %s on line %d
+
+NULL
 
 -- Iteration 14 --
-1
-int(1)
+
+Warning: vprintf() expects parameter 2 to be array, boolean given in %s on line %d
+
+NULL
 
 -- Iteration 15 --
 
-int(0)
+Warning: vprintf() expects parameter 2 to be array, boolean given in %s on line %d
+
+NULL
 
 -- Iteration 16 --
 
-int(0)
+Warning: vprintf() expects parameter 2 to be array, string given in %s on line %d
+
+NULL
 
 -- Iteration 17 --
 
-int(0)
+Warning: vprintf() expects parameter 2 to be array, string given in %s on line %d
+
+NULL
 
 -- Iteration 18 --
-string
-int(6)
+
+Warning: vprintf() expects parameter 2 to be array, string given in %s on line %d
+
+NULL
 
 -- Iteration 19 --
-string
-int(6)
+
+Warning: vprintf() expects parameter 2 to be array, string given in %s on line %d
+
+NULL
 
 -- Iteration 20 --
 
-Warning: vprintf(): Too few arguments in %s on line %d
+Warning: vprintf() expects parameter 2 to be array, object given in %s on line %d
 
-bool(false)
+NULL
 
 -- Iteration 21 --
 
-Warning: vprintf(): Too few arguments in %s on line %d
+Warning: vprintf() expects parameter 2 to be array, null given in %s on line %d
 
-bool(false)
+NULL
 
 -- Iteration 22 --
 
-Warning: vprintf(): Too few arguments in %s on line %d
+Warning: vprintf() expects parameter 2 to be array, null given in %s on line %d
 
-bool(false)
+NULL
 
 -- Iteration 23 --
-Resource id #%d
-int(%d)
+
+Warning: vprintf() expects parameter 2 to be array, resource given in %s on line %d
+
+NULL
 ===DONE===

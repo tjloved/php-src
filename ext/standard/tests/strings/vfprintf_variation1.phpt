@@ -65,8 +65,10 @@ unlink( $file );
 ?>
 --EXPECTF--
 *** Testing vfprintf() : variation functionality ***
-string(6) "format"
-int(6)
+
+Warning: vfprintf() expects parameter 3 to be array, null given in %s on line %d
+string(0) ""
+NULL
 string(17) "Foo is 30 and bar"
 int(17)
 string(14) "Foobar testing"
@@ -80,7 +82,7 @@ int(0)
 string(38) "Testing 1001 6 2.550200 30 foobar f 41"
 int(38)
 bool(false)
+NULL
 bool(false)
-bool(false)
-bool(false)
+NULL
 ===DONE===

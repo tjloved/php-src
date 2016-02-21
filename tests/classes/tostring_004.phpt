@@ -37,8 +37,8 @@ printf($obj . "\n");
 --EXPECTF--
 Object with no __toString():
 Try 1:
-Error: 4096 - Object of class stdClass could not be converted to string
-Object
+Error: 2 - printf() expects parameter 1 to be string, object given
+
 
 Try 2:
 Error: 4096 - Object of class stdClass could not be converted to string

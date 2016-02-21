@@ -108,15 +108,17 @@ unlink($data_file);
 --EXPECTF--
 *** Testing vfprintf() : with unexpected values for format argument ***
 
-Notice: Array to string conversion in %s on line %d
+Warning: vfprintf() expects parameter 2 to be string, array given in %s on line %d
 
-Notice: Array to string conversion in %s on line %d
+Warning: vfprintf() expects parameter 2 to be string, array given in %s on line %d
 
-Notice: Array to string conversion in %s on line %d
+Warning: vfprintf() expects parameter 2 to be string, array given in %s on line %d
 
-Notice: Array to string conversion in %s on line %d
+Warning: vfprintf() expects parameter 2 to be string, array given in %s on line %d
 
-Notice: Array to string conversion in %s on line %d
+Warning: vfprintf() expects parameter 2 to be string, array given in %s on line %d
+
+Warning: vfprintf() expects parameter 2 to be string, resource given in %s on line %d
 
 *** Testing vprintf() with with unexpected values for format argument ***
 
@@ -139,15 +141,15 @@ Notice: Array to string conversion in %s on line %d
 -- Iteration 9 --
 0.5
 -- Iteration 10 --
-Array
+
 -- Iteration 11 --
-Array
+
 -- Iteration 12 --
-Array
+
 -- Iteration 13 --
-Array
+
 -- Iteration 14 --
-Array
+
 -- Iteration 15 --
 
 -- Iteration 16 --
@@ -171,5 +173,5 @@ object
 -- Iteration 25 --
 
 -- Iteration 26 --
-Resource id #%d
+
 ===DONE===

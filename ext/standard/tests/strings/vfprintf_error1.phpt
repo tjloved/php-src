@@ -38,9 +38,9 @@ unlink( $file );
 --EXPECTF--
 -- Testing vfprintf() function with more than expected no. of arguments --
 
-Warning: Wrong parameter count for vfprintf() in %s on line %d
+Warning: vfprintf() expects exactly 3 parameters, 4 given in %s on line %d
 NULL
 
-Warning: Wrong parameter count for vfprintf() in %s on line %d
+Warning: vfprintf() expects exactly 3 parameters, 4 given in %s on line %d
 NULL
 ===DONE===

@@ -40,7 +40,7 @@ var_dump( printf($format3) );
 -- Testing printf() function with Zero arguments --
 
 Warning: printf() expects at least 1 parameter, 0 given in %s on line %d
-bool(false)
+NULL
 
 -- Testing printf() function with less than expected no. of arguments --
 

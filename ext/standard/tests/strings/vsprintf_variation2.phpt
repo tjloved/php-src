@@ -97,81 +97,117 @@ echo "Done";
 *** Testing vsprintf() : with unexpected values for args argument ***
 
 -- Iteration 1 --
-string(1) "0"
+
+Warning: vsprintf() expects parameter 2 to be array, integer given in %s on line %d
+NULL
 
 -- Iteration 2 --
-string(1) "1"
+
+Warning: vsprintf() expects parameter 2 to be array, integer given in %s on line %d
+NULL
 
 -- Iteration 3 --
-string(5) "12345"
+
+Warning: vsprintf() expects parameter 2 to be array, integer given in %s on line %d
+NULL
 
 -- Iteration 4 --
-string(5) "-2345"
+
+Warning: vsprintf() expects parameter 2 to be array, integer given in %s on line %d
+NULL
 
 -- Iteration 5 --
-string(4) "10.5"
+
+Warning: vsprintf() expects parameter 2 to be array, float given in %s on line %d
+NULL
 
 -- Iteration 6 --
-string(5) "-10.5"
+
+Warning: vsprintf() expects parameter 2 to be array, float given in %s on line %d
+NULL
 
 -- Iteration 7 --
-string(12) "101234567000"
+
+Warning: vsprintf() expects parameter 2 to be array, float given in %s on line %d
+NULL
 
 -- Iteration 8 --
-string(13) "1.07654321E-9"
+
+Warning: vsprintf() expects parameter 2 to be array, float given in %s on line %d
+NULL
 
 -- Iteration 9 --
-string(3) "0.5"
+
+Warning: vsprintf() expects parameter 2 to be array, float given in %s on line %d
+NULL
 
 -- Iteration 10 --
 
-Warning: vsprintf(): Too few arguments in %s on line %d
-bool(false)
+Warning: vsprintf() expects parameter 2 to be array, null given in %s on line %d
+NULL
 
 -- Iteration 11 --
 
-Warning: vsprintf(): Too few arguments in %s on line %d
-bool(false)
+Warning: vsprintf() expects parameter 2 to be array, null given in %s on line %d
+NULL
 
 -- Iteration 12 --
-string(1) "1"
+
+Warning: vsprintf() expects parameter 2 to be array, boolean given in %s on line %d
+NULL
 
 -- Iteration 13 --
-string(0) ""
+
+Warning: vsprintf() expects parameter 2 to be array, boolean given in %s on line %d
+NULL
 
 -- Iteration 14 --
-string(1) "1"
+
+Warning: vsprintf() expects parameter 2 to be array, boolean given in %s on line %d
+NULL
 
 -- Iteration 15 --
-string(0) ""
+
+Warning: vsprintf() expects parameter 2 to be array, boolean given in %s on line %d
+NULL
 
 -- Iteration 16 --
-string(0) ""
+
+Warning: vsprintf() expects parameter 2 to be array, string given in %s on line %d
+NULL
 
 -- Iteration 17 --
-string(0) ""
+
+Warning: vsprintf() expects parameter 2 to be array, string given in %s on line %d
+NULL
 
 -- Iteration 18 --
-string(6) "string"
+
+Warning: vsprintf() expects parameter 2 to be array, string given in %s on line %d
+NULL
 
 -- Iteration 19 --
-string(6) "string"
+
+Warning: vsprintf() expects parameter 2 to be array, string given in %s on line %d
+NULL
 
 -- Iteration 20 --
 
-Warning: vsprintf(): Too few arguments in %s on line %d
-bool(false)
+Warning: vsprintf() expects parameter 2 to be array, object given in %s on line %d
+NULL
 
 -- Iteration 21 --
 
-Warning: vsprintf(): Too few arguments in %s on line %d
-bool(false)
+Warning: vsprintf() expects parameter 2 to be array, null given in %s on line %d
+NULL
 
 -- Iteration 22 --
 
-Warning: vsprintf(): Too few arguments in %s on line %d
-bool(false)
+Warning: vsprintf() expects parameter 2 to be array, null given in %s on line %d
+NULL
 
 -- Iteration 23 --
-string(%d) "Resource id #%d"
+
+Warning: vsprintf() expects parameter 2 to be array, resource given in %s on line %d
+NULL
 Done
