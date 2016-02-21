@@ -174,13 +174,15 @@ static zend_bool groups_interfere(context *ctx, int var_a, int var_b) {
 		}
 		current_var = &ssa->vars[current];
 
+		// TODO faster predom based check
 		while (other != -1 && var_dominates(ctx->ssa, ctx->info, &ssa->vars[other], current_var)) {
 			zend_stack_del_top(&ctx->stack);
 			top = zend_stack_top(&ctx->stack);
 			other = top ? *top : -1;
 		}
 
-		if (other != -1 && interfere_dominating(ctx->liveness, other, current_var)) {
+		if (other != -1 && groups[other].min != groups[current].min
+				&& interfere_dominating(ctx->liveness, other, current_var)) {
 			ctx->stack.top = ctx->stack.max = 0;
 			return 1;
 		}
