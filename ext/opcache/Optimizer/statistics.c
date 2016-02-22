@@ -71,4 +71,5 @@ void zend_optimizer_statistics_shutdown() {
 	PRINT_STAT(simplified_sends);
 
 	PRINT_STAT(tmp);
+	PRINT_STAT(tmp2);
 }
