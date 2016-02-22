@@ -501,7 +501,7 @@ static void remove_redundancies(context *ctx) {
 			prev_var_num = def_op->result_use;
 		}
 
-		OPT_STAT(tmp)++;
+		//OPT_STAT(tmp)++;
 		//fprintf(stderr, "%d -> %d %s\n", i, ctx->valnums[i], zend_get_opcode_name(def_opline->opcode));
 		
 #if 0

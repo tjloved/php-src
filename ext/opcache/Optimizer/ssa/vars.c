@@ -9,13 +9,31 @@ typedef struct {
 	int next;
 } group;
 
+#define PCOPY_NUM_RESERVED_ELEMS 4
 typedef struct {
+	int from;
+	int to;
+} pcopy_elem;
+typedef struct {
+	pcopy_elem *elems;
+	pcopy_elem elems_storage[PCOPY_NUM_RESERVED_ELEMS];
+	uint32_t num_elems;
+} pcopy;
+typedef struct {
+	pcopy early;
+	pcopy late;
+} block_info;
+
+typedef struct {
+	zend_op_array *op_array;
 	zend_ssa *ssa;
 	const cfg_info *info;
 	const ssa_liveness *liveness;
 	int *predom;
 	group *groups;
 	zend_stack stack;
+	block_info *blocks;
+	int *shiftlist;
 } context;
 
 static zend_bool interfere_dominating(const ssa_liveness *liveness, int a, zend_ssa_var *var_b) {
@@ -208,20 +226,181 @@ static inline void try_merge(context *ctx, int a, int b) {
 	merge_groups(ctx, a, b);
 }
 
-static void group_stuff(ssa_opt_ctx *ssa_ctx) {
+static void remove_essa_pis(zend_ssa *ssa) {
+	zend_ssa_phi *phi;
+	FOREACH_PHI(phi) {
+		if (phi->pi >= 0) {
+			rename_var_uses(ssa, phi->ssa_var, phi->sources[0]);
+			remove_phi(ssa, phi);
+		}
+	} FOREACH_PHI_END();
+}
+
+static inline void pcopy_init(pcopy *cpy) {
+	cpy->num_elems = 0;
+	cpy->elems = cpy->elems_storage;
+}
+
+static inline zend_bool is_pow2(uint32_t n) {
+	return n != 0 && !(n & (n - 1));
+}
+
+static inline pcopy_elem *pcopy_reserve_elem(pcopy *cpy) {
+	if (cpy->num_elems >= PCOPY_NUM_RESERVED_ELEMS && is_pow2(cpy->num_elems)) {
+		// TODO How common?
+		pcopy_elem *new_elems = emalloc(2 * sizeof(pcopy_elem) * cpy->num_elems);
+		memcpy(new_elems, cpy->elems, sizeof(pcopy_elem) * cpy->num_elems);
+		if (cpy->elems != cpy->elems_storage) {
+			efree(cpy->elems);
+		}
+		cpy->elems = new_elems;
+		OPT_STAT(tmp)++;
+	}
+	OPT_STAT(tmp2)++;
+
+	return &cpy->elems[cpy->num_elems++];
+}
+
+static inline void pcopy_add_elem(pcopy *cpy, int from, int to) {
+	pcopy_elem *elem = pcopy_reserve_elem(cpy);
+	elem->from = from;
+	elem->to = to;
+}
+
+static inline void pcopy_free(pcopy *cpy) {
+	if (cpy->elems != cpy->elems_storage) {
+		efree(cpy->elems);
+	}
+}
+
+static inline uint32_t pcopy_estimated_num_copies(pcopy *cpy) {
+	/* A *very* conservative estimate */
+	return (cpy->num_elems + 1) / 2 * 3;
+}
+
+static void init_block_pcopys(context *ctx) {
+	zend_cfg *cfg = &ctx->ssa->cfg;
+	int i;
+	for (i = 0; i < cfg->blocks_count; i++) {
+		pcopy_init(&ctx->blocks[i].early);
+		pcopy_init(&ctx->blocks[i].late);
+	}
+}
+
+static void free_block_pcopys(context *ctx) {
+	zend_cfg *cfg = &ctx->ssa->cfg;
+	int i;
+	for (i = 0; i < cfg->blocks_count; i++) {
+		pcopy_free(&ctx->blocks[i].early);
+		pcopy_free(&ctx->blocks[i].late);
+	}
+}
+
+static void collect_pcopys(context *ctx) {
+	zend_ssa *ssa = ctx->ssa;
+	zend_cfg *cfg = &ssa->cfg;
+	zend_ssa_phi *phi;
+	FOREACH_PHI(phi) {
+		int i, *predecessors;
+
+		if (phi->var >= ssa->op_array->last_var) {
+			continue;
+		}
+
+		predecessors = &cfg->predecessors[cfg->blocks[phi->block].predecessor_offset];
+		if (ssa->var_info[phi->ssa_var].type & MAY_BE_REF) {
+			/* References do not participate in copy propagation (etc). We may only have to
+			 * insert copies if one of the source operands is a non-ref. */
+			for (i = 0; i < cfg->blocks[phi->block].predecessors_count; i++) {
+				if (phi->sources[i] >= 0 && !(ssa->var_info[phi->sources[i]].type & MAY_BE_REF)) {
+					pcopy_add_elem(
+						&ctx->blocks[predecessors[i]].late,
+						ssa->vars[phi->sources[i]].var, phi->var);
+				}
+			}
+		} else {
+			/* Ordinary, non-reference variables */
+			pcopy_add_elem(&ctx->blocks[phi->block].early, 0, phi->var);
+
+			for (i = 0; i < cfg->blocks[phi->block].predecessors_count; i++) {
+				if (phi->sources[i] >= 0) {
+					pcopy_add_elem(
+						&ctx->blocks[predecessors[i]].late,
+						ssa->vars[phi->sources[i]].var, 0);
+				}
+			}
+		}
+	} FOREACH_PHI_END();
+}
+
+static inline zend_bool has_jump_instr(
+		const zend_op_array *op_array, const zend_basic_block *block) {
+	return block->successors[1] >= 0 || op_array->opcodes[block->end].opcode == ZEND_JMP;
+}
+
+static void compute_shiftlists(context *ctx) {
+	zend_op_array *op_array = ctx->op_array;
+	zend_cfg *cfg = &ctx->ssa->cfg;
+	int i, j = 0, shift = 0;
+	int *shiftlist = ctx->shiftlist;
+
+	for (i = 0; i < cfg->blocks_count; i++) {
+		zend_basic_block *block = &cfg->blocks[i];
+		zend_bool has_jump = has_jump_instr(op_array, block);
+
+		while (j < block->start) {
+			shiftlist[j++] = shift;
+		}
+
+		shift += pcopy_estimated_num_copies(&ctx->blocks[i].early);
+		while (j < block->end) {
+			shiftlist[j++] = shift;
+		}
+
+		if (has_jump) {
+			shift += pcopy_estimated_num_copies(&ctx->blocks[i].late);
+			shiftlist[j++] = shift;
+		} else {
+			shiftlist[j++] = shift;
+			shift += pcopy_estimated_num_copies(&ctx->blocks[i].late);
+		}
+	}
+
+	while (j < op_array->last) {
+		shiftlist[j++] = shift;
+	}
+}
+
+static void insert_pcopys(context *ctx) {
+	init_block_pcopys(ctx);
+	collect_pcopys(ctx);
+	compute_shiftlists(ctx);
+	free_block_pcopys(ctx);
+}
+
+static void ssa_destroy(ssa_opt_ctx *ssa_ctx) {
 	zend_ssa *ssa = ssa_ctx->ssa;
 	zend_op_array *op_array = ssa_ctx->op_array;
 	zend_ssa_phi *phi;
 	int i;
 
 	context ctx;
+	ctx.op_array = op_array;
 	ctx.ssa = ssa;
 	ctx.info = ssa_ctx->cfg_info;
 	ctx.liveness = ssa_ctx->liveness;
 	ctx.predom = zend_arena_alloc(&ssa_ctx->opt_ctx->arena, sizeof(int) * ssa->vars_count);
 	ctx.groups = zend_arena_alloc(&ssa_ctx->opt_ctx->arena, sizeof(group) * ssa->vars_count);
-	compute_dominance_preorder(&ctx, ssa_ctx);
+	ctx.blocks = zend_arena_alloc(&ssa_ctx->opt_ctx->arena,
+			sizeof(block_info) * ssa->cfg.blocks_count);
+	ctx.shiftlist = zend_arena_alloc(&ssa_ctx->opt_ctx->arena, sizeof(int) * op_array->last);
 	zend_stack_init(&ctx.stack, sizeof(int));
+
+	remove_essa_pis(ssa);
+
+	compute_dominance_preorder(&ctx, ssa_ctx);
+
+	insert_pcopys(&ctx);
 
 	/* Start with identity groups */
 	for (i = 0; i < ssa->vars_count; i++) {
@@ -273,8 +452,6 @@ static void check_interferences(ssa_opt_ctx *ssa_ctx) {
 	int last_var = ssa_ctx->op_array->last_var;
 	int i, j;
 
-	group_stuff(ssa_ctx);
-
 	for (i = 0; i < ssa->vars_count; i++) {
 		zend_ssa_var *var_i = &ssa->vars[i];
 		int var = var_i->var;
@@ -298,7 +475,9 @@ static void check_interferences(ssa_opt_ctx *ssa_ctx) {
 }
 
 void ssa_optimize_vars(ssa_opt_ctx *ctx) {
-	check_interferences(ctx); // TODO temporarily in here...
+	// TODO temporarily in here...
+	check_interferences(ctx); 
+	ssa_destroy(ctx);
 
 	zend_op_array *op_array = ctx->op_array;
 	int i;
