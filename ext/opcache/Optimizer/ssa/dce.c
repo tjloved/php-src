@@ -228,6 +228,7 @@ static void simplify_jumps(zend_ssa *ssa, zend_op_array *op_array) {
 	for (i = 0; i < op_array->last; i++) {
 		zend_op *opline = &op_array->opcodes[i];
 		zend_ssa_op *ssa_op = &ssa->ops[i];
+		zend_basic_block *block;
 		zval *op1;
 
 		/* Convert jump-and-set into jump if result is not used  */
@@ -258,6 +259,7 @@ static void simplify_jumps(zend_ssa *ssa, zend_op_array *op_array) {
 
 		/* Convert constant conditional jump to unconditional jump */
 		op1 = &ZEND_OP1_LITERAL(opline);
+		block = &ssa->cfg.blocks[ssa->cfg.map[i]];
 		switch (opline->opcode) {
 			case ZEND_JMPZ:
 				if (!zend_is_true(op1)) {
@@ -265,6 +267,7 @@ static void simplify_jumps(zend_ssa *ssa, zend_op_array *op_array) {
 					opline->op1_type = IS_UNUSED;
 					opline->op1.num = opline->op2.num;
 					opline->opcode = ZEND_JMP;
+					//block->successors[1] = -1;
 				} else {
 					MAKE_NOP(opline);
 				}
@@ -318,6 +321,7 @@ static inline int get_common_phi_source(zend_ssa *ssa, zend_ssa_phi *phi) {
 			return -1;
 		}
 	} FOREACH_PHI_SOURCE_END();
+	ZEND_ASSERT(common_source != -1);
 	return common_source;
 }
 
@@ -341,6 +345,138 @@ static void try_remove_trivial_phi(context *ctx, zend_ssa_phi *phi) {
 			OPT_STAT(dce_dead_phis)++;
 		}*/
 	}
+}
+
+static inline zend_bool is_nop_sled(zend_op_array *op_array, int start, int end) {
+	int i;
+	for (i = start; i <= end; i++) {
+		if (op_array->opcodes[i].opcode != ZEND_NOP) {
+			return 0;
+		}
+	}
+	return 1;
+}
+
+static inline int num_predecessors(zend_cfg *cfg, zend_basic_block *block) {
+	int j, count = 0, *predecessors = &cfg->predecessors[block->predecessor_offset];
+	for (j = 0; j < block->predecessors_count; j++) {
+		if (predecessors[j] >= 0) {
+			count++;
+		}
+	}
+	return count;
+}
+
+static inline zend_bool blocks_unreachable(zend_cfg *cfg, int start, int end) {
+	int j;
+	for (j = start; j <= end; j++) {
+		if (cfg->blocks[j].flags & ZEND_BB_REACHABLE) {
+			return 0;
+		}
+	}
+	return 1;
+}
+
+static inline void update_block_map(zend_cfg *cfg, int start, int end, int block) {
+	int j;
+	for (j = start; j <= end; j++) {
+		cfg->map[j] = block;
+	}
+}
+
+static void simplify_cfg(zend_ssa *ssa, zend_op_array *op_array) {
+	zend_cfg *cfg = &ssa->cfg;
+	int i;
+	for (i = 0; i < cfg->blocks_count; i++) {
+		zend_basic_block *block = &cfg->blocks[i];
+		if (!(block->flags & ZEND_BB_REACHABLE)) {
+			continue;
+		}
+
+		if (block->successors[0] > i && block->successors[1] < 0) {
+			zend_basic_block *next = &cfg->blocks[block->successors[0]];
+			zend_ssa_block *next_ssa = &ssa->blocks[block->successors[0]];
+			if (num_predecessors(cfg, next) == 1
+					&& blocks_unreachable(cfg, i + 1, block->successors[0] - 1)) {
+				zend_op *opline = &op_array->opcodes[block->end];
+				if (next_ssa->phis) {
+					/* The block may contain pi statements -- unclear if we ought to just drop
+					 * them and merge or leave them alone and not merge. */
+					continue;
+				}
+				continue;
+				if (opline->opcode == ZEND_JMP) {
+					MAKE_NOP(opline);
+				}
+
+				update_block_map(cfg, block->end + 1, next->end, i);
+				block->end = next->end;
+				next->flags &= ~ZEND_BB_REACHABLE;
+				//next->start = -1;
+				//next->end = -1;
+				OPT_STAT(tmp)++;
+			}
+		}
+	}
+	/*for (i = 0; i < cfg->blocks_count;) {
+		zend_basic_block *block = &cfg->blocks[i];
+		int j;
+		if (block->flags & ZEND_BB_REACHABLE) {
+			i++;
+			continue;
+		}
+
+		for (j = i + 1; j < cfg->blocks_count; j++) {
+			if (cfg->blocks[j].flags & ZEND_BB_REACHABLE) {
+				break;
+			}
+		}
+
+		if (j != i + 1) {
+			OPT_STAT(tmp)++;
+		}
+
+		i = j;
+	}*/
+	/*for (i = 0; i < cfg->blocks_count; i++) {
+		zend_basic_block *block = &cfg->blocks[i];
+		if (block->successors[1] < 0 && block->successors[0] == i + 1
+				&& cfg->blocks[i + 1].predecessors_count == 1) {
+			OPT_STAT(tmp)++;
+		}
+	}*/
+	/*for (i = 0; i < cfg->blocks_count - 2; i++) {
+		zend_basic_block *block0 = &cfg->blocks[i];
+		zend_basic_block *block1 = &cfg->blocks[i+1];
+		zend_basic_block *block2 = &cfg->blocks[i+2];
+		if (!(block0->flags & ZEND_BB_REACHABLE)) {
+			continue;
+		}
+
+		if (block0->successors[0] == i + 2 && block0->successors[1] == i + 1
+				&& block1->successors[0] == i + 2
+				&& block1->predecessors_count == 1 && block2->predecessors_count == 2) {
+			if (!(block1->flags & ZEND_BB_REACHABLE)) {
+				zend_op *opline = &op_array->opcodes[block0->end];
+				switch (opline->opcode) {
+					case ZEND_JMPZ:
+					case ZEND_JMPNZ:
+						if (opline->op1_type & (IS_TMP_VAR|IS_VAR)) {
+							opline->opcode = ZEND_FREE;
+						} else if (opline->op1_type == IS_CONST) {
+							opline->opcode = ZEND_NOP;
+						} else {
+							continue;
+						}
+						break;
+				}
+				OPT_STAT(tmp)++;
+			}
+			if (!(block2->flags & ZEND_BB_REACHABLE)) {
+				OPT_STAT(tmp2)++;
+			}
+		}
+	}*/
 }
 
 void ssa_optimize_dce(ssa_opt_ctx *ssa_ctx) {
@@ -443,6 +579,7 @@ try_again:
 	} FOREACH_PHI_END();
 
 	simplify_jumps(ssa, op_array);
+	simplify_cfg(ssa, op_array);
 	if (j < 0) {
 		j++;
 		goto try_again;

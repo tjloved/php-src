@@ -254,9 +254,9 @@ static inline pcopy_elem *pcopy_reserve_elem(pcopy *cpy) {
 			efree(cpy->elems);
 		}
 		cpy->elems = new_elems;
-		OPT_STAT(tmp)++;
+		//OPT_STAT(tmp)++;
 	}
-	OPT_STAT(tmp2)++;
+	//OPT_STAT(tmp2)++;
 
 	return &cpy->elems[cpy->num_elems++];
 }
@@ -371,10 +371,14 @@ static void compute_shiftlists(context *ctx) {
 	}
 }
 
+static void insert_copies(context *ctx) {
+}
+
 static void insert_pcopys(context *ctx) {
 	init_block_pcopys(ctx);
 	collect_pcopys(ctx);
 	compute_shiftlists(ctx);
+	insert_copies(ctx);
 	free_block_pcopys(ctx);
 }
 
