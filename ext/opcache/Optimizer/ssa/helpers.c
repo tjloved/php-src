@@ -318,19 +318,25 @@ void remove_block(zend_ssa *ssa, int i, uint32_t *num_instr, uint32_t *num_phi) 
 		(*num_instr)++;
 	}
 
-	/* For phis in successor blocks, remove the operands associated with this block */
 	for (s = 0; s < 2; s++) {
 		if (block->successors[s] >= 0) {
-			zend_basic_block *next = &ssa->cfg.blocks[block->successors[s]];
-			int *predecessors = &ssa->cfg.predecessors[next->predecessor_offset];
+			zend_basic_block *next_block = &ssa->cfg.blocks[block->successors[s]];
+			zend_ssa_block *next_ssa_block = &ssa->blocks[block->successors[s]];
+			int *predecessors = &ssa->cfg.predecessors[next_block->predecessor_offset];
+			zend_ssa_phi *phi;
+
+			/* Find at which predecessor offset this block is referenced */
 			int pred_offset = -1;
-			zend_ssa_phi *phi = ssa->blocks[block->successors[s]].phis;
-			for (j = 0; j < next->predecessors_count; j++) {
+			for (j = 0; j < next_block->predecessors_count; j++) {
 				if (predecessors[j] == i) {
 					pred_offset = j;
+					break;
 				}
 			}
-			for (; phi; phi = phi->next) {
+			ZEND_ASSERT(pred_offset != -1);
+
+			/* For phis in successor blocks, remove the operands associated with this block */
+			for (phi = next_ssa_block->phis; phi; phi = phi->next) {
 				if (phi->pi >= 0) {
 					if (phi->pi == i) {
 						remove_uses_of_var(ssa, phi->ssa_var);
@@ -343,7 +349,12 @@ void remove_block(zend_ssa *ssa, int i, uint32_t *num_instr, uint32_t *num_phi) 
 					}
 				}
 			}
+
+			/* Remove this predecessor */
+			predecessors[pred_offset] = -1;
 		}
+
+		// TODO What about removing successors of predecessors?
 	}
 }
 
