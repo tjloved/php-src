@@ -63,15 +63,15 @@ struct st_mysqlnd_memory_pool
 	unsigned int free_size;
 
 	MYSQLND_MEMORY_POOL_CHUNK*	(*get_chunk)(MYSQLND_MEMORY_POOL * pool, unsigned int size);
-	enum_func_status	(*resize_chunk)(MYSQLND_MEMORY_POOL * pool, MYSQLND_MEMORY_POOL_CHUNK * chunk, unsigned int size);
+	MYSQLND_MEMORY_POOL_CHUNK*	(*resize_chunk)(MYSQLND_MEMORY_POOL * pool, MYSQLND_MEMORY_POOL_CHUNK * chunk, unsigned int size);
 	void				(*free_chunk)(MYSQLND_MEMORY_POOL * pool, MYSQLND_MEMORY_POOL_CHUNK * chunk);
 };
 
 struct st_mysqlnd_memory_pool_chunk
 {
-	zend_uchar			*ptr;
 	unsigned int		app;
 	unsigned int		size;
+	zend_uchar			ptr[1];
 };
 
 

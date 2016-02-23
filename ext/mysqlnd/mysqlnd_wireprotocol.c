@@ -1504,7 +1504,8 @@ php_mysqlnd_read_row_ex(MYSQLND_PFC * pfc,
 			/*
 			  We have to realloc the buffer.
 			*/
-			if (FAIL == pool->resize_chunk(pool, *buffer, *data_size)) {
+			*buffer = pool->resize_chunk(pool, *buffer, *data_size);
+			if (!*buffer) {
 				SET_OOM_ERROR(error_info);
 				ret = FAIL;
 				break;

@@ -25,6 +25,8 @@
 #include "mysqlnd_debug.h"
 #include "mysqlnd_priv.h"
 
+#define MYSQLND_POOL_CHUNK_HEADER_SIZE XtOffsetOf(MYSQLND_MEMORY_POOL_CHUNK, ptr)
+
 static inline zend_bool is_from_pool(MYSQLND_MEMORY_POOL * pool, zend_uchar * ptr)
 {
 	return ptr >= pool->arena && ptr < pool->arena + pool->arena_size;
@@ -42,19 +44,18 @@ mysqlnd_mempool_free_chunk(MYSQLND_MEMORY_POOL * pool, MYSQLND_MEMORY_POOL_CHUNK
 				This was the last allocation. Lucky us, we can free
 				a bit of memory from the pool. Next time we will return from the same ptr.
 			*/
-			pool->free_size += chunk->size;
+			pool->free_size += chunk->size + MYSQLND_POOL_CHUNK_HEADER_SIZE;
 		}
 	} else {
-		mnd_efree(chunk->ptr);
+		mnd_efree(chunk);
 	}
-	mnd_efree(chunk);
 	DBG_VOID_RETURN;
 }
 /* }}} */
 
 
 /* {{{ mysqlnd_mempool_resize_chunk */
-static enum_func_status
+static MYSQLND_MEMORY_POOL_CHUNK *
 mysqlnd_mempool_resize_chunk(MYSQLND_MEMORY_POOL * pool, MYSQLND_MEMORY_POOL_CHUNK * chunk, unsigned int size)
 {
 	DBG_ENTER("mysqlnd_mempool_resize_chunk");
@@ -66,42 +67,46 @@ mysqlnd_mempool_resize_chunk(MYSQLND_MEMORY_POOL * pool, MYSQLND_MEMORY_POOL_CHU
 				a bit of memory from the pool. Next time we will return from the same ptr.
 			*/
 			if ((chunk->size + pool->free_size) < size) {
-				zend_uchar *new_ptr;
-				new_ptr = mnd_emalloc(size);
-				if (!new_ptr) {
-					DBG_RETURN(FAIL);
+				MYSQLND_MEMORY_POOL_CHUNK *new_chunk =
+					mnd_emalloc(size + MYSQLND_POOL_CHUNK_HEADER_SIZE);
+				if (!new_chunk) {
+					DBG_RETURN(NULL);
 				}
-				memcpy(new_ptr, chunk->ptr, chunk->size);
-				chunk->ptr = new_ptr;
-				pool->free_size += chunk->size;
-				chunk->size = size;
+				new_chunk->app = chunk->app;
+				new_chunk->size = size;
+				memcpy(new_chunk->ptr, chunk->ptr, chunk->size);
+				pool->free_size += chunk->size * MYSQLND_POOL_CHUNK_HEADER_SIZE;
+				DBG_RETURN(new_chunk);
 			} else {
 				/* If the chunk is > than asked size then free_memory increases, otherwise decreases*/
 				pool->free_size += (chunk->size - size);
+				DBG_RETURN(chunk);
 			}
 		} else {
 			/* Not last chunk, if the user asks for less, give it to him */
 			if (chunk->size >= size) {
-				; /* nop */
+				DBG_RETURN(chunk);
 			} else {
-				zend_uchar *new_ptr;
-				new_ptr = mnd_emalloc(size);
-				if (!new_ptr) {
-					DBG_RETURN(FAIL);
+				MYSQLND_MEMORY_POOL_CHUNK *new_chunk =
+					mnd_emalloc(size + MYSQLND_POOL_CHUNK_HEADER_SIZE);
+				if (!new_chunk) {
+					DBG_RETURN(NULL);
 				}
-				memcpy(new_ptr, chunk->ptr, chunk->size);
-				chunk->ptr = new_ptr;
-				chunk->size = size;
+				new_chunk->app = chunk->app;
+				new_chunk->size = size;
+				memcpy(new_chunk->ptr, chunk->ptr, chunk->size);
+				DBG_RETURN(new_chunk);
 			}
 		}
 	} else {
-		zend_uchar *new_ptr = mnd_erealloc(chunk->ptr, size);
-		if (!new_ptr) {
-			DBG_RETURN(FAIL);
+		MYSQLND_MEMORY_POOL_CHUNK *new_chunk =
+			mnd_erealloc(chunk, size + MYSQLND_POOL_CHUNK_HEADER_SIZE);
+		if (!new_chunk) {
+			DBG_RETURN(NULL);
 		}
-		chunk->ptr = new_ptr;
+		new_chunk->size = size;
+		DBG_RETURN(new_chunk);
 	}
-	DBG_RETURN(PASS);
 }
 /* }}} */
 
@@ -111,28 +116,24 @@ static
 MYSQLND_MEMORY_POOL_CHUNK * mysqlnd_mempool_get_chunk(MYSQLND_MEMORY_POOL * pool, unsigned int size)
 {
 	MYSQLND_MEMORY_POOL_CHUNK *chunk = NULL;
+	unsigned int real_size;
 	DBG_ENTER("mysqlnd_mempool_get_chunk");
 
-	chunk = mnd_emalloc(sizeof(MYSQLND_MEMORY_POOL_CHUNK));
-	if (chunk) {
-		chunk->size = size;
-		/*
-		  Should not go over MYSQLND_MAX_PACKET_SIZE, since we
-		  expect non-arena memory in mysqlnd_wireprotocol.c . We
-		  realloc the non-arena memory.
-		*/
-		if (size > pool->free_size) {
-			chunk->ptr = mnd_emalloc(size);
-			if (!chunk->ptr) {
-				pool->free_chunk(pool, chunk);
-				chunk = NULL;
-			}
-		} else {
-			chunk->ptr = pool->arena + (pool->arena_size - pool->free_size);
-			/* Last step, update free_size */
-			pool->free_size -= size;
+	real_size = size + MYSQLND_POOL_CHUNK_HEADER_SIZE;
+	if (real_size > pool->free_size) {
+		chunk = mnd_emalloc(real_size);
+		if (!chunk) {
+			DBG_RETURN(NULL);
 		}
+	} else {
+		chunk = (MYSQLND_MEMORY_POOL_CHUNK *)
+			(pool->arena + (pool->arena_size - pool->free_size));
+		/* Last step, update free_size */
+		pool->free_size -= real_size;
 	}
+
+	chunk->app = 0;
+	chunk->size = size;
 	DBG_RETURN(chunk);
 }
 /* }}} */
