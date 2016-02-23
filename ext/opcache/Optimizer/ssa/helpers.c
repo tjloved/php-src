@@ -195,18 +195,22 @@ static inline zend_ssa_phi **next_use_phi_ptr(zend_ssa *ssa, int var, zend_ssa_p
 	return NULL;
 }
 
+/* May be called even if source is not used in the phi (useful when removing uses in a phi
+ * with multiple identical operands) */
+static inline void remove_use_of_phi_source(zend_ssa *ssa, zend_ssa_phi *phi, int source) {
+	zend_ssa_phi **cur = &ssa->vars[source].phi_use_chain;
+	while (*cur && *cur != phi) {
+		cur = next_use_phi_ptr(ssa, source, *cur);
+	}
+	if (*cur) {
+		*cur = zend_ssa_next_use_phi(ssa, source, *cur);
+	}
+}
+
 static void remove_uses_of_phi_sources(zend_ssa *ssa, zend_ssa_phi *phi) {
 	int source;
 	FOREACH_PHI_SOURCE(phi, source) {
-		zend_ssa_phi **cur = &ssa->vars[source].phi_use_chain;
-		while (*cur && *cur != phi) {
-			cur = next_use_phi_ptr(ssa, source, *cur);
-		}
-		/* *cur can be NULL here if the Phi uses the same source multiple times
-		 * and it was already removed in a previous iteration. */
-		if (*cur) {
-			*cur = zend_ssa_next_use_phi(ssa, source, *cur);
-		}
+		remove_use_of_phi_source(ssa, phi, source);
 	} FOREACH_PHI_SOURCE_END();
 }
 
@@ -261,19 +265,49 @@ void remove_uses_of_var(zend_ssa *ssa, int var_num) {
 	var->use_chain = -1;
 }
 
+static inline void remove_phi_source(zend_ssa *ssa, zend_ssa_phi *phi, int i) {
+	int j, var_num = phi->sources[i];
+
+	/* Check if they same var is used in a different phi operand as well, in this case we don't
+	 * need to adjust the use chain (but may have to move the next pointer). */
+	for (j = 0; j < ssa->cfg.blocks[phi->block].predecessors_count; j++) {
+		if (phi->sources[j] == var_num) {
+			if (j < i) {
+				phi->sources[i] = -1;
+				return;
+			}
+			if (j > i) {
+				phi->use_chains[j] = phi->use_chains[i];
+				phi->use_chains[i] = NULL;
+				phi->sources[i] = -1;
+				return;
+			}
+		}
+	}
+
+	/* Variable only used in one operand, remove the phi from the use chain. */
+	remove_use_of_phi_source(ssa, phi, var_num);
+	phi->sources[i] = -1;
+	phi->use_chains[i] = NULL;
+}
+
 void remove_block(zend_ssa *ssa, int i, uint32_t *num_instr, uint32_t *num_phi) {
 	zend_op_array *op_array = ssa->op_array;
 	zend_basic_block *block = &ssa->cfg.blocks[i];
 	zend_ssa_block *ssa_block = &ssa->blocks[i];
 	zend_ssa_phi *phi;
-	int j;
+	int j, s;
 
 	block->flags &= ~ZEND_BB_REACHABLE;
+
+	/* Removes phis in this block */
 	for (phi = ssa_block->phis; phi; phi = phi->next) {
 		remove_uses_of_var(ssa, phi->ssa_var);
 		remove_phi(ssa, phi);
 		(*num_phi)++;
 	}
+
+	/* Remove instructions in this block */
 	for (j = block->start; j <= block->end; j++) {
 		if (op_array->opcodes[j].opcode == ZEND_NOP) {
 			continue;
@@ -282,6 +316,34 @@ void remove_block(zend_ssa *ssa, int i, uint32_t *num_instr, uint32_t *num_phi) 
 		remove_defs_of_instr(ssa, &ssa->ops[j]);
 		remove_instr(ssa, &op_array->opcodes[j], &ssa->ops[j]);
 		(*num_instr)++;
+	}
+
+	/* For phis in successor blocks, remove the operands associated with this block */
+	for (s = 0; s < 2; s++) {
+		if (block->successors[s] >= 0) {
+			zend_basic_block *next = &ssa->cfg.blocks[block->successors[s]];
+			int *predecessors = &ssa->cfg.predecessors[next->predecessor_offset];
+			int pred_offset = -1;
+			zend_ssa_phi *phi = ssa->blocks[block->successors[s]].phis;
+			for (j = 0; j < next->predecessors_count; j++) {
+				if (predecessors[j] == i) {
+					pred_offset = j;
+				}
+			}
+			for (; phi; phi = phi->next) {
+				if (phi->pi >= 0) {
+					if (phi->pi == i) {
+						remove_uses_of_var(ssa, phi->ssa_var);
+						remove_phi(ssa, phi);
+						(*num_phi)++;
+					}
+				} else {
+					if (phi->sources[pred_offset] >= 0) {
+						remove_phi_source(ssa, phi, pred_offset);
+					}
+				}
+			}
+		}
 	}
 }
 
