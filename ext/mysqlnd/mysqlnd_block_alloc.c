@@ -25,13 +25,17 @@
 #include "mysqlnd_debug.h"
 #include "mysqlnd_priv.h"
 
+static inline zend_bool is_from_pool(MYSQLND_MEMORY_POOL * pool, zend_uchar * ptr)
+{
+	return ptr >= pool->arena && ptr < pool->arena + pool->arena_size;
+}
 
 /* {{{ mysqlnd_mempool_free_chunk */
 static void
 mysqlnd_mempool_free_chunk(MYSQLND_MEMORY_POOL * pool, MYSQLND_MEMORY_POOL_CHUNK * chunk)
 {
 	DBG_ENTER("mysqlnd_mempool_free_chunk");
-	if (chunk->from_pool) {
+	if (is_from_pool(pool, chunk->ptr)) {
 		/* Try to back-off and guess if this is the last block allocated */
 		if (chunk->ptr == (pool->arena + (pool->arena_size - pool->free_size - chunk->size))) {
 			/*
@@ -54,7 +58,7 @@ static enum_func_status
 mysqlnd_mempool_resize_chunk(MYSQLND_MEMORY_POOL * pool, MYSQLND_MEMORY_POOL_CHUNK * chunk, unsigned int size)
 {
 	DBG_ENTER("mysqlnd_mempool_resize_chunk");
-	if (chunk->from_pool) {
+	if (is_from_pool(pool, chunk->ptr)) {
 		/* Try to back-off and guess if this is the last block allocated */
 		if (chunk->ptr == (pool->arena + (pool->arena_size - pool->free_size - chunk->size))) {
 			/*
@@ -71,7 +75,6 @@ mysqlnd_mempool_resize_chunk(MYSQLND_MEMORY_POOL * pool, MYSQLND_MEMORY_POOL_CHU
 				chunk->ptr = new_ptr;
 				pool->free_size += chunk->size;
 				chunk->size = size;
-				chunk->from_pool = FALSE; /* now we have no pool memory */
 			} else {
 				/* If the chunk is > than asked size then free_memory increases, otherwise decreases*/
 				pool->free_size += (chunk->size - size);
@@ -89,7 +92,6 @@ mysqlnd_mempool_resize_chunk(MYSQLND_MEMORY_POOL * pool, MYSQLND_MEMORY_POOL_CHU
 				memcpy(new_ptr, chunk->ptr, chunk->size);
 				chunk->ptr = new_ptr;
 				chunk->size = size;
-				chunk->from_pool = FALSE; /* now we have non-pool memory */
 			}
 		}
 	} else {
@@ -120,14 +122,12 @@ MYSQLND_MEMORY_POOL_CHUNK * mysqlnd_mempool_get_chunk(MYSQLND_MEMORY_POOL * pool
 		  realloc the non-arena memory.
 		*/
 		if (size > pool->free_size) {
-			chunk->from_pool = FALSE;
 			chunk->ptr = mnd_emalloc(size);
 			if (!chunk->ptr) {
 				pool->free_chunk(pool, chunk);
 				chunk = NULL;
 			}
 		} else {
-			chunk->from_pool = TRUE;
 			chunk->ptr = pool->arena + (pool->arena_size - pool->free_size);
 			/* Last step, update free_size */
 			pool->free_size -= size;

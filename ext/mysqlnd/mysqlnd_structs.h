@@ -69,10 +69,9 @@ struct st_mysqlnd_memory_pool
 
 struct st_mysqlnd_memory_pool_chunk
 {
-	size_t				app;
 	zend_uchar			*ptr;
+	unsigned int		app;
 	unsigned int		size;
-	zend_bool			from_pool;
 };
 
 
