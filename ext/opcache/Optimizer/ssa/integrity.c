@@ -247,6 +247,14 @@ int ssa_verify_integrity(zend_ssa *ssa, const char *extra) {
 		zend_basic_block *block = &cfg->blocks[i];
 		int *predecessors = &cfg->predecessors[block->predecessor_offset];
 		int s, j;
+
+		if (i != 0 && block->start != (block-1)->end + 1) {
+			FAIL("Block %d start %d not adjacent to %d\n", i, block->start, (block-1)->end);
+		}
+		if (i != cfg->blocks_count-1 && block->end != (block+1)->start - 1) {
+			FAIL("Block %d end %d not adjacent to %d\n", i, block->end, (block+1)->start);
+		}
+
 		if (!(block->flags & ZEND_BB_REACHABLE)) {
 			continue;
 		}
