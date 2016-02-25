@@ -254,6 +254,9 @@ int ssa_verify_integrity(zend_ssa *ssa, const char *extra) {
 		for (s = 0; s < 2; s++) {
 			if (block->successors[s] >= 0) {
 				zend_basic_block *next_block = &cfg->blocks[block->successors[s]];
+				if (!(next_block->flags & ZEND_BB_REACHABLE)) {
+					FAIL("Successor %d of %d not reachable\n", block->successors[s], i);
+				}
 				if (!is_in_predecessors(cfg, next_block, i)) {
 					FAIL("Block %d predecessors missing %d\n", block->successors[s], i);
 				}
@@ -264,6 +267,9 @@ int ssa_verify_integrity(zend_ssa *ssa, const char *extra) {
 			if (predecessors[j] >= 0) {
 				int k;
 				zend_basic_block *prev_block = &cfg->blocks[predecessors[j]];
+				if (!(prev_block->flags & ZEND_BB_REACHABLE)) {
+					FAIL("Predecessor %d of %d not reachable\n", predecessors[j], i);
+				}
 				if (prev_block->successors[0] != i && prev_block->successors[1] != i) {
 					FAIL("Block %d successors missing %d\n", predecessors[j], i);
 				}

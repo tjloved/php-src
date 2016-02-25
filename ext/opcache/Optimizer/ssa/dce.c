@@ -398,7 +398,7 @@ static void simplify_cfg(zend_ssa *ssa, zend_op_array *op_array) {
 		if (block->successors[0] > i && block->successors[1] < 0) {
 			zend_basic_block *next = &cfg->blocks[block->successors[0]];
 			zend_ssa_block *next_ssa = &ssa->blocks[block->successors[0]];
-			if (num_predecessors(cfg, next) == 1
+			if (next->successors[1] < 0 && num_predecessors(cfg, next) == 1
 					&& blocks_unreachable(cfg, i + 1, block->successors[0] - 1)) {
 				zend_op *opline = &op_array->opcodes[block->end];
 				if (next_ssa->phis) {
@@ -406,13 +406,23 @@ static void simplify_cfg(zend_ssa *ssa, zend_op_array *op_array) {
 					 * them and merge or leave them alone and not merge. */
 					continue;
 				}
-				continue;
+				//continue;
 				if (opline->opcode == ZEND_JMP) {
 					MAKE_NOP(opline);
 				}
 
 				update_block_map(cfg, block->end + 1, next->end, i);
 				block->end = next->end;
+				{
+					zend_basic_block *next2 = &cfg->blocks[next->successors[0]];
+					int j, *predecessors = &cfg->predecessors[next2->predecessor_offset];
+					for (j = 0; j < next2->predecessors_count; j++) {
+						if (predecessors[j] == block->successors[0]) {
+							predecessors[j] = i;
+						}
+					}
+				}
+				block->successors[0] = next->successors[0];
 				next->flags &= ~ZEND_BB_REACHABLE;
 				//next->start = -1;
 				//next->end = -1;
