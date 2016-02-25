@@ -267,11 +267,8 @@ static void simplify_jumps(zend_ssa *ssa, zend_op_array *op_array) {
 					opline->op1_type = IS_UNUSED;
 					opline->op1.num = opline->op2.num;
 					opline->opcode = ZEND_JMP;
-					//block->successors[1] = -1;
 				} else {
 					MAKE_NOP(opline);
-					//block->successors[0] = block->successors[1];
-					//block->successors[1] = -1;
 				}
 				break;
 			case ZEND_JMPNZ:
@@ -389,11 +386,30 @@ static inline void update_block_map(zend_cfg *cfg, int start, int end, int block
 static void simplify_cfg(zend_ssa *ssa, zend_op_array *op_array) {
 	zend_cfg *cfg = &ssa->cfg;
 	int i;
+	for (i = 1; i < cfg->blocks_count - 1; i++) {
+		zend_basic_block *block = &cfg->blocks[i];
+		if (block->start != (block-1)->end + 1 || block->end != (block+1)->start - 1) {
+			//OPT_STAT(tmp2)++;
+		}
+	}
 	for (i = 0; i < cfg->blocks_count; i++) {
 		zend_basic_block *block = &cfg->blocks[i];
 		if (!(block->flags & ZEND_BB_REACHABLE)) {
 			continue;
 		}
+
+#if 0
+		if (block->successors[1] < 0 && block->successors[0] >= 0 && block->successors[0] != i + 1) { //&&
+				//is_nop_sled(op_array, block->start, block->end - 1)) {
+			if (op_array->opcodes[block->end].opcode != ZEND_JMP) {
+				if (op_array->function_name) {
+					fprintf(stderr, "%s\n", ZSTR_VAL(op_array->function_name));
+				}
+				fprintf(stderr, "%d: %s\n", i, zend_get_opcode_name(op_array->opcodes[block->end].opcode));
+				OPT_STAT(tmp2)++;
+			}
+		}
+#endif
 
 		if (block->successors[0] > i && block->successors[1] < 0) {
 			zend_basic_block *next = &cfg->blocks[block->successors[0]];
@@ -410,7 +426,7 @@ static void simplify_cfg(zend_ssa *ssa, zend_op_array *op_array) {
 				//continue;
 				if (opline->opcode == ZEND_JMP) {
 					MAKE_NOP(opline);
-					OPT_STAT(tmp2)++;
+					//OPT_STAT(tmp2)++;
 				}
 
 				for (s = 0; s < 2; s++) {
@@ -429,10 +445,16 @@ static void simplify_cfg(zend_ssa *ssa, zend_op_array *op_array) {
 
 				update_block_map(cfg, block->end + 1, next->end, i);
 				block->end = next->end;
+				while (block++ != next) {
+					block->start = next->end + 1;
+					block->end = next->end;
+				}
 				next->flags &= ~ZEND_BB_REACHABLE;
-				//next->start = -1;
-				//next->end = -1;
 				OPT_STAT(tmp)++;
+
+				/* Give the new block another try */
+				i--;
+				continue;
 			}
 		}
 	}
