@@ -270,6 +270,8 @@ static void simplify_jumps(zend_ssa *ssa, zend_op_array *op_array) {
 					//block->successors[1] = -1;
 				} else {
 					MAKE_NOP(opline);
+					//block->successors[0] = block->successors[1];
+					//block->successors[1] = -1;
 				}
 				break;
 			case ZEND_JMPNZ:

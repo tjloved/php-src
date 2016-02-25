@@ -46,6 +46,16 @@ static inline zend_bool is_in_phi_sources(zend_ssa *ssa, zend_ssa_phi *phi, int 
 	return 0;
 }
 
+static inline zend_bool is_in_predecessors(zend_cfg *cfg, zend_basic_block *block, int check) {
+	int i, *predecessors = &cfg->predecessors[block->predecessor_offset];
+	for (i = 0; i < block->predecessors_count; i++) {
+		if (predecessors[i] == check) {
+			return 1;
+		}
+	}
+	return 0;
+}
+
 static inline zend_bool is_var_type(zend_uchar type) {
 	return type == IS_CV || type == IS_VAR || type == IS_TMP_VAR;
 }
@@ -70,9 +80,12 @@ static inline zend_bool is_var_type(zend_uchar type) {
 	(i), (zend_get_opcode_name(op_array->opcodes[i].opcode))
 
 int ssa_verify_integrity(zend_ssa *ssa, const char *extra) {
+	zend_cfg *cfg = &ssa->cfg;
 	zend_op_array *op_array = ssa->op_array;
 	zend_ssa_phi *phi;
 	int i, status = SUCCESS;
+
+	/* Vars */
 	for (i = 0; i < ssa->vars_count; i++) {
 		zend_ssa_var *var = &ssa->vars[i];
 		int use, c;
@@ -122,6 +135,8 @@ int ssa_verify_integrity(zend_ssa *ssa, const char *extra) {
 			}
 		} FOREACH_PHI_USE_END();
 	}
+
+	/* Instructions */
 	for (i = 0; i < op_array->last; i++) {
 		zend_ssa_op *ssa_op = &ssa->ops[i];
 		zend_op *opline = &op_array->opcodes[i];
@@ -214,6 +229,8 @@ int ssa_verify_integrity(zend_ssa *ssa, const char *extra) {
 			}
 		}
 	}
+
+	/* Phis */
 	FOREACH_PHI(phi) {
 		int source;
 		FOREACH_PHI_SOURCE(phi, source) {
@@ -225,5 +242,39 @@ int ssa_verify_integrity(zend_ssa *ssa, const char *extra) {
 			FAIL(VARFMT " does not define this phi\n", VAR(phi->ssa_var));
 		}
 	} FOREACH_PHI_END();
+
+	for (i = 0; i < cfg->blocks_count; i++) {
+		zend_basic_block *block = &cfg->blocks[i];
+		int *predecessors = &cfg->predecessors[block->predecessor_offset];
+		int s, j;
+		if (!(block->flags & ZEND_BB_REACHABLE)) {
+			continue;
+		}
+
+		for (s = 0; s < 2; s++) {
+			if (block->successors[s] >= 0) {
+				zend_basic_block *next_block = &cfg->blocks[block->successors[s]];
+				if (!is_in_predecessors(cfg, next_block, i)) {
+					FAIL("Block %d predecessors missing %d\n", block->successors[s], i);
+				}
+			}
+		}
+
+		for (j = 0; j < block->predecessors_count; j++) {
+			if (predecessors[j] >= 0) {
+				int k;
+				zend_basic_block *prev_block = &cfg->blocks[predecessors[j]];
+				if (prev_block->successors[0] != i && prev_block->successors[1] != i) {
+					FAIL("Block %d successors missing %d\n", predecessors[j], i);
+				}
+				for (k = 0; k < block->predecessors_count; k++) {
+					if (k != j && predecessors[k] == predecessors[j]) {
+						FAIL("Block %d has duplicate predecessor %d\n", i, predecessors[j]);
+					}
+				}
+			}
+		}
+	}
+
 	return status;
 }

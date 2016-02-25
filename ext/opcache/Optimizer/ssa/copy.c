@@ -352,6 +352,7 @@ void visit_phi(void *void_ctx, zend_ssa_phi *phi) {
 		return;
 	}
 
+	//ZEND_ASSERT(ssa->cfg.blocks[phi->block].flags & ZEND_BB_REACHABLE);
 	if (phi->pi >= 0) {
 		if (phi->sources[0] >= 0 && scdf_is_edge_feasible(&ctx->scdf, phi->pi, phi->block)) {
 			if (ctx->copy[phi->sources[0]] != BOT) {
