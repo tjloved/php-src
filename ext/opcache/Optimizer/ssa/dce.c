@@ -400,6 +400,8 @@ static void merge_blocks(zend_cfg *cfg, int block1_num, int block2_num) {
 	zend_basic_block *block1 = &cfg->blocks[block1_num];
 	zend_basic_block *block2 = &cfg->blocks[block2_num];
 	int s;
+
+	ZEND_ASSERT(block1->successors[0] == block2_num);
 	ZEND_ASSERT(block1->successors[1] < 0);
 
 	/* Move successors to first block */
@@ -420,7 +422,6 @@ static void merge_blocks(zend_cfg *cfg, int block1_num, int block2_num) {
 
 	/* Second block now empty and unreachable */
 	block2->start = block2->end + 1;
-	block2->end = block2->end;
 	block2->flags &= ~ZEND_BB_REACHABLE;
 }
 
@@ -433,12 +434,16 @@ static void simplify_cfg(zend_ssa *ssa, zend_op_array *op_array) {
 			continue;
 		}
 
+#if 0
 		if (block->successors[1] < 0 && block->successors[0] >= 0
 				&& block_is_adjacent(cfg, block, block->successors[0])
 				//&& is_nop_sled(op_array, block->start, block->end - 1)
-				&& num_predecessors(cfg, &cfg->blocks[block->successors[0]]) == 1) {
+				&& num_predecessors(cfg, &cfg->blocks[block->successors[0]]) == 1
+				&& !ssa->blocks[block->successors[0]].phis) {
+			merge_blocks(cfg, i, block->successors[0]);
 			OPT_STAT(tmp2)++;
 		}
+#endif
 
 		if (block->successors[0] > i && block->successors[1] < 0) {
 			zend_basic_block *next = &cfg->blocks[block->successors[0]];
