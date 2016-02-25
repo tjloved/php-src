@@ -295,6 +295,7 @@ void remove_block(zend_ssa *ssa, int i, uint32_t *num_instr, uint32_t *num_phi) 
 	zend_op_array *op_array = ssa->op_array;
 	zend_basic_block *block = &ssa->cfg.blocks[i];
 	zend_ssa_block *ssa_block = &ssa->blocks[i];
+	int *predecessors;
 	zend_ssa_phi *phi;
 	int j, s;
 
@@ -322,11 +323,11 @@ void remove_block(zend_ssa *ssa, int i, uint32_t *num_instr, uint32_t *num_phi) 
 		if (block->successors[s] >= 0) {
 			zend_basic_block *next_block = &ssa->cfg.blocks[block->successors[s]];
 			zend_ssa_block *next_ssa_block = &ssa->blocks[block->successors[s]];
-			int *predecessors = &ssa->cfg.predecessors[next_block->predecessor_offset];
 			zend_ssa_phi *phi;
 
 			/* Find at which predecessor offset this block is referenced */
 			int pred_offset = -1;
+			predecessors = &ssa->cfg.predecessors[next_block->predecessor_offset];
 			for (j = 0; j < next_block->predecessors_count; j++) {
 				if (predecessors[j] == i) {
 					pred_offset = j;
@@ -353,8 +354,18 @@ void remove_block(zend_ssa *ssa, int i, uint32_t *num_instr, uint32_t *num_phi) 
 			/* Remove this predecessor */
 			predecessors[pred_offset] = -1;
 		}
+	}
 
-		// TODO What about removing successors of predecessors?
+	/* Remove successors of predecessors */
+	predecessors = &ssa->cfg.predecessors[block->predecessor_offset];
+	for (j = 0; j < block->predecessors_count; j++) {
+		if (predecessors[j] >= 0) {
+			zend_basic_block *prev_block = &ssa->cfg.blocks[predecessors[j]];
+			if (prev_block->successors[0] == i) {
+				prev_block->successors[0] = prev_block->successors[1];
+			}
+			prev_block->successors[1] = -1;
+		}
 	}
 }
 

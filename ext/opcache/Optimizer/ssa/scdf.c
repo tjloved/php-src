@@ -122,7 +122,9 @@ void scdf_solve(scdf_ctx *ctx, const char *name) {
 			{
 				zend_ssa_phi *phi;
 				FOREACH_PHI_USE(var, phi) {
-					ctx->handlers.visit_phi(ctx, phi);
+					if (zend_bitset_in(ctx->executable_blocks, phi->block)) {
+						ctx->handlers.visit_phi(ctx, phi);
+					}
 				} FOREACH_PHI_USE_END();
 			}
 		}
