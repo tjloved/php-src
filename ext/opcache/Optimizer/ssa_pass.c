@@ -270,6 +270,24 @@ static zend_call_info **compute_call_map(
 	return map;
 }
 
+static inline void debug_dump(
+		zend_op_array *op_array, zend_ssa *ssa, const char *name, int debug_level) {
+	if (ZCG(accel_directives).ssa_debug_level & debug_level) {
+		const char *func = ZCG(accel_directives).ssa_debug_func;
+		size_t len = strlen(func);
+		if (len) {
+			if (!op_array->function_name) {
+				return;
+			}
+			if (ZSTR_LEN(op_array->function_name) != len
+					|| memcmp(ZSTR_VAL(op_array->function_name), func, len)) {
+				return;
+			}
+		}
+		zend_dump_op_array(op_array, ZEND_DUMP_SSA, name, ssa);
+	}
+}
+
 static void run_pass(
 		ssa_opt_ctx *ctx, void (*optimize_fn)(ssa_opt_ctx *ctx),
 		const char *name, uint32_t debug_level) {
@@ -277,10 +295,7 @@ static void run_pass(
 #if SSA_VERIFY_INTEGRITY > 1
 	ssa_verify_integrity(ctx->ssa, name);
 #endif
-
-	if (ZCG(accel_directives).ssa_debug_level & debug_level) {
-		zend_dump_op_array(ctx->op_array, ZEND_DUMP_SSA, name, ctx->ssa);
-	}
+	debug_dump(ctx->op_array, ctx->ssa, name, debug_level);
 }
 
 static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) {
@@ -361,9 +376,7 @@ static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) 
 	ssa_verify_integrity(&info->ssa, "before SSA pass");
 #endif
 
-	if (ZCG(accel_directives).ssa_debug_level & 2) {
-		zend_dump_op_array(op_array, ZEND_DUMP_SSA, "before ssa pass", &info->ssa);
-	}
+	debug_dump(op_array, &info->ssa, "before ssa pass", 2);
 
 	compute_cfg_info(&cfg_info, ctx, &info->ssa.cfg);
 	ssa_liveness_precompute(ctx, &liveness, &info->ssa, &cfg_info);
@@ -384,7 +397,7 @@ static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) 
 	run_pass(&ssa_ctx, ssa_optimize_dce, "after DCE", 8);
 	run_pass(&ssa_ctx, ssa_optimize_copy, "after copy propagation", 16);
 	run_pass(&ssa_ctx, ssa_optimize_gvn, "after GVN", 64);
-	run_pass(&ssa_ctx, ssa_optimize_dce, "after DCE 2", 128);
+	//run_pass(&ssa_ctx, ssa_optimize_dce, "after DCE 2", 128);
 	run_pass(&ssa_ctx, ssa_optimize_assign, "after assignment contraction", 32);
 
 	//ssa_optimize_cv_to_tmp(&ssa_ctx);
@@ -396,9 +409,7 @@ static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) 
 	ssa_verify_integrity(&info->ssa, "after SSA pass");
 #endif
 
-	if (ZCG(accel_directives).ssa_debug_level & 1) {
-		zend_dump_op_array(op_array, ZEND_DUMP_SSA, "after ssa pass", &info->ssa);
-	}
+	debug_dump(op_array, &info->ssa, "after ssa pass", 1);
 
 	ssa_optimize_vars(&ssa_ctx);
 }
