@@ -5,9 +5,10 @@
 #include "Optimizer/ssa/instructions.h"
 #include "Optimizer/ssa/scdf.h"
 #include "Optimizer/statistics.h"
+#include "ext/standard/php_string.h"
 
-/* This implements sparse conditional constant propagation based on the SCDF framework. The used
- * lattice is defined as follows:
+/* This implements sparse conditional constant propagation (SCCP) based on the SCDF framework. The
+ * used value lattice is defined as follows:
  *
  * BOT < {constant values} < TOP
  *
@@ -573,6 +574,24 @@ static inline int ct_eval_func_call(
 		}
 		ZVAL_BOOL(result, value != NULL);
 		return SUCCESS;
+	} else if (zend_string_equals_literal(name, "trim")
+			|| zend_string_equals_literal(name, "rtrim")
+			|| zend_string_equals_literal(name, "ltrim")) {
+		zend_string *str;
+		int mode;
+		if ((num_args < 1 || num_args > 2) || Z_TYPE_P(args[0]) != IS_STRING
+				|| (num_args == 2 && Z_TYPE_P(args[1]) != IS_STRING)) {
+			return FAILURE;
+		}
+
+		mode = ZSTR_VAL(name)[0] == 'l' ? 1 : ZSTR_VAL(name)[0] == 'r' ? 2 : 3;
+		if (num_args == 2) {
+			str = php_trim(Z_STR_P(args[0]), Z_STRVAL_P(args[1]), Z_STRLEN_P(args[1]), mode);
+		} else {
+			str = php_trim(Z_STR_P(args[0]), NULL, 0, mode);
+		}
+		ZVAL_STR(result, str);
+		return SUCCESS;
 	}
 	return FAILURE;
 }
@@ -974,12 +993,14 @@ static void visit_instr(void *void_ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 				break;
 			}
 
-			/*fprintf(stderr, "%s\n", Z_STRVAL_P(name));
-			if (args[1]) {
+#if 0
+			fprintf(stderr, "%s\n", Z_STRVAL_P(name));
+			/*if (args[1]) {
 				php_printf("%s %Z %Z\n", Z_STRVAL_P(name), args[0], args[1]);
 			} else {
 				php_printf("%s %Z\n", Z_STRVAL_P(name), args[0]);
 			}*/
+#endif
 
 			SET_RESULT_BOT(result);
 			break;
@@ -1152,16 +1173,16 @@ static void replace_constant_operands(scp_ctx *ctx) {
 	}
 }
 
-/* This is a basic DCE pass we run after SCP. It only works on those instructions those result
- * value(s) were determined by SCP. It removes dead computational instructions and converts
+/* This is a basic DCE pass we run after SCCP. It only works on those instructions those result
+ * value(s) were determined by SCCP. It removes dead computational instructions and converts
  * CV-affecting instructions into CONST ASSIGNs. This basic DCE is performed for multiple reasons:
  * a) During operand replacement we eliminate FREEs. The corresponding computational instructions
- *    must be removed to avoid leaks. This way SCP can run independently of the full DCE pass.
+ *    must be removed to avoid leaks. This way SCCP can run independently of the full DCE pass.
  * b) The main DCE pass relies on type analysis to determine whether instructions have side-effects
  *    and can't be DCEd. This means that it will not be able collect all instructions rendered dead
- *    by SCP, because they may have potentially side-effecting types, but the actual values are
+ *    by SCCP, because they may have potentially side-effecting types, but the actual values are
  *    not. As such doing DCE here will allow us to eliminate more dead code in combination.
- * c) The ordinary DCE pass cannot collect dead calls. However SCP can result in dead calls, which
+ * c) The ordinary DCE pass cannot collect dead calls. However SCCP can result in dead calls, which
  *    we need to collect. */
 static void eliminate_dead_instructions(scp_ctx *ctx) {
 	zend_ssa *ssa = ctx->ssa;
