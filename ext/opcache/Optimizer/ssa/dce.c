@@ -228,7 +228,6 @@ static void simplify_jumps(zend_ssa *ssa, zend_op_array *op_array) {
 	for (i = 0; i < op_array->last; i++) {
 		zend_op *opline = &op_array->opcodes[i];
 		zend_ssa_op *ssa_op = &ssa->ops[i];
-		zend_basic_block *block;
 		zval *op1;
 
 		/* Convert jump-and-set into jump if result is not used  */
@@ -259,7 +258,6 @@ static void simplify_jumps(zend_ssa *ssa, zend_op_array *op_array) {
 
 		/* Convert constant conditional jump to unconditional jump */
 		op1 = &ZEND_OP1_LITERAL(opline);
-		block = &ssa->cfg.blocks[ssa->cfg.map[i]];
 		switch (opline->opcode) {
 			case ZEND_JMPZ:
 				if (!zend_is_true(op1)) {
@@ -356,6 +354,28 @@ static inline zend_bool is_nop_sled(zend_op_array *op_array, int start, int end)
 	return 1;
 }
 
+static inline zend_bool block_is_adjacent(
+		const zend_cfg *cfg, const zend_basic_block *block, int check) {
+	return block->end + 1 == cfg->blocks[check].start;
+}
+
+static inline zend_bool is_block_empty(
+		const zend_cfg *cfg, zend_op_array *op_array, zend_basic_block *block) {
+	zend_op *last;
+	if (!is_nop_sled(op_array, block->start, block->end - 1)) {
+		return 0;
+	}
+	if (block->successors[1] >= 0) {
+		return 1;
+	}
+
+	last = &op_array->opcodes[block->end];
+	if (last->opcode == ZEND_NOP) {
+		return 1;
+	}
+	return !block_is_adjacent(cfg, block, block->successors[0]);
+}
+
 static inline int num_predecessors(zend_cfg *cfg, zend_basic_block *block) {
 	int j, count = 0, *predecessors = &cfg->predecessors[block->predecessor_offset];
 	for (j = 0; j < block->predecessors_count; j++) {
@@ -381,10 +401,6 @@ static inline void update_block_map(zend_cfg *cfg, int start, int end, int block
 	for (j = start; j <= end; j++) {
 		cfg->map[j] = block;
 	}
-}
-
-static inline zend_bool block_is_adjacent(zend_cfg *cfg, zend_basic_block *block, int check) {
-	return block->end + 1 == cfg->blocks[check].start;
 }
 
 static inline void replace_predecessor(zend_cfg *cfg, zend_basic_block *block, int from, int to) {
@@ -416,12 +432,21 @@ static void merge_blocks(zend_cfg *cfg, int block1_num, int block2_num) {
 		}
 	}
 
-	/* First block now contains instructions of second block */
+	/* First block now contains instructions of second block and
+	 * all the intermediate unreachable blocks */
+	update_block_map(cfg, block1->end + 1, block2->end, block1_num);
 	block1->end = block2->end;
-	update_block_map(cfg, block2->start, block2->end, block1_num);
 
-	/* Second block now empty and unreachable */
-	block2->start = block2->end + 1;
+	/* Second block and all intermediate unreachable blocks are now empty */
+	{
+		zend_basic_block *b = block1;
+		while (b++ != block2) {
+			b->start = block1->end + 1;
+			b->end = block1->end;
+		}
+	}
+
+	/* Second block became unreachable */
 	block2->flags &= ~ZEND_BB_REACHABLE;
 }
 
@@ -433,17 +458,10 @@ static void simplify_cfg(zend_ssa *ssa, zend_op_array *op_array) {
 		if (!(block->flags & ZEND_BB_REACHABLE)) {
 			continue;
 		}
-
-#if 0
-		if (block->successors[1] < 0 && block->successors[0] >= 0
-				&& block_is_adjacent(cfg, block, block->successors[0])
-				//&& is_nop_sled(op_array, block->start, block->end - 1)
-				&& num_predecessors(cfg, &cfg->blocks[block->successors[0]]) == 1
-				&& !ssa->blocks[block->successors[0]].phis) {
-			merge_blocks(cfg, i, block->successors[0]);
+		
+		if (is_block_empty(cfg, op_array, block)) {
 			OPT_STAT(tmp2)++;
 		}
-#endif
 
 		if (block->successors[0] > i && block->successors[1] < 0) {
 			zend_basic_block *next = &cfg->blocks[block->successors[0]];
@@ -456,21 +474,13 @@ static void simplify_cfg(zend_ssa *ssa, zend_op_array *op_array) {
 					 * them and merge or leave them alone and not merge. */
 					continue;
 				}
+
 				if (opline->opcode == ZEND_JMP) {
 					MAKE_NOP(opline);
-					//OPT_STAT(tmp2)++;
 				}
-
-				// TODO cleanup unreachable block handling
-				zend_basic_block *block2 = block;
-				while (++block2 != next) {
-					block2->start = next->end + 1;
-					block2->end = next->end;
-				}
-				update_block_map(cfg, block->end + 1, next->start - 1, i);
 
 				merge_blocks(cfg, i, block->successors[0]);
-				OPT_STAT(tmp)++;
+				OPT_STAT(cfg_merged_blocks)++;
 
 				/* Give the new block another try */
 				i--;
@@ -478,65 +488,6 @@ static void simplify_cfg(zend_ssa *ssa, zend_op_array *op_array) {
 			}
 		}
 	}
-	/*for (i = 0; i < cfg->blocks_count;) {
-		zend_basic_block *block = &cfg->blocks[i];
-		int j;
-		if (block->flags & ZEND_BB_REACHABLE) {
-			i++;
-			continue;
-		}
-
-		for (j = i + 1; j < cfg->blocks_count; j++) {
-			if (cfg->blocks[j].flags & ZEND_BB_REACHABLE) {
-				break;
-			}
-		}
-
-		if (j != i + 1) {
-			OPT_STAT(tmp)++;
-		}
-
-		i = j;
-	}*/
-	/*for (i = 0; i < cfg->blocks_count; i++) {
-		zend_basic_block *block = &cfg->blocks[i];
-		if (block->successors[1] < 0 && block->successors[0] == i + 1
-				&& cfg->blocks[i + 1].predecessors_count == 1) {
-			OPT_STAT(tmp)++;
-		}
-	}*/
-	/*for (i = 0; i < cfg->blocks_count - 2; i++) {
-		zend_basic_block *block0 = &cfg->blocks[i];
-		zend_basic_block *block1 = &cfg->blocks[i+1];
-		zend_basic_block *block2 = &cfg->blocks[i+2];
-		if (!(block0->flags & ZEND_BB_REACHABLE)) {
-			continue;
-		}
-
-		if (block0->successors[0] == i + 2 && block0->successors[1] == i + 1
-				&& block1->successors[0] == i + 2
-				&& block1->predecessors_count == 1 && block2->predecessors_count == 2) {
-			if (!(block1->flags & ZEND_BB_REACHABLE)) {
-				zend_op *opline = &op_array->opcodes[block0->end];
-				switch (opline->opcode) {
-					case ZEND_JMPZ:
-					case ZEND_JMPNZ:
-						if (opline->op1_type & (IS_TMP_VAR|IS_VAR)) {
-							opline->opcode = ZEND_FREE;
-						} else if (opline->op1_type == IS_CONST) {
-							opline->opcode = ZEND_NOP;
-						} else {
-							continue;
-						}
-						break;
-				}
-				OPT_STAT(tmp)++;
-			}
-			if (!(block2->flags & ZEND_BB_REACHABLE)) {
-				OPT_STAT(tmp2)++;
-			}
-		}
-	}*/
 }
 
 void ssa_optimize_dce(ssa_opt_ctx *ssa_ctx) {

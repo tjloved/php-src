@@ -6,6 +6,47 @@
 #include "Optimizer/ssa/scdf.h"
 #include "Optimizer/statistics.h"
 
+/* This implements sparse conditional constant propagation based on the SCDF framework. The used
+ * lattice is defined as follows:
+ *
+ * BOT < {constant values} < TOP
+ *
+ * TOP indicates an underdefined value, i.e. that we do not yet know the value of variable.
+ * BOT indicates an overdefined value, i.e. that we know the variable to be non-constant.
+ *
+ * All variables are optimistically initialized to TOP, apart from the implicit variables defined
+ * at the start of the first block. Note that variables that MAY_BE_REF are *not* initialized to
+ * BOT. We rely on the fact that any operation resulting in a reference will produce a BOT anyway.
+ * This is better because such operations might never be reached due to the conditional nature of
+ * the algorithm.
+ *
+ * The meet operation for phi functions is defined as follows:
+ * BOT + any = BOT
+ * TOP + any = any
+ * C_i + C_i = C_i (i.e. two equal constants)
+ * C_i + C_j = BOT (i.e. two different constants)
+ *
+ * When evaluating instructions TOP and BOT are handled as follows:
+ * a) If any operand is BOT, the result is BOT. The main exception to this is op1 of ASSIGN, which
+ *    is ignored. However, if the op1 MAY_BE_REF we do have to propagate the BOT.
+ * b) Otherwise, if the instruction can never be evaluated (either in general, or with the
+ *    specific modifiers) the result is BOT.
+ * c) Otherwise, if any operand is TOP, the result is TOP.
+ * d) Otherwise (at this point all operands are known and constant), if we can compute the result
+ *    for these specific constants (without throwing notices or similar) then that is the result.
+ * e) Otherwise the result is BOT.
+ *
+ * It is sometimes possible to determine a result even if one argument is TOP / BOT, e.g. for things
+ * like BOT*0. Right now we don't bother with this -- the only thing that is done is evaluating
+ * TYPE_CHECKS based on the type information.
+ *
+ * Feasible successors for conditional branches are determined as follows:
+ * a) If we don't support the branch type or branch on BOT, all successors are feasible.
+ * b) Otherwise, if we branch on TOP none of the successors are feasible.
+ * c) Otherwise (we branch on a constant), the feasible successors are marked based on the constant
+ *    (usually only one successor will be feasible).
+ */
+
 #if 0
 #define SCP_DEBUG(...) php_printf(__VA_ARGS__)
 #else
@@ -54,6 +95,7 @@ static void set_value(scp_ctx *ctx, int var, zval *new) {
 		scdf_add_to_worklist(&ctx->scdf, var);
 		return;
 	}
+
 #if ZEND_DEBUG
 	ZEND_ASSERT(zend_is_identical(value, new));
 #endif
@@ -164,7 +206,7 @@ static zend_bool can_replace_op2(zend_op_array *op_array, zend_op *opline, zend_
 static zend_bool try_replace_op1(scp_ctx *ctx, int var, zend_op *opline, zend_ssa_op *ssa_op) {
 	if (ssa_op->op1_use == var && can_replace_op1(ctx->op_array, opline, ssa_op)) {
 		zval value;
-		ZVAL_DUP(&value, &ctx->values[var]); // TODO
+		ZVAL_DUP(&value, &ctx->values[var]);
 		if (zend_optimizer_update_op1_const(ctx->op_array, opline, &value)) {
 			return 1;
 		}
@@ -174,7 +216,7 @@ static zend_bool try_replace_op1(scp_ctx *ctx, int var, zend_op *opline, zend_ss
 static zend_bool try_replace_op2(scp_ctx *ctx, int var, zend_op *opline, zend_ssa_op *ssa_op) {
 	if (ssa_op->op2_use == var && can_replace_op2(ctx->op_array, opline, ssa_op)) {
 		zval value;
-		ZVAL_DUP(&value, &ctx->values[var]); // TODO
+		ZVAL_DUP(&value, &ctx->values[var]);
 		if (zend_optimizer_update_op2_const(ctx->op_array, opline, &value)) {
 			return 1;
 		}
@@ -262,7 +304,7 @@ static inline int ct_eval_cast(zval *result, uint32_t extended_value, zval *op1)
 	}
 }
 
-static inline int ct_eval_strlen(zval *result, zend_op *opline, zval *op1) {
+static inline int ct_eval_strlen(zval *result, zval *op1) {
 	zend_string *str;
 	if (Z_TYPE_P(op1) == IS_ARRAY) {
 		return FAILURE;
@@ -315,7 +357,7 @@ static inline int fetch_array_elem(zval **result, zval *op1, zval *op2) {
 	}
 }
 
-static inline int ct_eval_fetch_dim(zval *result, zend_op *opline, zval *op1, zval *op2) {
+static inline int ct_eval_fetch_dim(zval *result, zval *op1, zval *op2) {
 	if (Z_TYPE_P(op1) == IS_ARRAY) {
 		zval *value;
 		if (fetch_array_elem(&value, op1, op2) == SUCCESS && value) {
@@ -733,7 +775,7 @@ static void visit_instr(void *void_ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 			break;
 		case ZEND_STRLEN:
 			SKIP_IF_TOP(op1);
-			if (ct_eval_strlen(&zv, opline, op1) == SUCCESS) {
+			if (ct_eval_strlen(&zv, op1) == SUCCESS) {
 				SET_RESULT(result, &zv);
 				zval_ptr_dtor_nogc(&zv);
 				break;
@@ -744,7 +786,7 @@ static void visit_instr(void *void_ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 			SKIP_IF_TOP(op1);
 			SKIP_IF_TOP(op2);
 
-			if (ct_eval_fetch_dim(&zv, opline, op1, op2) == SUCCESS) {
+			if (ct_eval_fetch_dim(&zv, op1, op2) == SUCCESS) {
 				SET_RESULT(result, &zv);
 				zval_ptr_dtor_nogc(&zv);
 				break;
@@ -805,6 +847,7 @@ static void visit_instr(void *void_ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 			break;
 		case ZEND_ROPE_ADD:
 		case ZEND_ROPE_END:
+			// TODO Quadratic complexity, see INIT_ARRAY
 			SKIP_IF_TOP(op1);
 			SKIP_IF_TOP(op2);
 			if (ct_eval_binary(&zv, ZEND_CONCAT, op1, op2) == SUCCESS) {
@@ -817,6 +860,9 @@ static void visit_instr(void *void_ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 		case ZEND_INIT_ARRAY:
 		case ZEND_ADD_ARRAY_ELEMENT:
 		{
+			// TODO The way this is currently implemented will result in quadratic runtime
+			// This is not necessary, the way the algorithm works it's okay to reuse the same
+			// array for all SSA vars with some extra checks
 			zval *result = NULL;
 			if (opline->extended_value & ZEND_ARRAY_ELEMENT_REF) {
 				SET_RESULT_BOT(result);
@@ -1061,8 +1107,8 @@ static void visit_phi(void *void_ctx, zend_ssa_phi *phi) {
 	}
 }
 
-/* Removes instructions inside dead blocks. We don't remove the actual blocks, as modifying the
- * CFG would be overly painful at this point. */
+/* Removes dead blocks. This will remove both the instructions (and phis) in the blocks, as well
+ * as remove them from the successor / predecessor lists and mark them unreachable. */
 static void eliminate_dead_blocks(scp_ctx *ctx) {
 	zend_ssa *ssa = ctx->ssa;
 	int i;
@@ -1075,6 +1121,9 @@ static void eliminate_dead_blocks(scp_ctx *ctx) {
 	}
 }
 
+/* This will try to replace uses of SSA variables we have determined to be constant. Not all uses
+ * can be replaced, because some instructions don't accept constant operands or only accept them
+ * if they have a certain type. */
 static void replace_constant_operands(scp_ctx *ctx) {
 	int i;
 	zend_ssa *ssa = ctx->ssa;
@@ -1084,8 +1133,8 @@ static void replace_constant_operands(scp_ctx *ctx) {
 		if (!value_known(&ctx->values[i])) {
 			continue;
 		}
-		OPT_STAT(scp_const_vars)++;
 
+		OPT_STAT(scp_const_vars)++;
 		FOREACH_USE(var, use) {
 			zend_op *opline = &ctx->op_array->opcodes[use];
 			zend_ssa_op *ssa_op = &ssa->ops[use];
@@ -1096,10 +1145,7 @@ static void replace_constant_operands(scp_ctx *ctx) {
 			}
 			if (try_replace_op2(ctx, i, opline, ssa_op)) {
 				OPT_STAT(scp_const_operands)++;
-				if (ssa_op->op2_def >= 0) {
-					rename_var_uses(ssa, ssa_op->op2_def, ssa_op->op2_use);
-					remove_op2_def(ssa, ssa_op);
-				}
+				ZEND_ASSERT(ssa_op->op2_def == -1);
 				remove_op2_use(ssa, ssa_op);
 			}
 		} FOREACH_USE_END();

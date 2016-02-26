@@ -50,7 +50,8 @@ void zend_optimizer_statistics_shutdown() {
 
 	PRINT_NORM_STAT(dce_dead_instr, instrs);
 	PRINT_NORM_STAT(dce_dead_phis, phis);
-	PRINT_STAT(dce_frees),
+	PRINT_STAT(dce_frees);
+	PRINT_NORM_STAT(cfg_merged_blocks, cfg_blocks);
 
 	PRINT_STAT(assign_contracted_assign);
 	PRINT_STAT(assign_qm_assign);

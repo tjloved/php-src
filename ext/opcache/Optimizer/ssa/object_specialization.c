@@ -3,6 +3,12 @@
 #include "Optimizer/ssa_pass.h"
 #include "Optimizer/ssa/instructions.h"
 
+/* This pass tries to replace FETCH_OBJ_R opcodes with FETCH_OBJ_R_FIXED opcodes, which is
+ * hardwired to a certain property offset.
+ *
+ * TODO: Support the same for ASSIGN_OBJ
+ */
+
 static inline zend_bool is_property_accessible(
 		zend_property_info *property_info, zend_class_entry *ce, zend_class_entry *scope) {
 	if (property_info->flags & ZEND_ACC_PUBLIC) {
@@ -52,7 +58,8 @@ static uint32_t get_property_offset(
 	return property_info ? property_info->offset : -1;
 }
 
-// TODO Cache this, or solve it better altogether
+/* Checks if the property offsets of a class are finalized. This handles the case where a class
+ * uses delayed binding but still has finalized offsets because it only implements interfaces. */
 static zend_bool has_finalized_property_offsets(zend_script *script, zend_string *lcname) {
 	zend_op_array *op_array = &script->main_op_array;
 	int i;
@@ -60,6 +67,7 @@ static zend_bool has_finalized_property_offsets(zend_script *script, zend_string
 		return 1;
 	}
 
+	// TODO Cache this, or solve it better altogether
 	// TODO Duplicate conditional classes?
 	for (i = 0; i < op_array->last; i++) {
 		zend_op *opline = &op_array->opcodes[i];

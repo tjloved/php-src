@@ -48,6 +48,7 @@ typedef struct _zend_optimizer_statistics {
 	uint32_t scp_dead_calls;
 	uint32_t copy_propagated_tmp;
 	uint32_t tmp2;
+	uint32_t cfg_merged_blocks;
 } zend_optimizer_statistics;
 
 extern zend_optimizer_statistics optimizer_statistics;

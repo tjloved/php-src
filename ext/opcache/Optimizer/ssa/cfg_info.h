@@ -1,6 +1,15 @@
 #ifndef _CFG_INFO_H
 #define _CFG_INFO_H
 
+/* CFG info contains various metadata about the structure of the CFG:
+ *  * A preorder numbering of the CFG blocks
+ *  * A postorder numbering of the CFG blocks
+ *  * Bitsets for blocks that are source / target of a backedge
+ *  * A bitset that encodes all backedges, identified by the source block
+ *    and the successor number (0 or 1)
+ *  * A bitset of blocks that are strictly dominated by a certain block
+ */
+
 typedef struct _cfg_info {
 	uint32_t *preorder;
 	uint32_t *postorder;

@@ -4,7 +4,27 @@
 #include "Optimizer/ssa/helpers.h"
 #include "Optimizer/ssa/liveness.h"
 
-/* This implements "Fast Liveness Checking for SSA-Form Programs" by Boissinot et al. */
+/* This implements "Fast Liveness Checking for SSA-Form Programs" by Boissinot et al.
+ * A short summary of the main points:
+ *
+ * This algorithm does not compute liveness sets, it only provides an oracle that can tell you
+ * where an SSA variable is live at a certain program point. It does this by precomputing a
+ * number of sets which depend on the CFG only. As such, changes to the SSA variables do *not*
+ * invalidate this information (but some changes to the CFG may).
+ *
+ * The precomputed information is:
+ *  * R_v: All blocks that are reachable from block v without following a backedge.
+ *  * T_v: The transitive closure of all backedge targets reduced reachable from v, and v itself.
+ *  * S_v: All blocks strictly dominated by v (computed in cfg_info).
+ *  * Blocks that are backedge targets (computed in cfg_info).
+ *
+ * Given this information, a variable V is live-in at block B, if there is a use of V that is
+ * reduced reachable from a T_B strictly dominated by def(V). Things get slightly more involved
+ * when checking whether a variable is live-in/out as a specific instruction.
+ *
+ * Note furthermore that the use of phi operands is located along the CFG edge from the predecessor
+ * block, not in the block that contains the phi.
+ */
 
 #define LIVENESS_DEBUG 0
 #if LIVENESS_DEBUG
@@ -29,8 +49,7 @@ static void zend_bitset_dump(zend_bitset bitset, uint32_t len, uint32_t count) {
 #define TARGETS(block) (liveness->targets + (block) * liveness->block_set_len)
 
 static void compute_reduced_reachable(
-		zend_optimizer_ctx *opt_ctx, ssa_liveness *liveness,
-		const zend_cfg *cfg, const cfg_info *info) {
+		ssa_liveness *liveness, const zend_cfg *cfg, const cfg_info *info) {
 	/* Traverse CFG in postorder and build
 	 * R_v = {v} union unionall_{v' in succ(v)} R_v' */
 	int i;
@@ -50,8 +69,7 @@ static void compute_reduced_reachable(
 }
 
 static void compute_targets(
-		zend_optimizer_ctx *opt_ctx, ssa_liveness *liveness,
-		const zend_cfg *cfg, const cfg_info *info) {
+		ssa_liveness *liveness, const zend_cfg *cfg, const cfg_info *info) {
 	ALLOCA_FLAG(use_heap);
 	zend_bitset tmp = ZEND_BITSET_ALLOCA(liveness->block_set_len, use_heap);
 	int i;
@@ -93,7 +111,7 @@ static void compute_targets(
 	}
 
 	/* Propagate info upwards through reduced graph using postorder iteration */
-	for (i = cfg->blocks_count - 1; i >= 0; i--) {
+	for (i = 0; i < cfg->blocks_count; i++) {
 		int n = info->postorder[i];
 		zend_basic_block *block = &cfg->blocks[n];
 		if (block->successors[0] >= 0) {
@@ -120,12 +138,12 @@ void ssa_liveness_precompute(
 	liveness->info = info;
 	liveness->block_set_len = zend_bitset_len(cfg->blocks_count);
 	liveness->reduced_reachable = zend_arena_calloc(&opt_ctx->arena,
-		liveness->block_set_len * sizeof(zend_ulong), cfg->blocks_count);
+		liveness->block_set_len * ZEND_BITSET_ELM_SIZE, cfg->blocks_count);
 	liveness->targets = zend_arena_calloc(&opt_ctx->arena,
-		liveness->block_set_len * sizeof(zend_ulong), cfg->blocks_count);
+		liveness->block_set_len * ZEND_BITSET_ELM_SIZE, cfg->blocks_count);
 
-	compute_reduced_reachable(opt_ctx, liveness, cfg, info);
-	compute_targets(opt_ctx, liveness, cfg, info);
+	compute_reduced_reachable(liveness, cfg, info);
+	compute_targets(liveness, cfg, info);
 	
 #if LIVENESS_DEBUG
 	int i;
@@ -312,8 +330,4 @@ zend_bool ssa_is_live_in_at_op(const ssa_liveness *liveness, int var_num, int op
 }
 zend_bool ssa_is_live_out_at_op(const ssa_liveness *liveness, int var_num, int op) {
 	return ssa_is_live_at_op(liveness, var_num, op, 0);
-}
-
-zend_bool ssa_is_live_out_at_block(const ssa_liveness *liveness, int var_num, int block) {
-	return -1;
 }
