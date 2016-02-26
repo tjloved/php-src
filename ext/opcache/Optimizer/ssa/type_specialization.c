@@ -4,6 +4,9 @@
 #include "Optimizer/ssa/instructions.h"
 #include "Optimizer/statistics.h"
 
+/* This pass replaces certain instructions with type-specialized variants, e.g. ADD with
+ * ADD_INT or ADD_DOUBLE. Currently this is only done for scalar types, not for arrays. */
+
 zend_bool is_power_of_two(zend_long n) {
 	return n != 0 && !(n & (n - 1));
 }
@@ -46,6 +49,11 @@ void ssa_optimize_type_specialization(ssa_opt_ctx *ctx) {
 		}
 
 		switch (opline->opcode) {
+			case ZEND_CONCAT:
+				if (!CAN_BE(t1, MAY_BE_OBJECT) && !CAN_BE(t2, MAY_BE_OBJECT)) {
+					opline->opcode = ZEND_FAST_CONCAT;
+				}
+				break;
 			case ZEND_ADD:
 				normalize_op1_type(op_array, opline, &t1, t2);
 				normalize_op2_type(op_array, opline, t1, &t2);
@@ -91,7 +99,6 @@ void ssa_optimize_type_specialization(ssa_opt_ctx *ctx) {
 						|| !(MUST_BE(t1, MAY_BE_LONG) || MUST_BE(t1, MAY_BE_DOUBLE))) {
 					break;
 				}
-				// TODO Cleanup?
 				if (MUST_BE(t1, MAY_BE_LONG)) {
 					opline->opcode = opline->opcode == ZEND_PRE_INC ? ZEND_ADD_INT : ZEND_SUB_INT;
 					opline->op2_type = IS_CONST;
@@ -143,23 +150,25 @@ void ssa_optimize_type_specialization(ssa_opt_ctx *ctx) {
 				break;
 			//case ZEND_FETCH_DIM_R:
 			case ZEND_ASSIGN_DIM:
+				// TODO This code only collects some statistics,
+				// it does not actually specialize anything (yet)
 				if (MUST_BE(t1, MAY_BE_ARRAY)) {
-					OPT_STAT(type_spec_must_be_array)++;
+					OPT_STAT(ts_must_be_array)++;
 					if ((t1 & MAY_BE_ARRAY_KEY_LONG) == MAY_BE_ARRAY_KEY_LONG) {
-						OPT_STAT(type_spec_must_be_int_key)++;
+						OPT_STAT(ts_must_be_int_key)++;
 						if (opline->op2_type == IS_UNUSED) {
-							OPT_STAT(type_spec_must_be_append_int_key)++;
+							OPT_STAT(ts_must_be_append_int_key)++;
 						} else if (MUST_BE(t2, MAY_BE_LONG)) {
-							OPT_STAT(type_spec_must_be_matching_int_key)++;
+							OPT_STAT(ts_must_be_matching_int_key)++;
 						}
 					} else if ((t1 & MAY_BE_ARRAY_KEY_STRING) == MAY_BE_ARRAY_KEY_STRING) {
-						OPT_STAT(type_spec_must_be_string_key)++;
+						OPT_STAT(ts_must_be_string_key)++;
 					}
 					if (((t1 & MAY_BE_ARRAY_OF_ANY) & (MAY_BE_ARRAY_OF_STRING|MAY_BE_ARRAY_OF_ARRAY|MAY_BE_ARRAY_OF_RESOURCE|MAY_BE_ARRAY_OF_OBJECT)) == 0) {
-						OPT_STAT(type_spec_must_be_notref_array_values)++;
+						OPT_STAT(ts_must_be_notref_values)++;
 					}
 				} else {
-					OPT_STAT(type_spec_not_known_to_be_array)++;
+					OPT_STAT(ts_not_must_be_array)++;
 				}
 				break;
 		}

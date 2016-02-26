@@ -3,9 +3,11 @@
 #include "Optimizer/ssa_pass.h"
 #include "Optimizer/ssa/instructions.h"
 
-/* A "simple" type is a type that never uses refcounting */
-#define MAY_BE_SIMPLE (MAY_BE_NULL|MAY_BE_TRUE|MAY_BE_FALSE|MAY_BE_LONG|MAY_BE_DOUBLE)
-#define IS_SIMPLE(t) (((t) & MAY_BE_ANY) == ((t) & MAY_BE_SIMPLE))
+/* This is obsolete optimization pass that was turning CVs into TMPs. The way this worked
+ * interacted badly with other optimizations. Most of what it did has been subsumed by other
+ * passes by now. */
+
+#define IS_SIMPLE(t) (!(t & MAY_BE_REFCOUNTED))
 
 static inline zend_bool is_compound_assign(zend_op *opline) {
 	switch (opline->opcode) {
@@ -203,26 +205,28 @@ static void may_alias(context *ctx, int var1, int var2) {
 	mark_aliases(ctx, var1, var2);
 }
 
+#if 0
 static void debug_dump(context *ctx) {
 	int j;
 	for (j = 0; j < ctx->ssa->vars_count; ++j) {
 		if (ctx->alias[j].min == j) {
 			int k = j;
 			do {
-				php_printf("%d ", k);
+				fprintf(stderr, "%d ", k);
 				k = ctx->alias[k].next;
 			} while (k != -1);
-			php_printf("\n");
+			fprintf(stderr, "\n");
 		}
 	}
-	php_printf("Unaliased: ");
+	fprintf(stderr, "Unaliased: ");
 	for (j = 0; j < ctx->ssa->vars_count; ++j) {
 		if (ctx->alias[j].min == -1) {
-			php_printf("%d ", j);
+			fprintf(stderr, "%d ", j);
 		}
 	}
-	php_printf("\n");
+	fprintf(stderr, "\n");
 }
+#endif
 
 static void find_aliases(context *ctx) {
 	zend_ssa *ssa = ctx->ssa;
@@ -537,8 +541,8 @@ static void mark_cv_uses_as_tmp(zend_op_array *op_array) {
 	while (opline != end) {
 		uint32_t t1 = OP1_INFO();
 		uint32_t t2 = OP2_INFO();
-		zend_bool op1_simple = (t1 & MAY_BE_ANY) == (t1 & MAY_BE_SIMPLE);
-		zend_bool op2_simple = (t2 & MAY_BE_ANY) == (t2 & MAY_BE_SIMPLE);
+		zend_bool op1_simple = IS_SIMPLE(t1);
+		zend_bool op2_simple = IS_SIMPLE(t2);
 
 		if (opline->opcode == ZEND_ASSIGN) {
 			if (opline->op1_type == IS_CV && op1_simple && op2_simple) {

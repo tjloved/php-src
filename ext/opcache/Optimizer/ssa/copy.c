@@ -227,6 +227,7 @@ static inline zend_bool is_used_only_in(
 
 /* Propagates assignments of type ASSIGN CV_i, TMP_j where CV_i is used (properly) only once in
  * the same basic block, the use supports TMPs and TMP_j has no dtor effect. */
+// TODO: This needs to update live-ranges for temporaries
 void try_propagate_cv_tmp_assignment(
 		ssa_opt_ctx *ctx, zend_op *opline, zend_ssa_op *ssa_op, int op_num) {
 	zend_ssa *ssa = ctx->ssa;
@@ -578,23 +579,21 @@ void ssa_optimize_copy(ssa_opt_ctx *ctx) {
 			if (opline->op2_type == IS_CV
 					&& !(ssa->var_info[ssa_op->op2_use].type & MAY_BE_UNDEF)) {
 				try_propagate_cv_assignment(ctx, opline, ssa_op);
-				continue;
-			}
-			if (opline->op2_type & (IS_VAR|IS_TMP_VAR)) {
+			} else if (opline->op2_type & (IS_VAR|IS_TMP_VAR)) {
 				try_propagate_cv_tmp_assignment(ctx, opline, ssa_op, i);
-				continue;
 			}
-		} else if (opline->opcode == ZEND_QM_ASSIGN && opline->op1_type == IS_CV
-				&& !(ssa->var_info[ssa_op->op1_use].type & MAY_BE_UNDEF)) {
-			if (opline->result_type == IS_CV) {
-				/* Can no longer happen, even though the code still supports it */
-				ZEND_ASSERT(0);
-				try_propagate_cv_assignment(ctx, opline, ssa_op);
-				continue;
-			}
-			if (opline->result_type & (IS_VAR|IS_TMP_VAR)) {
-				try_propagate_cv_assignment(ctx, opline, ssa_op);
-				continue;
+		} else if (opline->opcode == ZEND_QM_ASSIGN) {
+			if (opline->op1_type == IS_CV
+					&& !(ssa->var_info[ssa_op->op1_use].type & MAY_BE_UNDEF)) {
+				if (opline->result_type == IS_CV) {
+					/* Can no longer happen, even though the code still supports it */
+					ZEND_ASSERT(0);
+					try_propagate_cv_assignment(ctx, opline, ssa_op);
+				} else if (opline->result_type & (IS_VAR|IS_TMP_VAR)) {
+					try_propagate_cv_assignment(ctx, opline, ssa_op);
+				}
+			} else if (opline->op1_type & (IS_VAR|IS_TMP_VAR)) {
+				// TODO
 			}
 		}
 	}

@@ -508,6 +508,9 @@ static inline void ct_eval_type_check(zval *result, uint32_t type, zval *op1) {
 	}
 }
 
+/* The functions chosen here are simple to implement and either likely to affect a branch,
+ * or just happened to be commonly used with constant operands in WP (need to test other
+ * applications as well, of course). */
 static inline int ct_eval_func_call(
 		zval *result, zend_string *name, uint32_t num_args, zval **args) {
 	if (zend_string_equals_literal(name, "chr")) {
@@ -994,6 +997,7 @@ static void visit_instr(void *void_ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 			}
 
 #if 0
+			/* sort out | uniq -c | sort -n */
 			fprintf(stderr, "%s\n", Z_STRVAL_P(name));
 			/*if (args[1]) {
 				php_printf("%s %Z %Z\n", Z_STRVAL_P(name), args[0], args[1]);

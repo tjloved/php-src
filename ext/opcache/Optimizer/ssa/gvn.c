@@ -6,7 +6,16 @@
 #include "Optimizer/ssa/liveness.h"
 #include "Optimizer/statistics.h"
 
-/* GVN instruction encoding:
+/* NOTE: Currently NOT WORKING because it depends on ssa destruction to land. It only compute
+ * the numbering fixed point, but does not replace anything. The implementation is probably buggy.
+ *
+ * This pass implements Global Value Numbering, a value-based full redundancy elimination
+ * mechanism. Currently the implementation uses the simple RPO algorithm from "SCC-Based Value
+ * Numbering" by Cooper and Simpson. In the future this could be switched to the faster SCC
+ * algorithm or something more advanced (Gargi is probably too much) or something simpler using
+ * simple dominator tree propagation.
+ *
+ * Instruction encoding:
  *
  * 64-bit [op:8] [op1:28] [op2:28]
  * 32-bit [op:8] [op1:12] [op2:12]
@@ -200,6 +209,8 @@ static inline zend_ulong hash_instr(const zend_op *opline, uint32_t op1_num, uin
 	if (op1_num == INVALID || op2_num == INVALID) {
 		return -Z_UL(1);
 	}
+
+	/* Reassociation */
 	/*if (opline->opcode == ZEND_IS_IDENTICAL || opline->opcode == ZEND_IS_NOT_IDENTICAL
 			|| opline->opcode == ZEND_IS_EQUAL || opline->opcode == ZEND_IS_NOT_EQUAL) {
 		if (op1_num > op2_num) {
@@ -382,6 +393,7 @@ static uint32_t find_cv_num(context *ctx, uint32_t num, uint32_t skip) {
 	return INVALID;
 }
 
+// TODO The following code is copy&pasted from copy propagation
 static zend_bool var_has_proper_writes(
 		zend_ssa *ssa, zend_op_array *op_array, zend_ssa_var *var) {
 	/* Check if LHS is written to */
@@ -449,6 +461,9 @@ static void rename_improper_use(
 	}
 }
 
+// TODO This code tried to use the same approach to value propagation as was used in copy
+// propagation. However it does not work because we would need to consider more variables for
+// intersection here. So this is blocked on out-of-ssa translation.
 static void remove_redundancies(context *ctx) {
 	zend_ssa *ssa = ctx->ssa;
 	zend_op_array *op_array = ctx->op_array;
@@ -501,10 +516,13 @@ static void remove_redundancies(context *ctx) {
 			prev_var_num = def_op->result_use;
 		}
 
+		(void) def_opline;
 		//OPT_STAT(tmp)++;
 		//fprintf(stderr, "%d -> %d %s\n", i, ctx->valnums[i], zend_get_opcode_name(def_opline->opcode));
 		
-#if 0
+		// TODO We don't actually replace anything for now, this doesn't work
+		continue;
+
 		/* Rename CV operands in uses */
 		int use;
 		FOREACH_USE(var, use) {
@@ -523,7 +541,6 @@ static void remove_redundancies(context *ctx) {
 		} FOREACH_USE_END();
 
 		rename_var_uses(ssa, i, leader_num);
-#endif
 	}
 }
 
