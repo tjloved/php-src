@@ -27,6 +27,7 @@ static void compute_cfg_info_recursive(
 		if (block->successors[s] < 0) {
 			break;
 		}
+
 		if (zend_bitset_in(state->active, block->successors[s])) {
 			/* Backedge detected */
 			zend_bitset_incl(state->backedges, block_num * 2 + s);

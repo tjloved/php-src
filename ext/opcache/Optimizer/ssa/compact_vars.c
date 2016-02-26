@@ -3,6 +3,8 @@
 #include "Optimizer/ssa_pass.h"
 #include "Optimizer/statistics.h"
 
+/* This pass removes all CVs that are completely unused. It does *not* merge any CVs.
+ * This pass does not operate on SSA form anymore. */
 void ssa_optimize_compact_vars(ssa_opt_ctx *ctx) {
 	zend_op_array *op_array = ctx->op_array;
 	int i;

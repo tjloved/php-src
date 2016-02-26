@@ -5,6 +5,15 @@
 #include "Optimizer/ssa/scdf.h"
 #include "Optimizer/statistics.h"
 
+/* This file contains code for three types of copy propagation:
+ *
+ *  * Assignments where the RHS is a CV (maintaining CSSA)
+ *  * Assignments where the RHS is a TMPVAR
+ *  * Global copy propagation
+ *
+ * The last of these is currently disabled, waiting on out-of-ssa translation to land.
+ */
+
 static void rename_improper_use(
 		zend_ssa *ssa, zend_op *use_opline, zend_ssa_op *use_op,
 		int old_lhs_var_num, int lhs_var_num) {
@@ -71,6 +80,11 @@ static inline zend_bool var_written_while_live(
 	return 0;
 }
 
+/* Tries to perform a copy propagation where the RHS is a CV. The main work this function does
+ * is to ensure the propagation does not violate CSSA form, namely for an assignment $a = $b we
+ * do not propagate if there are writes to $b between the assignment and a use of $a. This is
+ * ensured using liveness checks. Furthermore we do not propagate if read-write operations are
+ * performed on $a, e.g. $a++. */
 static int try_propagate_cv_assignment(ssa_opt_ctx *ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 	zend_op_array *op_array = ctx->op_array;
 	zend_ssa *ssa = ctx->ssa;
@@ -94,8 +108,9 @@ static int try_propagate_cv_assignment(ssa_opt_ctx *ctx, zend_op *opline, zend_s
 		return FAILURE;
 	}
 
+	/* LHS use in phi may lead to a proper write, nothing we can do about this without
+	 * further analysis */
 	if (lhs_var->phi_use_chain) {
-		// TODO
 		return FAILURE;
 	}
 
@@ -307,6 +322,13 @@ void try_propagate_cv_tmp_assignment(
 	OPT_STAT(copy_propagated_tmp)++;
 }
 
+/* The following code computes a global copy propagation based on the SCDF framework. The result
+ * is not actually used, because it would violate CSSA.
+ *
+ * The copy propagation is control-flow sensitive, in that comparisons like $a == $b may be
+ * statically evaluated. It does not seem like this is valuable in practice, one could use
+ * unconditional propagation for nearly the same result. */
+
 typedef struct _context {
 	scdf_ctx scdf;
 	int *copy;
@@ -325,14 +347,14 @@ static inline void set_copy(context *ctx, int var, int copy) {
 
 void visit_instr(void *void_ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 	context *ctx = (context *) void_ctx;
-	/*if (opline->opcode == ZEND_ASSIGN && opline->op2_type == IS_CV && ssa_op->op1_def >= 0) {
+	if (opline->opcode == ZEND_ASSIGN && opline->op2_type == IS_CV && ssa_op->op1_def >= 0) {
 		if (ctx->copy[ssa_op->op2_use] == BOT) {
 			set_copy(ctx, ssa_op->op1_def, ssa_op->op1_def);
 		} else {
 			set_copy(ctx, ssa_op->op1_def, ctx->copy[ssa_op->op2_use]);
 		}
 		return;
-	}*/
+	}
 
 	if (ssa_op->result_def >= 0) {
 		set_copy(ctx, ssa_op->result_def, ssa_op->result_def);
@@ -355,8 +377,7 @@ void visit_phi(void *void_ctx, zend_ssa_phi *phi) {
 	if (phi->pi >= 0) {
 		if (phi->sources[0] >= 0 && scdf_is_edge_feasible(&ctx->scdf, phi->pi, phi->block)) {
 			if (ctx->copy[phi->sources[0]] != BOT) {
-				//set_copy(ctx, phi->ssa_var, ctx->copy[phi->sources[0]]);
-				set_copy(ctx, phi->ssa_var, phi->sources[0]);
+				set_copy(ctx, phi->ssa_var, ctx->copy[phi->sources[0]]);
 			}
 		}
 	} else {
@@ -379,6 +400,7 @@ void visit_phi(void *void_ctx, zend_ssa_phi *phi) {
 	}
 }
 
+// TODO $a == $a is not necessarily true if $a is NaN
 static int is_cond_true(context *ctx, int var_num) {
 	zend_ssa_var *var = &ctx->scdf.ssa->vars[var_num];
 	zend_op *opline;
@@ -423,7 +445,6 @@ static int is_cond_true(context *ctx, int var_num) {
 	return !invert;
 }
 
-/* Unconditional constant propagation */
 zend_bool get_feasible_successors(
 		void *void_ctx, zend_basic_block *block,
 		zend_op *opline, zend_ssa_op *ssa_op, zend_bool *suc) {
@@ -509,9 +530,11 @@ void scdf_copy_propagation(ssa_opt_ctx *ssa_ctx) {
 	for (i = 0; i < ssa->vars_count; i++) {
 		if (ctx.copy[i] != TOP && ctx.copy[i] != BOT && ctx.copy[i] != i) {
 			if (ssa->vars[i].definition_phi && ssa->vars[i].definition_phi->pi < 0) {
-				/*rename_var_uses(ssa, i, ctx.copy[i]);
-				remove_phi(ssa, ssa->vars[i].definition_phi);*/
-				//OPT_STAT(tmp)++;
+#if 0
+				rename_var_uses(ssa, i, ctx.copy[i]);
+				remove_phi(ssa, ssa->vars[i].definition_phi);
+				OPT_STAT(tmp)++;
+#endif
 			}
 		}
 	}
@@ -521,8 +544,10 @@ void scdf_copy_propagation(ssa_opt_ctx *ssa_ctx) {
 			continue;
 		}
 		if (!zend_bitset_in(ctx.scdf.executable_blocks, i)) {
+#if 0
 			remove_block(ssa, i, &OPT_STAT(tmp), &OPT_STAT(tmp));
-			//OPT_STAT(tmp)++;
+			OPT_STAT(tmp)++;
+#endif
 		}
 	}
 
@@ -533,7 +558,9 @@ void ssa_optimize_copy(ssa_opt_ctx *ctx) {
 	zend_op_array *op_array = ctx->op_array;
 	zend_ssa *ssa = ctx->ssa;
 	int i;
+
 	scdf_copy_propagation(ctx);
+
 	for (i = 0; i < op_array->last; i++) {
 		zend_op *opline = &op_array->opcodes[i];
 		zend_ssa_op *ssa_op = &ssa->ops[i];
@@ -560,7 +587,7 @@ void ssa_optimize_copy(ssa_opt_ctx *ctx) {
 		} else if (opline->opcode == ZEND_QM_ASSIGN && opline->op1_type == IS_CV
 				&& !(ssa->var_info[ssa_op->op1_use].type & MAY_BE_UNDEF)) {
 			if (opline->result_type == IS_CV) {
-				/* Can no longer happen, currently */
+				/* Can no longer happen, even though the code still supports it */
 				ZEND_ASSERT(0);
 				try_propagate_cv_assignment(ctx, opline, ssa_op);
 				continue;

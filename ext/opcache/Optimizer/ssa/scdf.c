@@ -3,6 +3,32 @@
 #include "Optimizer/ssa_pass.h"
 #include "Optimizer/ssa/scdf.h"
 
+/* This defines a generic framework for sparse conditional dataflow propagation. The algorithm is
+ * based on "Sparse conditional constant propagation" by Wegman and Zadeck. We're using a
+ * generalized implementation as described in chapter 8.3 of the SSA book.
+ *
+ * Every SSA variable is associated with an element on a finite-height lattice, those value can only
+ * ever be lowered during the operation of the algorithm. If a value is lowered all instructions and
+ * phis using that value need to be reconsidered (this is done by adding the variable to a
+ * worklist). For phi functions the result is computed by applying the meet operation to the
+ * operands. This continues until a fixed point is reached.
+ *
+ * The algorithm is control-flow sensitive: All blocks except the start block are initially assumed
+ * to be unreachable. When considering a branch instruction, we determine the feasible successors
+ * based on the current state of the variable lattice. If a new edge becomes feasible we either have
+ * to mark the successor block executable and consider all instructions in it, or, if the target is
+ * already executable, we only have to reconsider the phi functions (as we only consider phi
+ * operands which are associated with a feasible edge).
+ *
+ * The generic framework requires the definition of three functions:
+ * * visit_instr() should recompute the lattice values of all SSA variables defined by an
+ *   instruction.
+ * * visit_phi() should recompute the lattice value of the SSA variable defined by the phi. While
+ *   doing this it should only consider operands for which scfg_is_edge_feasible() returns true.
+ * * get_feasible_successors() should determine the feasible successors for a branch instruction.
+ *   Note that this callback only needs to handle conditional branches (with two successors).
+ */
+
 #if 0
 #define DEBUG_PRINT(...) fprintf(stderr, __VA_ARGS__)
 #else

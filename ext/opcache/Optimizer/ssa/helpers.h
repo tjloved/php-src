@@ -51,8 +51,7 @@
 	int _i; \
 	for (_i = 0; _i < ssa->cfg.blocks_count; _i++) { \
 		phi = ssa->blocks[_i].phis; \
-		for (; phi; phi = phi->next) { \
-			//if (phi->ssa_var < 0) continue;
+		for (; phi; phi = phi->next) {
 #define FOREACH_PHI_END() \
 		} \
 	} \

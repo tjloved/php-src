@@ -2,6 +2,9 @@
 #include "Optimizer/zend_optimizer_internal.h"
 #include "Optimizer/ssa_pass.h"
 
+/* The ssa_verify_integrity() function ensures that that certain invariants of the SSA form and
+ * CFG are upheld and prints messages to stderr if this is not the case. */
+
 static inline zend_bool is_in_use_chain(zend_ssa *ssa, int var, int check) {
 	int use;
 	FOREACH_USE(&ssa->vars[var], use) {
@@ -243,6 +246,7 @@ int ssa_verify_integrity(zend_ssa *ssa, const char *extra) {
 		}
 	} FOREACH_PHI_END();
 
+	/* Blocks */
 	for (i = 0; i < cfg->blocks_count; i++) {
 		zend_basic_block *block = &cfg->blocks[i];
 		int *predecessors = &cfg->predecessors[block->predecessor_offset];
@@ -255,7 +259,16 @@ int ssa_verify_integrity(zend_ssa *ssa, const char *extra) {
 			FAIL("Block %d end %d not adjacent to %d\n", i, block->end, (block+1)->start);
 		}
 
+		for (j = block->start; j <= block->end; j++) {
+			if (cfg->map[j] != i) {
+				FAIL("Instr " INSTRFMT " not associated with block %d\n", INSTR(j), i);
+			}
+		}
+
 		if (!(block->flags & ZEND_BB_REACHABLE)) {
+			if (ssa->blocks[i].phis) {
+				FAIL("Unreachable block %d has phis\n", i);
+			}
 			continue;
 		}
 
