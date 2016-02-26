@@ -376,7 +376,7 @@ static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) 
 	ssa_verify_integrity(&info->ssa, "before SSA pass");
 #endif
 
-	debug_dump(op_array, &info->ssa, "before ssa pass", 2);
+	debug_dump(op_array, &info->ssa, "before SSA pass", 2);
 
 	compute_cfg_info(&cfg_info, ctx, &info->ssa.cfg);
 	ssa_liveness_precompute(ctx, &liveness, &info->ssa, &cfg_info);
@@ -409,9 +409,10 @@ static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) 
 	ssa_verify_integrity(&info->ssa, "after SSA pass");
 #endif
 
-	debug_dump(op_array, &info->ssa, "after ssa pass", 1);
+	debug_dump(op_array, &info->ssa, "after SSA pass", 1);
 
-	ssa_optimize_vars(&ssa_ctx);
+	ssa_optimize_destroy_ssa(&ssa_ctx);
+	ssa_optimize_compact_vars(&ssa_ctx);
 }
 
 void zend_optimize_ssa(zend_op_array *op_array, zend_optimizer_ctx *ctx) {
