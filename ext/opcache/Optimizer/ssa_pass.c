@@ -61,25 +61,6 @@ static void collect_ssa_stats(zend_op_array *op_array, zend_ssa *ssa) {
 	}
 }
 
-static void ssa_optimize_peephole(ssa_opt_ctx *ctx) {
-	zend_op_array *op_array = ctx->op_array;
-	zend_ssa *ssa = ctx->ssa;
-	zend_op *opline = op_array->opcodes;
-	zend_op *end = opline + op_array->last;
-	while (opline != end) {
-		uint32_t t1 = OP1_INFO();
-		uint32_t t2 = OP2_INFO();
-		switch (opline->opcode) {
-			case ZEND_CONCAT:
-				if (!CAN_BE(t1, MAY_BE_OBJECT) && !CAN_BE(t2, MAY_BE_OBJECT)) {
-					opline->opcode = ZEND_FAST_CONCAT;
-				}
-				break;
-		}
-		opline++;
-	}
-}
-
 /* The block map only contains entries for the start and end of a block.
  * Fill it up to cover all instructions. */
 static void complete_block_map(zend_cfg *cfg, uint32_t num_instr) {
@@ -94,59 +75,22 @@ static void complete_block_map(zend_cfg *cfg, uint32_t num_instr) {
 	}
 }
 
-/* Certain ops create spurious SSA var defs, which are only of interest for
- * RC1|RCN inference. As we are not interested in it, we drop them up front. */
-static void remove_spurious_ssa_vars(zend_op_array *op_array, zend_ssa *ssa) {
-	int i;
-	for (i = 0; i < op_array->last; i++) {
-		zend_op *opline = &op_array->opcodes[i];
-		zend_ssa_op *ssa_op = &ssa->ops[i];
-		switch (opline->opcode) {
-			case ZEND_ASSIGN:
-				if (ssa_op->op2_def >= 0) {
-					rename_var_uses(ssa, ssa_op->op2_def, ssa_op->op2_use);
-					remove_op2_def(ssa, ssa_op);
-				}
-				break;
-			case ZEND_ASSIGN_DIM:
-			case ZEND_ASSIGN_OBJ:
-			{
-				zend_ssa_op *data_op = ssa_op + 1;
-				if (data_op->op1_def >= 0) {
-					rename_var_uses(ssa, data_op->op1_def, data_op->op1_use);
-					remove_op1_def(ssa, data_op);
-				}
-				break;
-			}
-			case ZEND_INIT_ARRAY:
-			case ZEND_ADD_ARRAY_ELEMENT:
-				if (opline->extended_value & ZEND_ARRAY_ELEMENT_REF) {
-					break;
-				}
-				/* break missing intentionally */
-			case ZEND_FE_RESET_R:
-				if (ssa_op->op1_def >= 0) {
-					rename_var_uses(ssa, ssa_op->op1_def, ssa_op->op1_use);
-					remove_op1_def(ssa, ssa_op);
-				}
-				break;
-		}
-	}
-}
-
 static int get_common_phi_source(zend_ssa *ssa, zend_ssa_phi *phi) {
 	int common_source = -1;
 	int source;
 	FOREACH_PHI_SOURCE(phi, source) {
 		if (common_source == -1) {
 			common_source = source;
-		} else if (common_source != source) {
+		} else if (common_source != source && source != phi->ssa_var) {
 			return -1;
 		}
 	} FOREACH_PHI_SOURCE_END();
 	return common_source;
 }
 
+/* Used to be important to drop phis from RC inference vars. The things it finds now should
+ * indicate issues in SSA construction (result is not minimal or not pruned). */
+// TODO Investigate those cases
 static void remove_trivial_phis(zend_ssa *ssa) {
 	zend_ssa_phi *phi;
 	FOREACH_PHI(phi) {
@@ -156,6 +100,8 @@ static void remove_trivial_phis(zend_ssa *ssa) {
 			remove_phi(ssa, phi);
 			OPT_STAT(trivial_phis)++;
 		} else if (phi->pi < 0 && common_source >= 0) {
+			fprintf(stderr, "!!! %s: %d <- %d\n",
+				ZSTR_VAL(ssa->op_array->function_name), phi->ssa_var, common_source);
 			rename_var_uses(ssa, phi->ssa_var, common_source);
 			remove_phi(ssa, phi);
 			OPT_STAT(trivial_phis)++;
@@ -288,7 +234,7 @@ static inline void debug_dump(
 	}
 }
 
-static void run_pass(
+static inline void run_pass(
 		ssa_opt_ctx *ctx, void (*optimize_fn)(ssa_opt_ctx *ctx),
 		const char *name, uint32_t debug_level) {
 	optimize_fn(ctx);
@@ -369,8 +315,6 @@ static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) 
 	}
 
 	complete_block_map(&info->ssa.cfg, op_array->last);
-	remove_spurious_ssa_vars(op_array, &info->ssa);
-	remove_trivial_phis(&info->ssa);
 
 #if SSA_VERIFY_INTEGRITY > 1
 	ssa_verify_integrity(&info->ssa, "before SSA pass");
@@ -390,20 +334,20 @@ static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) 
 	ssa_ctx.reorder_dtor_effects =
 		(ctx->optimization_level & ZEND_OPTIMIZER_REORDER_DTOR_EFFECTS) != 0;
 
+	remove_trivial_phis(&info->ssa);
 	run_pass(&ssa_ctx, ssa_optimize_scp, "after SCP", 4);
 	/*if (zend_ssa_inference(&ctx->arena, op_array, ctx->script, &info->ssa) != SUCCESS) {
 		return;
 	}*/
 	run_pass(&ssa_ctx, ssa_optimize_dce, "after DCE", 8);
 	run_pass(&ssa_ctx, ssa_optimize_copy, "after copy propagation", 16);
-	run_pass(&ssa_ctx, ssa_optimize_gvn, "after GVN", 64);
-	//run_pass(&ssa_ctx, ssa_optimize_dce, "after DCE 2", 128);
-	run_pass(&ssa_ctx, ssa_optimize_assign, "after assignment contraction", 32);
+	run_pass(&ssa_ctx, ssa_optimize_gvn, "after GVN", 32);
+	//run_pass(&ssa_ctx, ssa_optimize_dce, "after DCE 2", 64);
+	run_pass(&ssa_ctx, ssa_optimize_assign, "after assignment contraction", 128);
 
 	//ssa_optimize_cv_to_tmp(&ssa_ctx);
 	ssa_optimize_type_specialization(&ssa_ctx);
 	ssa_optimize_object_specialization(&ssa_ctx);
-	ssa_optimize_peephole(&ssa_ctx);
 
 #if SSA_VERIFY_INTEGRITY
 	ssa_verify_integrity(&info->ssa, "after SSA pass");

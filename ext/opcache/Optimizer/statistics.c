@@ -5,9 +5,9 @@
 zend_optimizer_statistics optimizer_statistics;
 
 #define PRINT_STAT(name) \
-	fprintf(stderr, "%-25s: %6" PRIu32 "\n", #name, OPT_STAT(name))
+	fprintf(stderr, "%-27s: %6" PRIu32 "\n", #name, OPT_STAT(name))
 #define PRINT_NORM_STAT(name, norm) \
-	fprintf(stderr, "%-25s: %6" PRIu32 "   (%5.2f%% " #norm ")\n", \
+	fprintf(stderr, "%-27s: %6" PRIu32 "   (%5.2f%% " #norm ")\n", \
 		#name, OPT_STAT(name), (float) OPT_STAT(name) / OPT_STAT(norm) * 100);
 
 void zend_optimizer_statistics_startup() {}
@@ -58,13 +58,13 @@ void zend_optimizer_statistics_shutdown() {
 	PRINT_STAT(copy_propagated_cv);
 	PRINT_STAT(copy_propagated_tmp);
 	PRINT_STAT(type_spec_arithm);
-	PRINT_STAT(type_spec_must_be_array);
-	PRINT_STAT(type_spec_not_known_to_be_array);
-	PRINT_STAT(type_spec_must_be_int_key);
-	PRINT_STAT(type_spec_must_be_string_key);
-	PRINT_STAT(type_spec_must_be_matching_int_key);
-	PRINT_STAT(type_spec_must_be_append_int_key);
-	PRINT_STAT(type_spec_must_be_notref_array_values);
+	PRINT_STAT(ts_must_be_array);
+	PRINT_STAT(ts_not_must_be_array);
+	PRINT_STAT(ts_must_be_int_key);
+	PRINT_STAT(ts_must_be_string_key);
+	PRINT_STAT(ts_must_be_matching_int_key);
+	PRINT_STAT(ts_must_be_append_int_key);
+	PRINT_STAT(ts_must_be_notref_values);
 
 	PRINT_STAT(vars_orig_cvs);
 	PRINT_NORM_STAT(vars_dead_cvs, vars_orig_cvs);

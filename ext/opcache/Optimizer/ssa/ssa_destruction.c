@@ -4,6 +4,12 @@
 #include "Optimizer/statistics.h"
 #include "Optimizer/ssa/liveness.h"
 
+/* This is a work-in-progress implementation of the out-of-ssa translation algorithm described
+ * in "Revisiting Out-of-SSA Translation for Correctness, Code Quality, and Efficiency" by
+ * Boissinot et al.
+ *
+ * Far from finished! */
+
 typedef struct {
 	int min;
 	int next;
