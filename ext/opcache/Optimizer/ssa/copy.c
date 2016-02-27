@@ -323,6 +323,55 @@ void try_propagate_cv_tmp_assignment(
 	OPT_STAT(copy_propagated_tmp)++;
 }
 
+/* Propagates assignments of type QM_ASSIGN TMP_i, TMP_j */
+// TODO: This needs to update live-ranges for temporaries
+void try_propagate_tmp_tmp_assignment(
+		ssa_opt_ctx *ctx, zend_op *opline, zend_ssa_op *ssa_op, int op_num) {
+	zend_ssa *ssa = ctx->ssa;
+	zend_op_array *op_array = ctx->op_array;
+	zend_ssa_var *rhs_var = &ssa->vars[ssa_op->op1_use];
+	zend_ssa_var *lhs_var = &ssa->vars[ssa_op->result_def];
+	int use;
+
+	if (lhs_var->phi_use_chain || !is_used_only_in(ssa, rhs_var, ssa_op, op_num)) {
+		return;
+	}
+
+	if (ssa->var_info[ssa_op->op1_use].type & MAY_BE_REF) {
+		/* The assignment will deref the value. */
+		return;
+	}
+
+	FOREACH_USE(lhs_var, use) {
+		/* Weird opcode, best not mess with it */
+		if (op_array->opcodes[use].opcode == ZEND_SEPARATE) {
+			return;
+		}
+	} FOREACH_USE_END();
+
+	/* Replace uses */
+	FOREACH_USE(lhs_var, use) {
+		zend_ssa_op *use_op = &ssa->ops[use];
+		zend_op *use_opline = &op_array->opcodes[use];
+		if (use_op->op1_use == ssa_op->result_def) {
+			COPY_NODE(use_opline->op1, opline->op1);
+			if (use_opline->opcode == ZEND_SEND_VAR && use_opline->op1_type == IS_TMP_VAR) {
+				use_opline->opcode = ZEND_SEND_VAL;
+			}
+		}
+		if (use_op->op2_use == ssa_op->result_def) {
+			COPY_NODE(use_opline->op2, opline->op1);
+		}
+	} FOREACH_USE_END();
+
+	/* Remove assignment */
+	rename_var_uses(ssa, ssa_op->result_def, ssa_op->op1_use);
+	remove_result_def(ssa, ssa_op);
+	remove_instr(ssa, opline, ssa_op);
+
+	OPT_STAT(copy_propagated_tmp)++;
+}
+
 /* The following code computes a global copy propagation based on the SCDF framework. The result
  * is not actually used, because it would violate CSSA.
  *
@@ -593,7 +642,7 @@ void ssa_optimize_copy(ssa_opt_ctx *ctx) {
 					try_propagate_cv_assignment(ctx, opline, ssa_op);
 				}
 			} else if (opline->op1_type & (IS_VAR|IS_TMP_VAR)) {
-				// TODO
+				try_propagate_tmp_tmp_assignment(ctx, opline, ssa_op, i);
 			}
 		}
 	}
