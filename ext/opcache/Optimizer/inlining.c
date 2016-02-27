@@ -131,6 +131,9 @@ static zend_bool can_inline_from(
 	if (op_array->fn_flags & forbidden_flags) {
 		return 0;
 	}
+	if (op_array->early_binding != (uint32_t) -1) {
+		return 0;
+	}
 	// TODO Support merging static variables
 	if (op_array->static_variables) {
 		return 0;
@@ -760,7 +763,6 @@ static void inline_calls(zend_optimizer_ctx *ctx, zend_op_array *op_array, inlin
 		op_array->cache_size = new_num_cache_slots;
 	}
 	// TODO add/extend live range for return temporary
-	// TODO merge early binding
 }
 
 void zend_optimize_inlining(zend_op_array *op_array, zend_optimizer_ctx *ctx) {
