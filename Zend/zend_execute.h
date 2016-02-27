@@ -363,6 +363,11 @@ void zend_cleanup_unfinished_execution(zend_execute_data *execute_data, uint32_t
 		}                                                \
 	} while (0)
 
+#define ZEND_VM_BENCH 1&&ZEND_DEBUG
+#if ZEND_VM_BENCH
+extern uint32_t zend_vm_executed_ops[];
+#endif
+
 END_EXTERN_C()
 
 #endif /* ZEND_EXECUTE_H */
