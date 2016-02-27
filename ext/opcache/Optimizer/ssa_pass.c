@@ -88,9 +88,9 @@ static int get_common_phi_source(zend_ssa *ssa, zend_ssa_phi *phi) {
 	return common_source;
 }
 
-/* Used to be important to drop phis from RC inference vars. The things it finds now should
- * indicate issues in SSA construction (result is not minimal or not pruned). */
-// TODO Investigate those cases
+/* Used to be important to drop phis from RC inference vars. The things it finds now indicate bugs
+ * in SSA construction (result not minimal or not pruned). Currently there still exists at least
+ * one case where we generate non-minimal SSA due to incorrect handling of pi statements. */
 static void remove_trivial_phis(zend_ssa *ssa) {
 	zend_ssa_phi *phi;
 	FOREACH_PHI(phi) {
@@ -100,8 +100,6 @@ static void remove_trivial_phis(zend_ssa *ssa) {
 			remove_phi(ssa, phi);
 			OPT_STAT(trivial_phis)++;
 		} else if (phi->pi < 0 && common_source >= 0) {
-			fprintf(stderr, "!!! %s: %d <- %d\n",
-				ZSTR_VAL(ssa->op_array->function_name), phi->ssa_var, common_source);
 			rename_var_uses(ssa, phi->ssa_var, common_source);
 			remove_phi(ssa, phi);
 			OPT_STAT(trivial_phis)++;
