@@ -413,6 +413,18 @@ void shutdown_executor(void) /* {{{ */
 	}
 
 	EG(active) = 0;
+
+#if ZEND_VM_BENCH
+	if (EG(assertions) < -1) {
+		int i;
+		for (i = 0; i <= ZEND_VM_LAST_OPCODE; i++) {
+			const char *name = zend_get_opcode_name(i);
+			if (name) {
+				fprintf(stderr, "%s: %d\n", name, zend_vm_executed_ops[i]);
+			}
+		}
+	}
+#endif
 }
 /* }}} */
 

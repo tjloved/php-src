@@ -368,6 +368,11 @@ ZEND_API int ZEND_FASTCALL zend_do_fcall_overloaded(zend_execute_data *call, zva
 		}                                                \
 	} while (0)
 
+#define ZEND_VM_BENCH 1&&ZEND_DEBUG
+#if ZEND_VM_BENCH
+extern uint32_t zend_vm_executed_ops[];
+#endif
+
 END_EXTERN_C()
 
 #endif /* ZEND_EXECUTE_H */
