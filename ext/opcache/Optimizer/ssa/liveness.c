@@ -152,15 +152,15 @@ void ssa_liveness_precompute(
 	}
 	fprintf(stderr, "Postorder numbering:\n");
 	for (i = 0; i < cfg->blocks_count; i++) {
-		fprintf(stderr, "%d ", info.postorder[i]);
+		fprintf(stderr, "%d ", info->postorder[i]);
 	}
 	fprintf(stderr, "\nBackedges:\n");
 	for (i = 0; i < cfg->blocks_count; i++) {
 		zend_basic_block *block = &cfg->blocks[i];
-		if (zend_bitset_in(info.backedges, 2 * i + 0)) {
+		if (zend_bitset_in(info->backedges, 2 * i + 0)) {
 			fprintf(stderr, "%d->%d ", i, block->successors[0]);
 		}
-		if (zend_bitset_in(info.backedges, 2 * i + 1)) {
+		if (zend_bitset_in(info->backedges, 2 * i + 1)) {
 			fprintf(stderr, "%d->%d ", i, block->successors[1]);
 		}
 	}
