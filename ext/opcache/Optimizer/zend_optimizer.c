@@ -1077,7 +1077,9 @@ int zend_optimize_script(zend_script *script, zend_long optimization_level, zend
 	} else
 #endif
 
-	if (ZEND_OPTIMIZER_PASS_12 & optimization_level) {
+	/* Force stack size adjustement if inling is used */
+	if ((ZEND_OPTIMIZER_PASS_12 & optimization_level)
+			|| (ZEND_OPTIMIZER_PASS_8 & optimization_level)) {
 		foreach_op_array(&ctx, zend_adjust_fcall_stack_size);
 	}
 
