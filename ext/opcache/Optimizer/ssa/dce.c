@@ -25,6 +25,59 @@ static inline zend_bool may_have_side_effects(
 	}
 
 	switch (opline->opcode) {
+		case ZEND_NOP:
+		case ZEND_IS_IDENTICAL:
+		case ZEND_IS_NOT_IDENTICAL:
+		case ZEND_QM_ASSIGN:
+		case ZEND_FREE:
+		case ZEND_TYPE_CHECK:
+		case ZEND_DEFINED:
+		case ZEND_ADD:
+		case ZEND_SUB:
+		case ZEND_MUL:
+		case ZEND_POW:
+		case ZEND_BW_OR:
+		case ZEND_BW_AND:
+		case ZEND_BW_XOR:
+		case ZEND_CONCAT:
+		case ZEND_FAST_CONCAT:
+		case ZEND_DIV:
+		case ZEND_MOD:
+		case ZEND_BOOL_XOR:
+		case ZEND_BOOL:
+		case ZEND_BOOL_NOT:
+		case ZEND_BW_NOT:
+		case ZEND_SL:
+		case ZEND_SR:
+		case ZEND_IS_EQUAL:
+		case ZEND_IS_NOT_EQUAL:
+		case ZEND_IS_SMALLER:
+		case ZEND_IS_SMALLER_OR_EQUAL:
+		case ZEND_CASE:
+		case ZEND_CAST:
+		case ZEND_ROPE_INIT:
+		case ZEND_ROPE_ADD:
+		case ZEND_ROPE_END:
+		case ZEND_INIT_ARRAY:
+		case ZEND_ADD_ARRAY_ELEMENT:
+			/* No side effects */
+			return 0;
+		case ZEND_ASSIGN_ADD:
+		case ZEND_ASSIGN_SUB:
+		case ZEND_ASSIGN_MUL:
+		case ZEND_ASSIGN_DIV:
+		case ZEND_ASSIGN_MOD:
+		case ZEND_ASSIGN_SL:
+		case ZEND_ASSIGN_SR:
+		case ZEND_ASSIGN_CONCAT:
+		case ZEND_ASSIGN_BW_OR:
+		case ZEND_ASSIGN_BW_AND:
+		case ZEND_ASSIGN_BW_XOR:
+		case ZEND_ASSIGN_POW:
+		case ZEND_RECV:
+		case ZEND_RECV_INIT:
+			// TODO
+			return 1;
 		case ZEND_JMP:
 		case ZEND_JMPZ:
 		case ZEND_JMPNZ:
@@ -34,7 +87,7 @@ static inline zend_bool may_have_side_effects(
 		case ZEND_JMP_SET:
 		case ZEND_COALESCE:
 		case ZEND_ASSERT_CHECK:
-			/* For our purposes a jump is a side effect. */
+			/* For our purposes a jumps and branches are side effects. */
 			return 1;
 		case ZEND_BEGIN_SILENCE:
 		case ZEND_END_SILENCE:
@@ -98,8 +151,10 @@ static inline zend_bool may_have_side_effects(
 		case ZEND_POST_DEC:
 			/* If there's no op1 def it's an indirected incref not tracked by SSA */
 			return ssa_op->op1_def < 0 || (OP1_INFO() & MAY_BE_REF);
+		default:
+			/* For everything we didn't handle, assume a side-effect */
+			return 1;
 	}
-	return 0;
 }
 
 static inline void add_to_worklists(context *ctx, int var_num) {
