@@ -339,10 +339,11 @@ static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) 
 		return;
 	}*/
 	run_pass(&ssa_ctx, ssa_optimize_dce, "after DCE", 8);
-	run_pass(&ssa_ctx, ssa_optimize_copy, "after copy propagation", 16);
-	run_pass(&ssa_ctx, ssa_optimize_gvn, "after GVN", 32);
-	run_pass(&ssa_ctx, ssa_optimize_dce, "after DCE 2", 64);
-	run_pass(&ssa_ctx, ssa_optimize_assign, "after assignment contraction", 128);
+	run_pass(&ssa_ctx, ssa_optimize_simplify_cfg, "after CFG simplification", 16);
+	run_pass(&ssa_ctx, ssa_optimize_copy, "after copy propagation", 32);
+	run_pass(&ssa_ctx, ssa_optimize_gvn, "after GVN", 64);
+	run_pass(&ssa_ctx, ssa_optimize_dce, "after DCE 2", 128);
+	run_pass(&ssa_ctx, ssa_optimize_assign, "after assignment contraction", 256);
 
 	//ssa_optimize_cv_to_tmp(&ssa_ctx);
 	ssa_optimize_type_specialization(&ssa_ctx);
