@@ -105,7 +105,7 @@ void scdf_init(scdf_ctx *ctx, zend_op_array *op_array, zend_ssa *ssa) {
 	ctx->block_worklist_len = zend_bitset_len(ssa->cfg.blocks_count);
 
 	bitsets = safe_emalloc(
-		ctx->var_worklist_len + 3 * ctx->block_worklist_len, sizeof(zend_ulong), 0);
+		ctx->var_worklist_len + 4 * ctx->block_worklist_len, sizeof(zend_ulong), 0);
 
 	ctx->var_worklist = bitsets;
 	ctx->block_worklist = ctx->var_worklist + ctx->var_worklist_len;
