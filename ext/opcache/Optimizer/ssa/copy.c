@@ -604,6 +604,19 @@ void scdf_copy_propagation(ssa_opt_ctx *ssa_ctx) {
 	scdf_free(&ctx.scdf);
 }
 
+static inline zend_bool may_be_undef(ssa_opt_ctx *ctx, int var_num) {
+	uint32_t t = ctx->ssa->var_info[var_num].type;
+	if (!(t & MAY_BE_UNDEF)) {
+		/* Can't be undef */
+		return 0;
+	}
+	if (!(t & MAY_BE_ANY)) {
+		/* Must be undef -- don't optimize even with assume_no_undef */
+		return 1;
+	}
+	return !ctx->assume_no_undef;
+}
+
 void ssa_optimize_copy(ssa_opt_ctx *ctx) {
 	zend_op_array *op_array = ctx->op_array;
 	zend_ssa *ssa = ctx->ssa;
@@ -625,15 +638,13 @@ void ssa_optimize_copy(ssa_opt_ctx *ctx) {
 				/* Removing the assignment may shorten LHS lifetime */
 				continue;
 			}
-			if (opline->op2_type == IS_CV
-					&& !(ssa->var_info[ssa_op->op2_use].type & MAY_BE_UNDEF)) {
+			if (opline->op2_type == IS_CV && !may_be_undef(ctx, ssa_op->op2_use)) {
 				try_propagate_cv_assignment(ctx, opline, ssa_op);
 			} else if (opline->op2_type & (IS_VAR|IS_TMP_VAR)) {
 				try_propagate_cv_tmp_assignment(ctx, opline, ssa_op, i);
 			}
 		} else if (opline->opcode == ZEND_QM_ASSIGN) {
-			if (opline->op1_type == IS_CV
-					&& !(ssa->var_info[ssa_op->op1_use].type & MAY_BE_UNDEF)) {
+			if (opline->op1_type == IS_CV && !may_be_undef(ctx, ssa_op->op1_use)) {
 				if (opline->result_type == IS_CV) {
 					/* Can no longer happen, even though the code still supports it */
 					ZEND_ASSERT(0);
