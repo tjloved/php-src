@@ -16,6 +16,18 @@ typedef struct {
 	unsigned reorder_dtor_effects : 1;
 } context;
 
+static inline zend_bool is_bad_mod(const zend_ssa *ssa, int use, int def) {
+	if (def < 0) {
+		/* This modification is not tracked by SSA, assume the worst */
+		return 1;
+	}
+	if (ssa->var_info[use].type & MAY_BE_REF) {
+		/* Modification of reference may have side-effect */
+		return 1;
+	}
+	return 0;
+}
+
 static inline zend_bool may_have_side_effects(
 		const context *ctx, const zend_op *opline, const zend_ssa_op *ssa_op) {
 	zend_op_array *op_array = ctx->op_array;
@@ -74,10 +86,11 @@ static inline zend_bool may_have_side_effects(
 		case ZEND_ASSIGN_BW_AND:
 		case ZEND_ASSIGN_BW_XOR:
 		case ZEND_ASSIGN_POW:
-		case ZEND_RECV:
-		case ZEND_RECV_INIT:
 			// TODO
-			return 1;
+			if (opline->extended_value == ZEND_ASSIGN_OBJ) {
+				return 1;
+			}
+			return ssa_op->op1_def < 0 || (OP1_INFO() & MAY_BE_REF);
 		case ZEND_JMP:
 		case ZEND_JMPZ:
 		case ZEND_JMPNZ:
@@ -99,6 +112,8 @@ static inline zend_bool may_have_side_effects(
 		case ZEND_EXT_FCALL_END:
 		case ZEND_EXT_NOP:
 		case ZEND_TICKS:
+		case ZEND_YIELD:
+		case ZEND_YIELD_FROM:
 			/* Intrinsic side effects */
 			return 1;
 		case ZEND_DO_FCALL:
@@ -107,14 +122,17 @@ static inline zend_bool may_have_side_effects(
 		case ZEND_DO_UCALL:
 			/* For now assume all calls have side effects */
 			return 1;
+		case ZEND_RECV:
+		case ZEND_RECV_INIT:
+			/* Even though RECV_INIT can be side-effect free, these cannot be simply dropped
+			 * due to the prologue skipping code. */
+			return 1;
 		case ZEND_ASSIGN_REF:
 			return 1;
 		case ZEND_ASSIGN:
 		{
 			uint32_t t1 = OP1_INFO();
-			if (ssa_op->op1_def < 0 || (t1 & MAY_BE_REF)) {
-				/* Variable not tracked by SSA or a reference. In both cases a missing assignment
-				 * may be (and probably is) observable. */
+			if (is_bad_mod(ssa, ssa_op->op1_use, ssa_op->op1_def)) {
 				return 1;
 			}
 			if (!ctx->reorder_dtor_effects) {
@@ -132,6 +150,9 @@ static inline zend_bool may_have_side_effects(
 		case ZEND_UNSET_VAR:
 		{
 			uint32_t t1 = OP1_INFO();
+			if (!(opline->extended_value & ZEND_QUICK_SET)) {
+				return 1;
+			}
 			if (t1 & MAY_BE_REF) {
 				/* We don't consider uses as the LHS of an assignment as real uses during DCE, so
 				 * an unset may be considered dead even if there is a later assignment to the
@@ -149,8 +170,7 @@ static inline zend_bool may_have_side_effects(
 		case ZEND_POST_INC:
 		case ZEND_PRE_DEC:
 		case ZEND_POST_DEC:
-			/* If there's no op1 def it's an indirected incref not tracked by SSA */
-			return ssa_op->op1_def < 0 || (OP1_INFO() & MAY_BE_REF);
+			return is_bad_mod(ssa, ssa_op->op1_use, ssa_op->op1_def);
 		default:
 			/* For everything we didn't handle, assume a side-effect */
 			return 1;
@@ -601,12 +621,7 @@ try_again:
 	/* Eliminate dead instructions */
 	for (i = 0; i < op_array->last; ++i) {
 		if (zend_bitset_in(ctx.instr_dead, i)) {
-			const char *name = zend_get_opcode_name(op_array->opcodes[i].opcode);
-			if (dce_instr(&ctx, &op_array->opcodes[i], &ssa->ops[i]) && j != 0) {
-				fprintf(stderr, "!!!!! %s %s::%s\n", name,
-					op_array->scope ? ZSTR_VAL(op_array->scope->name) : "",
-					op_array->function_name ? ZSTR_VAL(op_array->function_name) : "{main}");
-			}
+			dce_instr(&ctx, &op_array->opcodes[i], &ssa->ops[i]);
 		}
 	}
 
@@ -650,27 +665,4 @@ try_again:
 		j++;
 		goto try_again;
 	}
-
-#if 0
-	for (i = 0; i < op_array->last; ++i) {
-		zend_ssa_op *ssa_op = &ssa->ops[i];
-		zend_op *opline = &op_array->opcodes[i];
-		if (!may_have_side_effects(ctx, opline, ssa_op)) {
-			continue;
-		}
-		if (ssa_op->op1_use < 0 && ssa_op->op2_use < 0 && ssa_op->result_use < 0) {
-			continue;
-		}
-		if ((ssa_op->op1_def >= 0 && var_used(&ssa->vars[ssa_op->op1_def])) ||
-			(ssa_op->op2_def >= 0 && var_used(&ssa->vars[ssa_op->op2_def])) ||
-			(ssa_op->result_def >= 0 && var_used(&ssa->vars[ssa_op->result_def]))
-		) {
-			continue;
-		}
-		if (opline->opcode == ZEND_OP_DATA) {
-			opline--;
-		}
-		fprintf(stderr, "ROOT %s\n", zend_get_opcode_name(opline->opcode));
-	}
-#endif
 }
