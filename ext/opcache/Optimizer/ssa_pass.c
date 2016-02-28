@@ -331,6 +331,7 @@ static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) 
 	ssa_ctx.call_map = compute_call_map(ctx, info, op_array);
 	ssa_ctx.reorder_dtor_effects =
 		(ctx->optimization_level & ZEND_OPTIMIZER_REORDER_DTOR_EFFECTS) != 0;
+	ssa_ctx.assume_no_undef = (ctx->optimization_level & ZEND_OPTIMIZER_ASSUME_NO_UNDEF) != 0;
 
 	remove_trivial_phis(&info->ssa);
 	run_pass(&ssa_ctx, ssa_optimize_scp, "after SCP", 4);

@@ -43,11 +43,15 @@
 #define ZEND_OPTIMIZER_PASS_16		(1<<15)  /* Inline functions */
 
 /* Allow changing the lifetime of an object in a way that might be observable if it
- * has a destructor with side-effects. This is relevant only for uncommon patterns where
- * an object is stored into variable at the start of a function, the variable is
- * never used, and the behavior of the program relies on the fact that the object will
- * only be destroyed at the very end of the function and no earlier. */
+ * has a destructor with side-effects. Note that the destructor will still be called
+ * (and called exactly once), however the destruction point may be moved relative to
+ * other instructions. This is very unlikely to affect real code. */
 #define ZEND_OPTIMIZER_REORDER_DTOR_EFFECTS (1 << 24)
+/* Perform optimization under the assumption that the code never uses undefined
+ * variables. If the code *does* access an undefined variable, it may be that the
+ * undefined variable notice will be duplicated (copy propagation) or elided (dead
+ * code elimination). */
+#define ZEND_OPTIMIZER_ASSUME_NO_UNDEF (1 << 25)
 
 #define ZEND_OPTIMIZER_ALL_PASSES	0x7FFFFFFF
 
