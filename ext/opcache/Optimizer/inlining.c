@@ -21,8 +21,54 @@
 #include "Optimizer/zend_optimizer_internal.h"
 #include "Optimizer/statistics.h"
 
+/* This pass implements function inling. Currently only inlining of free functions that meet certain
+ * relatively stringent requirements is possible.
+ *
+ * For a function func($a, $b) with opcodes
+ *
+ * $a = RECV 1
+ * $b = RECV 2
+ * T0 = ADD $a, $b
+ * ASSIGN $c, T0
+ * RETURN $c
+ *
+ * a call
+ *
+ * INIT_FCALL "func"
+ * SEND_VAL 42
+ * SEND_VAR $var
+ * V1 = DO_UCALL
+ * L:
+ * ...
+ *
+ * will be transformed into
+ *
+ * ASSIGN $a, 42
+ * ASSIGN $b, $var
+ * T0 = ADD $a, $b
+ * ASSIGN $c, T0
+ * V1 = QM_ASSIGN $c
+ * JMP L
+ * L:
+ * UNSET_VAR $a
+ * UNSET_VAR $b
+ * UNSET_VAR $c
+ * ...
+ *
+ * The UNSETs are inserted to make sure that a) variables do not live longer due to inlining and
+ * b) references are broken. The assumption / hope is that DCE will elimiate these UNSETs again and
+ * SCCP and copy propagation will eliminate the ASSIGNs.
+ *
+ * Note that inlining may result in there existing multiple CVs with the same name.
+ *
+ * There is no proper inlining heuristic yet -- we pretty much inline everything we can that isn't
+ * excessively large. Inlining happens in multiple passes, the current choice of 3 passes is
+ * motivated by SSA construction overflowing the stack if you try more...
+ */
+
 typedef struct _merge_info {
 	uint32_t tmp_offset;
+	/* Shiftlist for instructions */
 	int32_t *shiftlist;
 	/* Map from old live_range offsets to new ones */
 	int32_t *live_range_map;
@@ -199,18 +245,6 @@ static inline zend_bool is_call_opline(zend_op *opline) {
 			return 0;
 	}
 }
-
-/*static inline zend_bool is_simple_send_opline(zend_op *opline) {
-	switch (opline->opcode) {
-		case ZEND_SEND_VAL:
-		case ZEND_SEND_VAR:
-		case ZEND_SEND_VAL_EX:
-		case ZEND_SEND_VAR_EX:
-			return 1;
-		default:
-			return 0;
-	}
-}*/
 
 /* Returns NULL if unsupported call type */
 static zend_op *find_call_opline(zend_op *opline) {

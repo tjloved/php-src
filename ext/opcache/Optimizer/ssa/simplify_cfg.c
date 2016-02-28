@@ -3,6 +3,8 @@
 #include "Optimizer/ssa_pass.h"
 #include "Optimizer/statistics.h"
 
+/* This pass simplifies control flow. At present it only does one operation (merging blocks). */
+
 #if 0
 static inline zend_bool is_nop_sled(zend_op_array *op_array, int start, int end) {
 	int i;
@@ -122,6 +124,11 @@ void ssa_optimize_simplify_cfg(ssa_opt_ctx *ssa_ctx) {
 			continue;
 		}
 
+		/* Terminal block -- we're not interested */
+		if (block->successors[0] < 0) {
+			continue;
+		}
+
 		/* Merge two blocks that have only one successor / predecessor respectively and are only
 		 * separated by unreachable blocks. */
 		if (block->successors[0] > i && block->successors[1] < 0) {
@@ -148,5 +155,7 @@ void ssa_optimize_simplify_cfg(ssa_opt_ctx *ssa_ctx) {
 				continue;
 			}
 		}
+
+		// TODO There is more to do here...
 	}
 }

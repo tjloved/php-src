@@ -4,6 +4,26 @@
 #include "Optimizer/ssa/instructions.h"
 #include "Optimizer/statistics.h"
 
+/* This pass implements a form of dead code elimination (DCE). The algorithm optimistically assumes
+ * that all instructions and phis are dead. Instructions with immediate side-effects are then marked
+ * as live. We then recursively (using a worklist) propagate liveness to the instructions that def
+ * the used operands.
+ *
+ * Notes:
+ *  * This pass does not perform unreachable code elimination. This happens as part of the SCCP
+ *    pass.
+ *  * The DCE is performed without taking control-dependence into account, i.e. all conditional
+ *    branches are assumed to be live. It's possible to take control-dependence into account using
+ *    the DCE algorithm described by Cytron et al., however it requires the construction of a
+ *    postdominator tree and of postdominance frontiers, which does not seem worthwhile at this
+ *    point.
+ *  * We separate intrinsic side-effects from potential side-effects in the form of notices thrown
+ *    by the instruction (in case we want to make this configurable). See may_have_side_effect() and
+ *    may_throw().
+ *  * We often cannot DCE assignments and unsets while guaranteeing that dtors run in the same
+ *    order. There is an optimization option to allow reordering of dtor effects.
+ */
+
 typedef struct {
 	zend_ssa *ssa;
 	zend_op_array *op_array;
@@ -74,23 +94,6 @@ static inline zend_bool may_have_side_effects(
 		case ZEND_ADD_ARRAY_ELEMENT:
 			/* No side effects */
 			return 0;
-		case ZEND_ASSIGN_ADD:
-		case ZEND_ASSIGN_SUB:
-		case ZEND_ASSIGN_MUL:
-		case ZEND_ASSIGN_DIV:
-		case ZEND_ASSIGN_MOD:
-		case ZEND_ASSIGN_SL:
-		case ZEND_ASSIGN_SR:
-		case ZEND_ASSIGN_CONCAT:
-		case ZEND_ASSIGN_BW_OR:
-		case ZEND_ASSIGN_BW_AND:
-		case ZEND_ASSIGN_BW_XOR:
-		case ZEND_ASSIGN_POW:
-			// TODO
-			if (opline->extended_value == ZEND_ASSIGN_OBJ) {
-				return 1;
-			}
-			return ssa_op->op1_def < 0 || (OP1_INFO() & MAY_BE_REF);
 		case ZEND_JMP:
 		case ZEND_JMPZ:
 		case ZEND_JMPNZ:
@@ -170,6 +173,23 @@ static inline zend_bool may_have_side_effects(
 		case ZEND_POST_INC:
 		case ZEND_PRE_DEC:
 		case ZEND_POST_DEC:
+			return is_bad_mod(ssa, ssa_op->op1_use, ssa_op->op1_def);
+		case ZEND_ASSIGN_ADD:
+		case ZEND_ASSIGN_SUB:
+		case ZEND_ASSIGN_MUL:
+		case ZEND_ASSIGN_DIV:
+		case ZEND_ASSIGN_MOD:
+		case ZEND_ASSIGN_SL:
+		case ZEND_ASSIGN_SR:
+		case ZEND_ASSIGN_CONCAT:
+		case ZEND_ASSIGN_BW_OR:
+		case ZEND_ASSIGN_BW_AND:
+		case ZEND_ASSIGN_BW_XOR:
+		case ZEND_ASSIGN_POW:
+			if (opline->extended_value) {
+				/* ASSIGN_DIM has no side-effect, but we can't deal with OP_DATA anyway */
+				return 1;
+			}
 			return is_bad_mod(ssa, ssa_op->op1_use, ssa_op->op1_def);
 		default:
 			/* For everything we didn't handle, assume a side-effect */
@@ -274,30 +294,7 @@ static zend_bool dce_instr(context *ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 	return 1;
 }
 
-#if 0
-static inline zend_op *simplify_target(
-		zend_cfg *cfg, zend_op_array *op_array, zend_op *target) {
-	zend_basic_block *block = &cfg->blocks[cfg->map[target - op_array->opcodes]];
-	zend_op *opline;
-	int i;
-	for (i = block->start; i < block->end; i++) {
-		if (op_array->opcodes[i].opcode != ZEND_NOP) {
-			return target;
-		}
-	}
-	opline = &op_array->opcodes[i];
-	switch (opline->opcode) {
-		case ZEND_NOP:
-			return simplify_target(cfg, op_array, opline + 1);
-		case ZEND_JMP:
-			return simplify_target(cfg, op_array, ZEND_OP1_JMP_ADDR(opline));
-		default:
-			return target;
-	}
-}
-#endif
-
-// TODO Move this somewhere else
+// TODO Move this somewhere else (CFG simplification?)
 static void simplify_jumps(zend_ssa *ssa, zend_op_array *op_array) {
 	int i;
 	for (i = 0; i < op_array->last; i++) {
@@ -356,31 +353,6 @@ static void simplify_jumps(zend_ssa *ssa, zend_op_array *op_array) {
 				break;
 		}
 	}
-
-#if 0
-	for (i = 0; i < op_array->last; i++) {
-		zend_op *opline = &op_array->opcodes[i];
-		if (opline->opcode == ZEND_JMPZ || opline->opcode == ZEND_JMPNZ) {
-			zend_op *target = ZEND_OP2_JMP_ADDR(opline);
-			if (simplify_target(&ssa->cfg, op_array, target)
-					== simplify_target(&ssa->cfg, op_array, opline + 1)) {
-			/*if (target > opline) {
-				while (--target > opline) {
-					if (target->opcode != ZEND_NOP) break;
-				}
-				if (target == opline) {*/
-					if (opline->op1_type == IS_CV) {
-						if (!(ssa->var_info[ssa->ops[i].op1_use].type & MAY_BE_UNDEF)) {
-							remove_instr(ssa, opline, &ssa->ops[i]);
-						}
-					} else {
-						opline->opcode = ZEND_FREE;
-					}
-				//}
-			}
-		}
-	}
-#endif
 }
 
 static inline int get_common_phi_source(zend_ssa *ssa, zend_ssa_phi *phi) {
@@ -433,9 +405,6 @@ void ssa_optimize_dce(ssa_opt_ctx *ssa_ctx) {
 	ctx.ssa = ssa;
 	ctx.op_array = op_array;
 	ctx.reorder_dtor_effects = ssa_ctx->reorder_dtor_effects;
-
-	int j = 0;
-try_again:
 
 	/* We have no dedicated phi vector, so we use the whole ssa var vector instead */
 	ctx.instr_worklist_len = zend_bitset_len(op_array->last);
@@ -514,8 +483,4 @@ try_again:
 	} FOREACH_PHI_END();
 
 	simplify_jumps(ssa, op_array);
-	if (j < 0) {
-		j++;
-		goto try_again;
-	}
 }
