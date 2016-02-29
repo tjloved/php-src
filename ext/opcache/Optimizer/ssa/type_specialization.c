@@ -49,6 +49,20 @@ void ssa_optimize_type_specialization(ssa_opt_ctx *ctx) {
 		}
 
 		switch (opline->opcode) {
+			case ZEND_QM_ASSIGN:
+				if (opline->op1_type == IS_CONST && MUST_BE(t1, MAY_BE_LONG)
+						&& ssa->var_info[ssa_op->result_def].use_as_double) {
+					zval *op1 = CT_CONSTANT_EX(op_array, opline->op1.constant);
+					convert_to_double(op1);
+				}
+				break;
+			case ZEND_ASSIGN:
+				if (opline->op2_type == IS_CONST && MUST_BE(t2, MAY_BE_LONG)
+						&& ssa->var_info[ssa_op->op1_def].use_as_double) {
+					zval *op2 = CT_CONSTANT_EX(op_array, opline->op2.constant);
+					convert_to_double(op2);
+				}
+				break;
 			case ZEND_CONCAT:
 				if (!CAN_BE(t1, MAY_BE_OBJECT) && !CAN_BE(t2, MAY_BE_OBJECT)) {
 					opline->opcode = ZEND_FAST_CONCAT;
