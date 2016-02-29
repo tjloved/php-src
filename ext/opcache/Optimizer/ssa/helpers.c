@@ -6,7 +6,7 @@
 static void propagate_phi_type_widening(zend_ssa *ssa, int var) {
 	zend_ssa_phi *phi;
 	FOREACH_PHI_USE(&ssa->vars[var], phi) {
-		if (ssa->var_info[phi->ssa_var].type & ~ssa->var_info[var].type) {
+		if (ssa->var_info[var].type & ~ssa->var_info[phi->ssa_var].type) {
 			ssa->var_info[phi->ssa_var].type |= ssa->var_info[var].type;
 			propagate_phi_type_widening(ssa, phi->ssa_var);
 		}
@@ -120,7 +120,7 @@ void rename_var_uses_ex(zend_ssa *ssa, int old, int new, zend_bool update_types)
 		 * This should not normally happen, but can occur if we DCE an assignment
 		 * or unset and there is an improper phi-indirected use lateron. */
 		// TODO Alternatively we could rerun type-inference after DCE
-		if (update_types && (ssa->var_info[phi->ssa_var].type & ~ssa->var_info[new].type)) {
+		if (update_types && (ssa->var_info[new].type & ~ssa->var_info[phi->ssa_var].type)) {
 			ssa->var_info[phi->ssa_var].type |= ssa->var_info[new].type;
 			propagate_phi_type_widening(ssa, phi->ssa_var);
 		}
