@@ -208,7 +208,9 @@ static zend_call_info **compute_call_map(
 		map[call->caller_init_opline - start] = call;
 		map[call->caller_call_opline - start] = call;
 		for (i = 0; i < call->num_args; i++) {
-			map[call->arg_info[i].opline - start] = call;
+			if (call->arg_info[i].opline) {
+				map[call->arg_info[i].opline - start] = call;
+			}
 		}
 	}
 	return map;
