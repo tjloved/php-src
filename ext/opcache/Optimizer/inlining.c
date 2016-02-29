@@ -524,7 +524,7 @@ static void merge_opcodes(
 					new_opline->op1.var += cv_offset * sizeof(zval);
 				} else if (new_opline->op1_type == IS_CONST) {
 					if (info->fbc != op_array) {
-						ZEND_PASS_TWO_UNDO_CONSTANT(info->fbc->op_array, new_opline->op1);
+						ZEND_PASS_TWO_UNDO_CONSTANT(info->fbc, new_opline->op1);
 					}
 					new_opline->op1.constant += literal_offset;
 				}
@@ -532,7 +532,7 @@ static void merge_opcodes(
 					new_opline->op2.var += cv_offset * sizeof(zval);
 				} else if (new_opline->op2_type == IS_CONST) {
 					if (info->fbc != op_array) {
-						ZEND_PASS_TWO_UNDO_CONSTANT(info->fbc->op_array, new_opline->op2);
+						ZEND_PASS_TWO_UNDO_CONSTANT(info->fbc, new_opline->op2);
 					}
 					new_opline->op2.constant += literal_offset;
 				}
