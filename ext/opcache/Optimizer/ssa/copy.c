@@ -26,7 +26,7 @@ static void rename_improper_use(
 	}
 }
 
-static inline zend_bool var_has_proper_writes(
+static inline zend_bool var_has_inplace_writes(
 		const zend_ssa *ssa, const zend_op_array *op_array, const zend_ssa_var *var) {
 	int use;
 	int var_num = var - ssa->vars;
@@ -80,6 +80,16 @@ static inline zend_bool var_written_while_live(
 	return 0;
 }
 
+static inline zend_bool has_proper_phi_use(const zend_ssa *ssa, const zend_ssa_var *var) {
+	zend_ssa_phi *phi;
+	FOREACH_PHI_USE(var, phi) {
+		if (!ssa->vars[phi->ssa_var].no_val) {
+			return 1;
+		}
+	} FOREACH_PHI_USE_END();
+	return 0;
+}
+
 /* Tries to perform a copy propagation where the RHS is a CV. The main work this function does
  * is to ensure the propagation does not violate CSSA form, namely for an assignment $a = $b we
  * do not propagate if there are writes to $b between the assignment and a use of $a. This is
@@ -108,14 +118,14 @@ static int try_propagate_cv_assignment(ssa_opt_ctx *ctx, zend_op *opline, zend_s
 		return FAILURE;
 	}
 
-	/* LHS use in phi may lead to a proper write, nothing we can do about this without
-	 * further analysis */
-	if (lhs_var->phi_use_chain) {
+	/* Wheck if the LHS is used in any place that is not triviall improper. This is a conservative
+	 * check, it's not precise. */
+	if (has_proper_phi_use(ssa, lhs_var)) {
 		return FAILURE;
 	}
 
-	/* Check if LHS is written to */
-	if (var_has_proper_writes(ssa, op_array, lhs_var)) {
+	/* Check if LHS is written to in-place */
+	if (var_has_inplace_writes(ssa, op_array, lhs_var)) {
 		return FAILURE;
 	}
 
@@ -239,10 +249,6 @@ void try_propagate_cv_tmp_assignment(
 	zend_basic_block *block;
 	zend_bool found_use = 0;
 
-	if (lhs_var->phi_use_chain) {
-		return;
-	}
-
 	if (!is_used_only_in(ssa, rhs_var, ssa_op, op_num)) {
 		return;
 	}
@@ -254,6 +260,10 @@ void try_propagate_cv_tmp_assignment(
 
 	if (!ctx->reorder_dtor_effects && (ssa->var_info[ssa_op->op2_use].type & MAY_HAVE_DTOR)) {
 		/* Dropping the assignment might shorten the RHS lifetime */
+		return;
+	}
+
+	if (has_proper_phi_use(ssa, lhs_var)) {
 		return;
 	}
 
