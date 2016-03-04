@@ -172,6 +172,9 @@ int ssa_verify_integrity(zend_ssa *ssa, const char *extra) {
 		}
 
 		if (ssa_op->op1_use >= 0) {
+			if (ssa_op->op1_use >= ssa->vars_count) {
+				FAIL("op1 use %d out of range\n", ssa_op->op1_use);
+			}
 			if (!is_in_use_chain(ssa, ssa_op->op1_use, i)) {
 				FAIL("op1 use of " VARFMT " in " INSTRFMT " not in use chain\n",
 						VAR(ssa_op->op1_use), INSTR(i));
@@ -182,6 +185,9 @@ int ssa_verify_integrity(zend_ssa *ssa, const char *extra) {
 			}
 		}
 		if (ssa_op->op2_use >= 0) {
+			if (ssa_op->op2_use >= ssa->vars_count) {
+				FAIL("op2 use %d out of range\n", ssa_op->op2_use);
+			}
 			if (!is_in_use_chain(ssa, ssa_op->op2_use, i)) {
 				FAIL("op1 use of " VARFMT " in " INSTRFMT " not in use chain\n",
 						VAR(ssa_op->op2_use), INSTR(i));
@@ -192,6 +198,9 @@ int ssa_verify_integrity(zend_ssa *ssa, const char *extra) {
 			}
 		}
 		if (ssa_op->result_use >= 0) {
+			if (ssa_op->result_use >= ssa->vars_count) {
+				FAIL("result use %d out of range\n", ssa_op->result_use);
+			}
 			if (!is_in_use_chain(ssa, ssa_op->result_use, i)) {
 				FAIL("result use of " VARFMT " in " INSTRFMT " not in use chain\n",
 					VAR(ssa_op->result_use), INSTR(i));
@@ -202,6 +211,9 @@ int ssa_verify_integrity(zend_ssa *ssa, const char *extra) {
 			}
 		}
 		if (ssa_op->op1_def >= 0) {
+			if (ssa_op->op1_def >= ssa->vars_count) {
+				FAIL("op1 def %d out of range\n", ssa_op->op1_def);
+			}
 			if (ssa->vars[ssa_op->op1_def].definition != i) {
 				FAIL("op1 def of " VARFMT " in " INSTRFMT " invalid\n",
 						VAR(ssa_op->op1_def), INSTR(i));
@@ -212,6 +224,9 @@ int ssa_verify_integrity(zend_ssa *ssa, const char *extra) {
 			}
 		}
 		if (ssa_op->op2_def >= 0) {
+			if (ssa_op->op2_def >= ssa->vars_count) {
+				FAIL("op2 def %d out of range\n", ssa_op->op2_def);
+			}
 			if (ssa->vars[ssa_op->op2_def].definition != i) {
 				FAIL("op2 def of " VARFMT " in " INSTRFMT " invalid\n",
 						VAR(ssa_op->op2_def), INSTR(i));
@@ -222,6 +237,9 @@ int ssa_verify_integrity(zend_ssa *ssa, const char *extra) {
 			}
 		}
 		if (ssa_op->result_def >= 0) {
+			if (ssa_op->result_def >= ssa->vars_count) {
+				FAIL("result def %d out of range\n", ssa_op->result_def);
+			}
 			if (ssa->vars[ssa_op->result_def].definition != i) {
 				FAIL("result def of " VARFMT " in " INSTRFMT " invalid\n",
 						VAR(ssa_op->result_def), INSTR(i));

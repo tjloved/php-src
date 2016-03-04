@@ -40,6 +40,7 @@ typedef struct {
 	zend_stack stack;
 	block_info *blocks;
 	int *shiftlist;
+	uint32_t new_num_opcodes;
 } context;
 
 static zend_bool interfere_dominating(const ssa_liveness *liveness, int a, zend_ssa_var *var_b) {
@@ -219,6 +220,7 @@ static zend_bool groups_interfere(context *ctx, int var_a, int var_b) {
 }
 
 static inline void try_merge(context *ctx, int a, int b) {
+	ZEND_ASSERT(a >= 0 && b >= 0);
 	a = ctx->groups[a].min;
 	b = ctx->groups[b].min;
 	if (a == -1 || b == -1 || a == b) {
@@ -302,6 +304,20 @@ static void free_block_pcopys(context *ctx) {
 	}
 }
 
+static void pcopy_sequentialize(zend_op *opline, const pcopy *cpy) {
+	// TODO Actually sequentialize here
+	uint32_t i;
+	for (i = 0; i < cpy->num_elems; i++) {
+		pcopy_elem *elem = &cpy->elems[i];
+		opline->opcode = ZEND_ASSIGN;
+		opline->op1_type = IS_CV;
+		opline->op1.var = elem->to;
+		opline->op2_type = IS_CV;
+		opline->op2.var = elem->from;
+		opline++;
+	}
+}
+
 static void collect_pcopys(context *ctx) {
 	zend_ssa *ssa = ctx->ssa;
 	zend_cfg *cfg = &ssa->cfg;
@@ -344,15 +360,19 @@ static inline zend_bool has_jump_instr(
 	return block->successors[1] >= 0 || op_array->opcodes[block->end].opcode == ZEND_JMP;
 }
 
-static void compute_shiftlists(context *ctx) {
-	zend_op_array *op_array = ctx->op_array;
-	zend_cfg *cfg = &ctx->ssa->cfg;
+static void compute_shiftlist(context *ctx) {
+	const zend_op_array *op_array = ctx->op_array;
+	const zend_cfg *cfg = &ctx->ssa->cfg;
 	int i, j = 0, shift = 0;
 	int *shiftlist = ctx->shiftlist;
 
 	for (i = 0; i < cfg->blocks_count; i++) {
-		zend_basic_block *block = &cfg->blocks[i];
-		zend_bool has_jump = has_jump_instr(op_array, block);
+		const zend_basic_block *block = &cfg->blocks[i];
+		zend_bool has_jump;
+
+		if (!(block->flags & ZEND_BB_REACHABLE)) {
+			continue;
+		}
 
 		while (j < block->start) {
 			shiftlist[j++] = shift;
@@ -363,6 +383,7 @@ static void compute_shiftlists(context *ctx) {
 			shiftlist[j++] = shift;
 		}
 
+		has_jump = has_jump_instr(op_array, block);
 		if (has_jump) {
 			shift += pcopy_estimated_num_copies(&ctx->blocks[i].late);
 			shiftlist[j++] = shift;
@@ -375,16 +396,146 @@ static void compute_shiftlists(context *ctx) {
 	while (j < op_array->last) {
 		shiftlist[j++] = shift;
 	}
+
+	ctx->new_num_opcodes = op_array->last + shift;
+}
+
+static inline void copy_instr(
+		zend_op *new_opline, const zend_op *old_opline,
+		const zend_op_array *op_array, const zend_op *new_opcodes, const int *shiftlist) {
+#define TO_NEW(opline) \
+		(opline - op_array->opcodes + new_opcodes) + shiftlist[opline - op_array->opcodes]
+	ZEND_ASSERT(new_opline - new_opcodes
+		== old_opline - op_array->opcodes + shiftlist[old_opline - op_array->opcodes]);
+	*new_opline = *old_opline;
+
+	/* Adjust JMP offsets */
+	switch (new_opline->opcode) {
+		case ZEND_JMP:
+		case ZEND_FAST_CALL:
+			ZEND_SET_OP_JMP_ADDR(new_opline, new_opline->op1,
+					TO_NEW(ZEND_OP1_JMP_ADDR(old_opline)));
+			break;
+		case ZEND_JMPZNZ:
+			new_opline->extended_value = ZEND_OPLINE_TO_OFFSET(new_opline,
+				TO_NEW(ZEND_OFFSET_TO_OPLINE(old_opline, old_opline->extended_value)));
+			/* break missing intentionally */
+		case ZEND_JMPZ:
+		case ZEND_JMPNZ:
+		case ZEND_JMPZ_EX:
+		case ZEND_JMPNZ_EX:
+		case ZEND_FE_RESET_R:
+		case ZEND_FE_RESET_RW:
+		case ZEND_NEW:
+		case ZEND_JMP_SET:
+		case ZEND_COALESCE:
+		case ZEND_ASSERT_CHECK:
+			ZEND_SET_OP_JMP_ADDR(new_opline, new_opline->op2,
+				TO_NEW(ZEND_OP2_JMP_ADDR(old_opline)));
+			break;
+		case ZEND_CATCH:
+			if (!new_opline->result.num) {
+				new_opline->extended_value = ZEND_OPLINE_TO_OFFSET(new_opline,
+					TO_NEW(ZEND_OFFSET_TO_OPLINE(old_opline, old_opline->extended_value)));
+			}
+			break;
+		case ZEND_DECLARE_ANON_CLASS:
+		case ZEND_DECLARE_ANON_INHERITED_CLASS:
+		case ZEND_FE_FETCH_R:
+		case ZEND_FE_FETCH_RW:
+			new_opline->extended_value = ZEND_OPLINE_TO_OFFSET(new_opline,
+				TO_NEW(ZEND_OFFSET_TO_OPLINE(old_opline, old_opline->extended_value)));
+			break;
+	} 
+#undef TO_NEW
 }
 
 static void insert_copies(context *ctx) {
+	zend_op_array *op_array = ctx->op_array;
+	const zend_cfg *cfg = &ctx->ssa->cfg;
+	const zend_op *old = op_array->opcodes;
+	const int *shiftlist = ctx->shiftlist;
+	zend_op *new_opcodes = ecalloc(sizeof(zend_op), ctx->new_num_opcodes);
+	zend_op *new = new_opcodes;
+	int i;
+	for (i = 0; i < cfg->blocks_count; i++) {
+		const zend_basic_block *block = &cfg->blocks[i];
+		zend_bool has_jump;
+		if (!(block->flags & ZEND_BB_REACHABLE)) {
+			continue;
+		}
+
+		while (old < &op_array->opcodes[block->start]) {
+			copy_instr(new++, old++, op_array, new_opcodes, shiftlist);
+		}
+
+		// TODO insert copies
+		new += pcopy_estimated_num_copies(&ctx->blocks[i].early);
+		while (old < &op_array->opcodes[block->end]) {
+			copy_instr(new++, old++, op_array, new_opcodes, shiftlist);
+		}
+
+		has_jump = has_jump_instr(op_array, block);
+		if (has_jump) {
+			new += pcopy_estimated_num_copies(&ctx->blocks[i].late);
+			copy_instr(new++, old++, op_array, new_opcodes, shiftlist);
+		} else {
+			copy_instr(new++, old++, op_array, new_opcodes, shiftlist);
+			new += pcopy_estimated_num_copies(&ctx->blocks[i].late);
+		}
+	}
+
+	while (old < &op_array->opcodes[op_array->last]) {
+		copy_instr(new++, old++, op_array, new_opcodes, shiftlist);
+	}
+
+	efree(op_array->opcodes);
+	op_array->opcodes = new_opcodes;
+	op_array->last = ctx->new_num_opcodes;
+}
+
+static void adjust_auxiliary_structures(context *ctx) {
+	zend_op_array *op_array = ctx->op_array;
+	int i, *shiftlist = ctx->shiftlist;
+
+	/* Update live ranges */
+	if (op_array->last_live_range) {
+		for (i = 0; i < op_array->last_live_range; i++) {
+			zend_live_range *range = &op_array->live_range[i];
+			range->start += shiftlist[range->start];
+			range->end += shiftlist[range->end];
+		}
+	}
+
+	/* Update try/catch/finally offsets */
+	if (op_array->last_try_catch) {
+		for (i = 0; i < op_array->last_try_catch; i++) {
+			zend_try_catch_element *try_catch = &op_array->try_catch_array[i];
+			try_catch->try_op += shiftlist[try_catch->try_op];
+			try_catch->catch_op += shiftlist[try_catch->catch_op];
+			if (try_catch->finally_op) {
+				try_catch->finally_op += shiftlist[try_catch->finally_op];
+				try_catch->finally_end += shiftlist[try_catch->finally_end];
+			}
+		}
+	}
+
+	/* Update early binding chain */
+	if (op_array->early_binding != (uint32_t) -1) {
+		uint32_t *opline_num = &op_array->early_binding;
+		do {
+			*opline_num += shiftlist[*opline_num];
+			opline_num = &op_array->opcodes[*opline_num].result.opline_num;
+		} while (*opline_num != (uint32_t) -1);
+	}
 }
 
 static void insert_pcopys(context *ctx) {
 	init_block_pcopys(ctx);
 	collect_pcopys(ctx);
-	compute_shiftlists(ctx);
+	compute_shiftlist(ctx);
 	insert_copies(ctx);
+	adjust_auxiliary_structures(ctx);
 	free_block_pcopys(ctx);
 }
 
@@ -409,8 +560,6 @@ static void ssa_destroy(ssa_opt_ctx *ssa_ctx) {
 	remove_essa_pis(ssa);
 
 	compute_dominance_preorder(&ctx, ssa_ctx);
-
-	insert_pcopys(&ctx);
 
 	/* Start with identity groups */
 	for (i = 0; i < ssa->vars_count; i++) {
@@ -452,6 +601,8 @@ static void ssa_destroy(ssa_opt_ctx *ssa_ctx) {
 			fprintf(stderr, "Interference in group %d\n", i);
 		}
 	}
+
+	insert_pcopys(&ctx);
 
 	zend_stack_destroy(&ctx.stack);
 }
