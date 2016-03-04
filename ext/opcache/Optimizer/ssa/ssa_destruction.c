@@ -10,7 +10,7 @@
  *
  * Far from finished! */
 
-#define DEBUG 1
+#define DEBUG 0
 
 typedef struct {
 	int min;
@@ -307,17 +307,18 @@ static void free_block_pcopys(context *ctx) {
 	}
 }
 
-static void pcopy_sequentialize(zend_op *opline, const pcopy *cpy) {
+static void pcopy_sequentialize(zend_op *opline, const pcopy *cpy, uint32_t lineno) {
 	// TODO Actually sequentialize here
 	uint32_t i;
 	for (i = 0; i < cpy->num_elems; i++) {
 		pcopy_elem *elem = &cpy->elems[i];
-		opline->opcode = ZEND_ASSIGN;
+		opline->opcode = ZEND_PHI_ASSIGN;
 		opline->op1_type = IS_CV;
 		opline->op1.var = NUM_VAR(elem->to);
 		opline->op2_type = IS_CV;
 		opline->op2.var = NUM_VAR(elem->from);
 		opline->result_type = IS_UNUSED;
+		opline->lineno = lineno;
 		opline++;
 	}
 }
@@ -502,7 +503,7 @@ static void insert_copies(context *ctx) {
 			copy_instr(new++, old++, op_array, new_opcodes, shiftlist, tmp_var_offset);
 		}
 
-		pcopy_sequentialize(new, &ctx->blocks[i].early);
+		pcopy_sequentialize(new, &ctx->blocks[i].early, op_array->opcodes[block->start].lineno);
 		new += pcopy_estimated_num_copies(&ctx->blocks[i].early);
 
 		while (old < &op_array->opcodes[block->end]) {
@@ -512,12 +513,12 @@ static void insert_copies(context *ctx) {
 		// TODO This is pretty ugly
 		has_jump = has_jump_instr(op_array, block);
 		if (has_jump) {
-			pcopy_sequentialize(new, &ctx->blocks[i].late);
+			pcopy_sequentialize(new, &ctx->blocks[i].late, op_array->opcodes[block->end].lineno);
 			new += pcopy_estimated_num_copies(&ctx->blocks[i].late);
 			copy_instr(new++, old++, op_array, new_opcodes, shiftlist, tmp_var_offset);
 		} else {
 			copy_instr(new++, old++, op_array, new_opcodes, shiftlist, tmp_var_offset);
-			pcopy_sequentialize(new, &ctx->blocks[i].late);
+			pcopy_sequentialize(new, &ctx->blocks[i].late, op_array->opcodes[block->end].lineno);
 			new += pcopy_estimated_num_copies(&ctx->blocks[i].late);
 		}
 	}
