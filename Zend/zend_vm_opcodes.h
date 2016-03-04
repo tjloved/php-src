@@ -253,6 +253,7 @@ END_EXTERN_C()
 #define ZEND_FETCH_THIS                      184
 #define ZEND_ISSET_ISEMPTY_THIS              186
 #define ZEND_FETCH_OBJ_R_FIXED               189
+#define ZEND_PHI_ASSIGN                      190
 #define ZEND_ADD_INT                         200
 #define ZEND_SUB_INT                         201
 #define ZEND_ADD_DOUBLE                      202
