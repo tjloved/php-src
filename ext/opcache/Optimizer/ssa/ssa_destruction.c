@@ -10,6 +10,8 @@
  *
  * Far from finished! */
 
+#define DEBUG 1
+
 typedef struct {
 	int min;
 	int next;
@@ -41,6 +43,7 @@ typedef struct {
 	block_info *blocks;
 	int *shiftlist;
 	uint32_t new_num_opcodes;
+	uint32_t new_num_vars;
 } context;
 
 static zend_bool interfere_dominating(const ssa_liveness *liveness, int a, zend_ssa_var *var_b) {
@@ -311,9 +314,10 @@ static void pcopy_sequentialize(zend_op *opline, const pcopy *cpy) {
 		pcopy_elem *elem = &cpy->elems[i];
 		opline->opcode = ZEND_ASSIGN;
 		opline->op1_type = IS_CV;
-		opline->op1.var = elem->to;
+		opline->op1.var = NUM_VAR(elem->to);
 		opline->op2_type = IS_CV;
-		opline->op2.var = elem->from;
+		opline->op2.var = NUM_VAR(elem->from);
+		opline->result_type = IS_UNUSED;
 		opline++;
 	}
 }
@@ -342,17 +346,33 @@ static void collect_pcopys(context *ctx) {
 			}
 		} else {
 			/* Ordinary, non-reference variables */
-			pcopy_add_elem(&ctx->blocks[phi->block].early, 0, phi->var);
+			uint32_t var = ctx->new_num_vars++;
+			pcopy_add_elem(&ctx->blocks[phi->block].early, var, phi->var);
 
 			for (i = 0; i < cfg->blocks[phi->block].predecessors_count; i++) {
 				if (phi->sources[i] >= 0) {
 					pcopy_add_elem(
 						&ctx->blocks[predecessors[i]].late,
-						ssa->vars[phi->sources[i]].var, 0);
+						ssa->vars[phi->sources[i]].var, var);
 				}
 			}
 		}
 	} FOREACH_PHI_END();
+
+#if DEBUG
+	int i, j;
+	for (i = 0; i < cfg->blocks_count; i++) {
+		const block_info *info = &ctx->blocks[i];
+		if (info->early.num_elems) {
+			fprintf(stderr, "BB%d early: ", i);
+			for (j = 0; j < info->early.num_elems; j++) {
+				const pcopy_elem *elem = &info->early.elems[j];
+				fprintf(stderr, "%d->%d ", elem->from, elem->to);
+			}
+			fprintf(stderr, "\n");
+		}
+	}
+#endif
 }
 
 static inline zend_bool has_jump_instr(
@@ -402,12 +422,24 @@ static void compute_shiftlist(context *ctx) {
 
 static inline void copy_instr(
 		zend_op *new_opline, const zend_op *old_opline,
-		const zend_op_array *op_array, const zend_op *new_opcodes, const int *shiftlist) {
+		const zend_op_array *op_array, const zend_op *new_opcodes,
+		const int *shiftlist, uint32_t tmp_var_offset) {
 #define TO_NEW(opline) \
 		(opline - op_array->opcodes + new_opcodes) + shiftlist[opline - op_array->opcodes]
 	ZEND_ASSERT(new_opline - new_opcodes
 		== old_opline - op_array->opcodes + shiftlist[old_opline - op_array->opcodes]);
 	*new_opline = *old_opline;
+
+	/* Adjust TMP/VAR offsets */
+	if (new_opline->op1_type & (IS_TMP_VAR|IS_VAR)) {
+		new_opline->op1.var += tmp_var_offset * sizeof(zval);
+	}
+	if (new_opline->op2_type & (IS_TMP_VAR|IS_VAR)) {
+		new_opline->op2.var += tmp_var_offset * sizeof(zval);
+	}
+	if (new_opline->result_type & (IS_TMP_VAR|IS_VAR)) {
+		new_opline->result.var += tmp_var_offset * sizeof(zval);
+	}
 
 	/* Adjust JMP offsets */
 	switch (new_opline->opcode) {
@@ -455,6 +487,7 @@ static void insert_copies(context *ctx) {
 	const zend_cfg *cfg = &ctx->ssa->cfg;
 	const zend_op *old = op_array->opcodes;
 	const int *shiftlist = ctx->shiftlist;
+	uint32_t tmp_var_offset = ctx->new_num_vars - op_array->last_var;
 	zend_op *new_opcodes = ecalloc(sizeof(zend_op), ctx->new_num_opcodes);
 	zend_op *new = new_opcodes;
 	int i;
@@ -466,27 +499,31 @@ static void insert_copies(context *ctx) {
 		}
 
 		while (old < &op_array->opcodes[block->start]) {
-			copy_instr(new++, old++, op_array, new_opcodes, shiftlist);
+			copy_instr(new++, old++, op_array, new_opcodes, shiftlist, tmp_var_offset);
 		}
 
-		// TODO insert copies
+		pcopy_sequentialize(new, &ctx->blocks[i].early);
 		new += pcopy_estimated_num_copies(&ctx->blocks[i].early);
+
 		while (old < &op_array->opcodes[block->end]) {
-			copy_instr(new++, old++, op_array, new_opcodes, shiftlist);
+			copy_instr(new++, old++, op_array, new_opcodes, shiftlist, tmp_var_offset);
 		}
 
+		// TODO This is pretty ugly
 		has_jump = has_jump_instr(op_array, block);
 		if (has_jump) {
+			pcopy_sequentialize(new, &ctx->blocks[i].late);
 			new += pcopy_estimated_num_copies(&ctx->blocks[i].late);
-			copy_instr(new++, old++, op_array, new_opcodes, shiftlist);
+			copy_instr(new++, old++, op_array, new_opcodes, shiftlist, tmp_var_offset);
 		} else {
-			copy_instr(new++, old++, op_array, new_opcodes, shiftlist);
+			copy_instr(new++, old++, op_array, new_opcodes, shiftlist, tmp_var_offset);
+			pcopy_sequentialize(new, &ctx->blocks[i].late);
 			new += pcopy_estimated_num_copies(&ctx->blocks[i].late);
 		}
 	}
 
 	while (old < &op_array->opcodes[op_array->last]) {
-		copy_instr(new++, old++, op_array, new_opcodes, shiftlist);
+		copy_instr(new++, old++, op_array, new_opcodes, shiftlist, tmp_var_offset);
 	}
 
 	efree(op_array->opcodes);
@@ -497,11 +534,13 @@ static void insert_copies(context *ctx) {
 static void adjust_auxiliary_structures(context *ctx) {
 	zend_op_array *op_array = ctx->op_array;
 	int i, *shiftlist = ctx->shiftlist;
+	uint32_t tmp_var_offset = ctx->new_num_vars - op_array->last_var;
 
 	/* Update live ranges */
 	if (op_array->last_live_range) {
 		for (i = 0; i < op_array->last_live_range; i++) {
 			zend_live_range *range = &op_array->live_range[i];
+			range->var += tmp_var_offset * sizeof(zval);
 			range->start += shiftlist[range->start];
 			range->end += shiftlist[range->end];
 		}
@@ -530,12 +569,32 @@ static void adjust_auxiliary_structures(context *ctx) {
 	}
 }
 
+static void add_extra_vars(context *ctx) {
+	zend_op_array *op_array = ctx->op_array;
+	zend_string **new_vars;
+	int i;
+	if (ctx->new_num_vars <= op_array->last_var) {
+		return;
+	}
+
+	new_vars = emalloc(sizeof(zend_string *) * ctx->new_num_vars);
+	memcpy(new_vars, op_array->vars, sizeof(zend_string *) * op_array->last_var);
+	for (i = op_array->last_var; i < ctx->new_num_vars; i++) {
+		new_vars[i] = zend_long_to_str(i - op_array->last_var);
+	}
+
+	efree(op_array->vars);
+	op_array->vars = new_vars;
+	op_array->last_var = ctx->new_num_vars;
+}
+
 static void insert_pcopys(context *ctx) {
 	init_block_pcopys(ctx);
 	collect_pcopys(ctx);
 	compute_shiftlist(ctx);
 	insert_copies(ctx);
 	adjust_auxiliary_structures(ctx);
+	add_extra_vars(ctx);
 	free_block_pcopys(ctx);
 }
 
@@ -555,6 +614,7 @@ static void ssa_destroy(ssa_opt_ctx *ssa_ctx) {
 	ctx.blocks = zend_arena_alloc(&ssa_ctx->opt_ctx->arena,
 			sizeof(block_info) * ssa->cfg.blocks_count);
 	ctx.shiftlist = zend_arena_alloc(&ssa_ctx->opt_ctx->arena, sizeof(int) * op_array->last);
+	ctx.new_num_vars = op_array->last_var;
 	zend_stack_init(&ctx.stack, sizeof(int));
 
 	remove_essa_pis(ssa);
