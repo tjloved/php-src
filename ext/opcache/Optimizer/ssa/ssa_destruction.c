@@ -446,7 +446,9 @@ static void compute_shiftlist(context *ctx) {
 			continue;
 		}
 
-		while (j < block->start) {
+		/* This assumes that a live range can never start at the first instruction in a basic
+		 * block. Right now this should hold. */
+		while (j <= block->start) {
 			shiftlist[j++] = shift;
 		}
 
@@ -478,8 +480,6 @@ static inline void copy_instr(
 		const int *shiftlist, uint32_t tmp_var_offset) {
 #define TO_NEW(opline) \
 		(opline - op_array->opcodes + new_opcodes) + shiftlist[opline - op_array->opcodes]
-	ZEND_ASSERT(new_opline - new_opcodes
-		== old_opline - op_array->opcodes + shiftlist[old_opline - op_array->opcodes]);
 	*new_opline = *old_opline;
 
 	/* Adjust TMP/VAR offsets */
@@ -658,6 +658,7 @@ static void insert_pcopys(context *ctx) {
 	memset(ctx->loc, -1, sizeof(int) * ctx->new_num_vars);
 	memset(ctx->pred, -1, sizeof(int) * ctx->new_num_vars);
 	insert_copies(ctx);
+	zend_arena_release(&ctx->arena, ctx->loc);
 
 	adjust_auxiliary_structures(ctx);
 	add_extra_vars(ctx);
