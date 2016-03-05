@@ -10,7 +10,7 @@
  *
  * Far from finished! */
 
-#define DEBUG 1
+#define DEBUG 0
 
 typedef struct {
 	int min;
@@ -47,6 +47,7 @@ typedef struct {
 	int *pred;
 	uint32_t new_num_opcodes;
 	uint32_t new_num_vars;
+	uint32_t new_num_temps;
 } context;
 
 static zend_bool interfere_dominating(const ssa_liveness *liveness, int a, zend_ssa_var *var_b) {
@@ -310,12 +311,14 @@ static void free_block_pcopys(context *ctx) {
 	}
 }
 
-static void emit_assign(zend_op *opline, int from, int to, uint32_t lineno) {
+static void emit_assign(
+		zend_op *opline, int from, int to, uint32_t lineno, const zend_op_array *op_array) {
 	ZEND_ASSERT(from >= 0 && to >= 0);
+	ZEND_ASSERT(from != to);
 	opline->opcode = ZEND_PHI_ASSIGN;
-	opline->op1_type = IS_CV;
+	opline->op1_type = to < op_array->last_var ? IS_CV : IS_VAR;
 	opline->op1.var = NUM_VAR(to);
-	opline->op2_type = IS_CV;
+	opline->op2_type = from < op_array->last_var ? IS_CV : IS_VAR;
 	opline->op2.var = NUM_VAR(from);
 	opline->result_type = IS_UNUSED;
 	opline->lineno = lineno;
@@ -352,7 +355,7 @@ static void pcopy_sequentialize(context *ctx, zend_op *opline, const pcopy *cpy,
 			zend_stack_del_top(ready);
 			//fprintf(stderr, "from %d (in %d) to %d\n", from, from_loc, to);
 
-			emit_assign(opline++, from_loc, to, lineno);
+			emit_assign(opline++, from_loc, to, lineno, ctx->op_array);
 			loc[from] = to;
 			if (from == from_loc && pred[from] >= 0) {
 				zend_stack_push(ready, &from);
@@ -360,9 +363,9 @@ static void pcopy_sequentialize(context *ctx, zend_op *opline, const pcopy *cpy,
 		}
 		if (elem->to == loc[elem->to]) {
 			/* Break cycle */
-			int extra_var = ctx->new_num_vars++;
+			int extra_var = ctx->new_num_temps++;
 			fprintf(stderr, "cycle\n");
-			emit_assign(opline++, elem->to, extra_var, lineno);
+			emit_assign(opline++, elem->to, extra_var, lineno, ctx->op_array);
 			loc[elem->to] = extra_var;
 			zend_stack_push(ready, &elem->to);
 		}
@@ -399,7 +402,7 @@ static void collect_pcopys(context *ctx) {
 			}
 		} else {
 			/* Ordinary, non-reference variables */
-			uint32_t var = ctx->new_num_vars++;
+			uint32_t var = ctx->new_num_temps++;
 			pcopy_add_elem(&ctx->blocks[phi->block].early, var, phi->var);
 
 			for (i = 0; i < cfg->blocks[phi->block].predecessors_count; i++) {
@@ -682,22 +685,28 @@ static void insert_pcopys(context *ctx) {
 	init_block_pcopys(ctx);
 
 	ctx->new_num_vars = op_array->last_var;
+	ctx->new_num_temps = op_array->T;
 	collect_pcopys(ctx);
 
 	ctx->shiftlist = zend_arena_alloc(&ctx->arena, sizeof(int) * op_array->last);
 	compute_shiftlist(ctx);
 
-	ctx->loc = zend_arena_alloc(&ctx->arena, sizeof(int) * ctx->new_num_vars);
-	ctx->pred = zend_arena_alloc(&ctx->arena, sizeof(int) * ctx->new_num_vars);
-	memset(ctx->loc, -1, sizeof(int) * ctx->new_num_vars);
-	memset(ctx->pred, -1, sizeof(int) * ctx->new_num_vars);
+	ctx->loc = zend_arena_alloc(&ctx->arena,
+		sizeof(int) * (ctx->new_num_vars + ctx->new_num_temps));
+	ctx->pred = zend_arena_alloc(&ctx->arena,
+		sizeof(int) * (ctx->new_num_vars + ctx->new_num_temps));
+	memset(ctx->loc, -1, sizeof(int) * (ctx->new_num_vars + ctx->new_num_temps));
+	memset(ctx->pred, -1, sizeof(int) * (ctx->new_num_vars + ctx->new_num_temps));
 	insert_copies(ctx);
 	zend_arena_release(&ctx->arena, ctx->loc);
 
 	adjust_var_offsets(ctx);
 	adjust_auxiliary_structures(ctx);
 	adjust_cfg(ctx);
+
 	add_extra_vars(ctx);
+	op_array->T = ctx->new_num_temps;
+
 	free_block_pcopys(ctx);
 }
 

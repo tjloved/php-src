@@ -8139,16 +8139,21 @@ ZEND_VM_HANDLER(189, ZEND_FETCH_OBJ_R_FIXED, TMPVAR|UNUSED|THIS|CV, CONST, NUM)
 	ZEND_VM_NEXT_OPCODE_CHECK_EXCEPTION();
 }
 
-ZEND_VM_HANDLER(190, ZEND_PHI_ASSIGN, CV, CV)
+ZEND_VM_HANDLER(190, ZEND_PHI_ASSIGN, VAR|CV, VAR|CV)
 {
 	/* Temporary separate opcode for assignments from phi elimination */
 	// TODO Make sure we can drop this (problem: silenced regions)
 	USE_OPLINE
 	zval *op1 = EX_VAR(opline->op1.var);
 	zval *op2 = EX_VAR(opline->op2.var);
-	if (op1 != op2) {
-		zval_ptr_dtor(op1);
+	ZEND_ASSERT(op1 != op2);
+	if (OP1_TYPE == IS_VAR) {
+		ZEND_ASSERT(OP2_TYPE == IS_CV);
 		ZVAL_COPY(op1, op2);
+	} else {
+		ZEND_ASSERT(OP2_TYPE == IS_VAR);
+		zval_ptr_dtor(op1);
+		ZVAL_COPY_VALUE(op1, op2);
 	}
 	ZEND_VM_NEXT_OPCODE();
 }
