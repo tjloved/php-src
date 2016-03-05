@@ -216,20 +216,27 @@ static zend_call_info **compute_call_map(
 	return map;
 }
 
-static inline void debug_dump(
-		zend_op_array *op_array, zend_ssa *ssa, const char *name, int debug_level) {
+static inline zend_bool should_dump(const zend_op_array *op_array, int debug_level) {
 	if (ZCG(accel_directives).ssa_debug_level & debug_level) {
 		const char *func = ZCG(accel_directives).ssa_debug_func;
 		size_t len = strlen(func);
 		if (len) {
 			if (!op_array->function_name) {
-				return;
+				return 0;
 			}
 			if (ZSTR_LEN(op_array->function_name) != len
 					|| memcmp(ZSTR_VAL(op_array->function_name), func, len)) {
-				return;
+				return 0;
 			}
 		}
+		return 1;
+	}
+	return 0;
+}
+
+static inline void debug_dump(
+		const zend_op_array *op_array, const zend_ssa *ssa, const char *name, int debug_level) {
+	if (should_dump(op_array, debug_level)) {
 		zend_dump_op_array(op_array, ZEND_DUMP_SSA, name, ssa);
 	}
 }
@@ -359,6 +366,10 @@ static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) 
 
 	ssa_optimize_destroy_ssa(&ssa_ctx);
 	ssa_optimize_compact_vars(&ssa_ctx);
+
+	if (should_dump(op_array, 512)) {
+		zend_dump_op_array(op_array, ZEND_DUMP_CFG, "after SSA finalization", &info->ssa.cfg);
+	}
 }
 
 void zend_optimize_ssa(zend_op_array *op_array, zend_optimizer_ctx *ctx) {
