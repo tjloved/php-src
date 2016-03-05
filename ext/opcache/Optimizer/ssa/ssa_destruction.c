@@ -33,6 +33,7 @@ typedef struct {
 } block_info;
 
 typedef struct {
+	zend_arena *arena;
 	zend_op_array *op_array;
 	zend_ssa *ssa;
 	const cfg_info *info;
@@ -310,6 +311,7 @@ static void free_block_pcopys(context *ctx) {
 }
 
 static void emit_assign(zend_op *opline, int from, int to, uint32_t lineno) {
+	ZEND_ASSERT(from >= 0 && to >= 0);
 	opline->opcode = ZEND_PHI_ASSIGN;
 	opline->op1_type = IS_CV;
 	opline->op1.var = NUM_VAR(to);
@@ -321,6 +323,11 @@ static void emit_assign(zend_op *opline, int from, int to, uint32_t lineno) {
 
 static void pcopy_sequentialize(context *ctx, zend_op *opline, const pcopy *cpy, uint32_t lineno) {
 	int i, *loc = ctx->loc, *pred = ctx->pred;
+	zend_stack *ready = &ctx->stack;
+	if (!cpy->num_elems) {
+		return;
+	}
+
 	/*for (i = 0; i < cpy->num_elems; i++) {
 		pcopy_elem *elem = &cpy->elems[i];
 		emit_assign(opline++, elem->from, elem->to, lineno);
@@ -333,28 +340,32 @@ static void pcopy_sequentialize(context *ctx, zend_op *opline, const pcopy *cpy,
 	for (i = 0; i < cpy->num_elems; i++) {
 		pcopy_elem *elem = &cpy->elems[i];
 		if (loc[elem->to] < 0) {
-			zend_stack_push(&ctx->stack, &elem->to);
+			zend_stack_push(ready, &elem->to);
 		}
 	}
+	//fprintf(stderr, "next\n");
 	for (i = 0; i < cpy->num_elems; i++) {
 		pcopy_elem *elem = &cpy->elems[i];
 		while (!zend_stack_is_empty(&ctx->stack)) {
-			int to = *(int *)zend_stack_top(&ctx->stack);
+			int to = *(int *)zend_stack_top(ready);
 			int from = pred[to], from_loc = loc[from];
-			zend_stack_del_top(&ctx->stack);
+			zend_stack_del_top(ready);
+			//fprintf(stderr, "from %d (in %d) to %d\n", from, from_loc, to);
 
 			emit_assign(opline++, from_loc, to, lineno);
 			loc[from] = to;
 			if (from == from_loc && pred[from] >= 0) {
-				zend_stack_push(&ctx->stack, &from);
+				zend_stack_push(ready, &from);
 			}
 		}
 		if (elem->to == loc[elem->to]) {
 			/* Break cycle */
+			fprintf(stderr, "cycle\n");
+			continue;
 			int extra_var = ctx->new_num_vars++;
 			emit_assign(opline++, elem->to, extra_var, lineno);
 			loc[elem->to] = extra_var;
-			zend_stack_push(&ctx->stack, &elem->to);
+			zend_stack_push(ready, &elem->to);
 		}
 	}
 	for (i = 0; i < cpy->num_elems; i++) {
@@ -633,10 +644,21 @@ static void add_extra_vars(context *ctx) {
 }
 
 static void insert_pcopys(context *ctx) {
+	zend_op_array *op_array = ctx->op_array;
 	init_block_pcopys(ctx);
+
+	ctx->new_num_vars = op_array->last_var;
 	collect_pcopys(ctx);
+
+	ctx->shiftlist = zend_arena_alloc(&ctx->arena, sizeof(int) * op_array->last);
 	compute_shiftlist(ctx);
+
+	ctx->loc = zend_arena_alloc(&ctx->arena, sizeof(int) * ctx->new_num_vars);
+	ctx->pred = zend_arena_alloc(&ctx->arena, sizeof(int) * ctx->new_num_vars);
+	memset(ctx->loc, -1, sizeof(int) * ctx->new_num_vars);
+	memset(ctx->pred, -1, sizeof(int) * ctx->new_num_vars);
 	insert_copies(ctx);
+
 	adjust_auxiliary_structures(ctx);
 	add_extra_vars(ctx);
 	free_block_pcopys(ctx);
@@ -649,6 +671,7 @@ static void ssa_destroy(ssa_opt_ctx *ssa_ctx) {
 	int i;
 
 	context ctx;
+	ctx.arena = ssa_ctx->opt_ctx->arena;
 	ctx.op_array = op_array;
 	ctx.ssa = ssa;
 	ctx.info = ssa_ctx->cfg_info;
@@ -657,12 +680,6 @@ static void ssa_destroy(ssa_opt_ctx *ssa_ctx) {
 	ctx.groups = zend_arena_alloc(&ssa_ctx->opt_ctx->arena, sizeof(group) * ssa->vars_count);
 	ctx.blocks = zend_arena_alloc(&ssa_ctx->opt_ctx->arena,
 			sizeof(block_info) * ssa->cfg.blocks_count);
-	ctx.shiftlist = zend_arena_alloc(&ssa_ctx->opt_ctx->arena, sizeof(int) * op_array->last);
-	ctx.loc = zend_arena_alloc(&ssa_ctx->opt_ctx->arena, sizeof(int) * op_array->last_var);
-	ctx.pred = zend_arena_alloc(&ssa_ctx->opt_ctx->arena, sizeof(int) * op_array->last_var);
-	memset(ctx.loc, -1, sizeof(int) * op_array->last_var);
-	memset(ctx.pred, -1, sizeof(int) * op_array->last_var);
-	ctx.new_num_vars = op_array->last_var;
 	zend_stack_init(&ctx.stack, sizeof(int));
 
 	remove_essa_pis(ssa);
@@ -713,6 +730,7 @@ static void ssa_destroy(ssa_opt_ctx *ssa_ctx) {
 	insert_pcopys(&ctx);
 
 	zend_stack_destroy(&ctx.stack);
+	ssa_ctx->opt_ctx->arena = ctx.arena;
 }
 
 static void check_interferences(ssa_opt_ctx *ssa_ctx) {
