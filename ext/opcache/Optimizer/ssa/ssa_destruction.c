@@ -360,8 +360,6 @@ static void pcopy_sequentialize(context *ctx, zend_op *opline, const pcopy *cpy,
 		}
 		if (elem->to == loc[elem->to]) {
 			/* Break cycle */
-			fprintf(stderr, "cycle\n");
-			continue;
 			int extra_var = ctx->new_num_vars++;
 			emit_assign(opline++, elem->to, extra_var, lineno);
 			loc[elem->to] = extra_var;
@@ -482,17 +480,6 @@ static inline void copy_instr(
 		(opline - op_array->opcodes + new_opcodes) + shiftlist[opline - op_array->opcodes]
 	*new_opline = *old_opline;
 
-	/* Adjust TMP/VAR offsets */
-	if (new_opline->op1_type & (IS_TMP_VAR|IS_VAR)) {
-		new_opline->op1.var += tmp_var_offset * sizeof(zval);
-	}
-	if (new_opline->op2_type & (IS_TMP_VAR|IS_VAR)) {
-		new_opline->op2.var += tmp_var_offset * sizeof(zval);
-	}
-	if (new_opline->result_type & (IS_TMP_VAR|IS_VAR)) {
-		new_opline->result.var += tmp_var_offset * sizeof(zval);
-	}
-
 	/* Adjust JMP offsets */
 	switch (new_opline->opcode) {
 		case ZEND_JMP:
@@ -586,6 +573,26 @@ static void insert_copies(context *ctx) {
 	op_array->last = ctx->new_num_opcodes;
 }
 
+static inline void adjust_var_offsets_in_opline(zend_op *opline, uint32_t tmp_var_offset) {
+	if (opline->op1_type & (IS_TMP_VAR|IS_VAR)) {
+		opline->op1.var += tmp_var_offset * sizeof(zval);
+	}
+	if (opline->op2_type & (IS_TMP_VAR|IS_VAR)) {
+		opline->op2.var += tmp_var_offset * sizeof(zval);
+	}
+	if (opline->result_type & (IS_TMP_VAR|IS_VAR)) {
+		opline->result.var += tmp_var_offset * sizeof(zval);
+	}
+}
+
+static void adjust_var_offsets(context *ctx) {
+	zend_op_array *op_array = ctx->op_array;
+	int i, tmp_var_offset = ctx->new_num_vars - op_array->last_var;
+	for (i = 0; i < op_array->last; i++) {
+		adjust_var_offsets_in_opline(&op_array->opcodes[i], tmp_var_offset);
+	}
+}
+
 static void adjust_auxiliary_structures(context *ctx) {
 	zend_op_array *op_array = ctx->op_array;
 	int i, *shiftlist = ctx->shiftlist;
@@ -660,6 +667,7 @@ static void insert_pcopys(context *ctx) {
 	insert_copies(ctx);
 	zend_arena_release(&ctx->arena, ctx->loc);
 
+	adjust_var_offsets(ctx);
 	adjust_auxiliary_structures(ctx);
 	add_extra_vars(ctx);
 	free_block_pcopys(ctx);
