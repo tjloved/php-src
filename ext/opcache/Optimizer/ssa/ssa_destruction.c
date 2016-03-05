@@ -10,7 +10,7 @@
  *
  * Far from finished! */
 
-#define DEBUG 0
+#define DEBUG 1
 
 typedef struct {
 	int min;
@@ -361,6 +361,7 @@ static void pcopy_sequentialize(context *ctx, zend_op *opline, const pcopy *cpy,
 		if (elem->to == loc[elem->to]) {
 			/* Break cycle */
 			int extra_var = ctx->new_num_vars++;
+			fprintf(stderr, "cycle\n");
 			emit_assign(opline++, elem->to, extra_var, lineno);
 			loc[elem->to] = extra_var;
 			zend_stack_push(ready, &elem->to);
@@ -389,9 +390,11 @@ static void collect_pcopys(context *ctx) {
 			 * insert copies if one of the source operands is a non-ref. */
 			for (i = 0; i < cfg->blocks[phi->block].predecessors_count; i++) {
 				if (phi->sources[i] >= 0 && !(ssa->var_info[phi->sources[i]].type & MAY_BE_REF)) {
-					pcopy_add_elem(
-						&ctx->blocks[predecessors[i]].late,
-						ssa->vars[phi->sources[i]].var, phi->var);
+					if (ssa->vars[phi->sources[i]].var != phi->var) {
+						pcopy_add_elem(
+							&ctx->blocks[predecessors[i]].late,
+							ssa->vars[phi->sources[i]].var, phi->var);
+					}
 				}
 			}
 		} else {
@@ -417,6 +420,14 @@ static void collect_pcopys(context *ctx) {
 			fprintf(stderr, "BB%d early: ", i);
 			for (j = 0; j < info->early.num_elems; j++) {
 				const pcopy_elem *elem = &info->early.elems[j];
+				fprintf(stderr, "%d->%d ", elem->from, elem->to);
+			}
+			fprintf(stderr, "\n");
+		}
+		if (info->late.num_elems) {
+			fprintf(stderr, "BB%d late: ", i);
+			for (j = 0; j < info->late.num_elems; j++) {
+				const pcopy_elem *elem = &info->late.elems[j];
 				fprintf(stderr, "%d->%d ", elem->from, elem->to);
 			}
 			fprintf(stderr, "\n");
@@ -475,7 +486,7 @@ static void compute_shiftlist(context *ctx) {
 static inline void copy_instr(
 		zend_op *new_opline, const zend_op *old_opline,
 		const zend_op_array *op_array, const zend_op *new_opcodes,
-		const int *shiftlist, uint32_t tmp_var_offset) {
+		const int *shiftlist) {
 #define TO_NEW(opline) \
 		(opline - op_array->opcodes + new_opcodes) + shiftlist[opline - op_array->opcodes]
 	*new_opline = *old_opline;
@@ -526,7 +537,6 @@ static void insert_copies(context *ctx) {
 	const zend_cfg *cfg = &ctx->ssa->cfg;
 	const zend_op *old = op_array->opcodes;
 	const int *shiftlist = ctx->shiftlist;
-	uint32_t tmp_var_offset = ctx->new_num_vars - op_array->last_var;
 	zend_op *new_opcodes = ecalloc(sizeof(zend_op), ctx->new_num_opcodes);
 	zend_op *new = new_opcodes;
 	int i;
@@ -538,7 +548,7 @@ static void insert_copies(context *ctx) {
 		}
 
 		while (old < &op_array->opcodes[block->start]) {
-			copy_instr(new++, old++, op_array, new_opcodes, shiftlist, tmp_var_offset);
+			copy_instr(new++, old++, op_array, new_opcodes, shiftlist);
 		}
 
 		pcopy_sequentialize(ctx, new, &ctx->blocks[i].early,
@@ -546,7 +556,7 @@ static void insert_copies(context *ctx) {
 		new += pcopy_estimated_num_copies(&ctx->blocks[i].early);
 
 		while (old < &op_array->opcodes[block->end]) {
-			copy_instr(new++, old++, op_array, new_opcodes, shiftlist, tmp_var_offset);
+			copy_instr(new++, old++, op_array, new_opcodes, shiftlist);
 		}
 
 		// TODO This is pretty ugly
@@ -555,9 +565,9 @@ static void insert_copies(context *ctx) {
 			pcopy_sequentialize(ctx, new, &ctx->blocks[i].late,
 				op_array->opcodes[block->end].lineno);
 			new += pcopy_estimated_num_copies(&ctx->blocks[i].late);
-			copy_instr(new++, old++, op_array, new_opcodes, shiftlist, tmp_var_offset);
+			copy_instr(new++, old++, op_array, new_opcodes, shiftlist);
 		} else {
-			copy_instr(new++, old++, op_array, new_opcodes, shiftlist, tmp_var_offset);
+			copy_instr(new++, old++, op_array, new_opcodes, shiftlist);
 			pcopy_sequentialize(ctx, new, &ctx->blocks[i].late,
 				op_array->opcodes[block->end].lineno);
 			new += pcopy_estimated_num_copies(&ctx->blocks[i].late);
@@ -565,7 +575,7 @@ static void insert_copies(context *ctx) {
 	}
 
 	while (old < &op_array->opcodes[op_array->last]) {
-		copy_instr(new++, old++, op_array, new_opcodes, shiftlist, tmp_var_offset);
+		copy_instr(new++, old++, op_array, new_opcodes, shiftlist);
 	}
 
 	efree(op_array->opcodes);
@@ -631,6 +641,23 @@ static void adjust_auxiliary_structures(context *ctx) {
 	}
 }
 
+static void adjust_cfg(context *ctx) {
+	zend_cfg *cfg = &ctx->ssa->cfg;
+	int i, shift = 0;
+	for (i = 0; i < cfg->blocks_count; i++) {
+		zend_basic_block *block = &cfg->blocks[i];
+		block_info *info = &ctx->blocks[i];
+		if (!(block->flags & ZEND_BB_REACHABLE)) {
+			continue;
+		}
+
+		block->start += shift;
+		shift += pcopy_estimated_num_copies(&info->early);
+		shift += pcopy_estimated_num_copies(&info->late);
+		block->end += shift;
+	}
+}
+
 static void add_extra_vars(context *ctx) {
 	zend_op_array *op_array = ctx->op_array;
 	zend_string **new_vars;
@@ -669,6 +696,7 @@ static void insert_pcopys(context *ctx) {
 
 	adjust_var_offsets(ctx);
 	adjust_auxiliary_structures(ctx);
+	adjust_cfg(ctx);
 	add_extra_vars(ctx);
 	free_block_pcopys(ctx);
 }
