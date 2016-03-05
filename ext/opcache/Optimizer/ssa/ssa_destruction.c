@@ -42,6 +42,8 @@ typedef struct {
 	zend_stack stack;
 	block_info *blocks;
 	int *shiftlist;
+	int *loc;
+	int *pred;
 	uint32_t new_num_opcodes;
 	uint32_t new_num_vars;
 } context;
@@ -307,19 +309,57 @@ static void free_block_pcopys(context *ctx) {
 	}
 }
 
-static void pcopy_sequentialize(zend_op *opline, const pcopy *cpy, uint32_t lineno) {
-	// TODO Actually sequentialize here
-	uint32_t i;
+static void emit_assign(zend_op *opline, int from, int to, uint32_t lineno) {
+	opline->opcode = ZEND_PHI_ASSIGN;
+	opline->op1_type = IS_CV;
+	opline->op1.var = NUM_VAR(to);
+	opline->op2_type = IS_CV;
+	opline->op2.var = NUM_VAR(from);
+	opline->result_type = IS_UNUSED;
+	opline->lineno = lineno;
+}
+
+static void pcopy_sequentialize(context *ctx, zend_op *opline, const pcopy *cpy, uint32_t lineno) {
+	int i, *loc = ctx->loc, *pred = ctx->pred;
+	/*for (i = 0; i < cpy->num_elems; i++) {
+		pcopy_elem *elem = &cpy->elems[i];
+		emit_assign(opline++, elem->from, elem->to, lineno);
+	}*/
 	for (i = 0; i < cpy->num_elems; i++) {
 		pcopy_elem *elem = &cpy->elems[i];
-		opline->opcode = ZEND_PHI_ASSIGN;
-		opline->op1_type = IS_CV;
-		opline->op1.var = NUM_VAR(elem->to);
-		opline->op2_type = IS_CV;
-		opline->op2.var = NUM_VAR(elem->from);
-		opline->result_type = IS_UNUSED;
-		opline->lineno = lineno;
-		opline++;
+		loc[elem->from] = elem->from;
+		pred[elem->to] = elem->from;
+	}
+	for (i = 0; i < cpy->num_elems; i++) {
+		pcopy_elem *elem = &cpy->elems[i];
+		if (loc[elem->to] < 0) {
+			zend_stack_push(&ctx->stack, &elem->to);
+		}
+	}
+	for (i = 0; i < cpy->num_elems; i++) {
+		pcopy_elem *elem = &cpy->elems[i];
+		while (!zend_stack_is_empty(&ctx->stack)) {
+			int to = *(int *)zend_stack_top(&ctx->stack);
+			int from = pred[to], from_loc = loc[from];
+			zend_stack_del_top(&ctx->stack);
+
+			emit_assign(opline++, from_loc, to, lineno);
+			loc[from] = to;
+			if (from == from_loc && pred[from] >= 0) {
+				zend_stack_push(&ctx->stack, &from);
+			}
+		}
+		if (elem->to == loc[elem->to]) {
+			/* Break cycle */
+			int extra_var = ctx->new_num_vars++;
+			emit_assign(opline++, elem->to, extra_var, lineno);
+			loc[elem->to] = extra_var;
+			zend_stack_push(&ctx->stack, &elem->to);
+		}
+	}
+	for (i = 0; i < cpy->num_elems; i++) {
+		loc[cpy->elems[i].from] = -1;
+		pred[cpy->elems[i].to] = -1;
 	}
 }
 
@@ -503,7 +543,8 @@ static void insert_copies(context *ctx) {
 			copy_instr(new++, old++, op_array, new_opcodes, shiftlist, tmp_var_offset);
 		}
 
-		pcopy_sequentialize(new, &ctx->blocks[i].early, op_array->opcodes[block->start].lineno);
+		pcopy_sequentialize(ctx, new, &ctx->blocks[i].early,
+			op_array->opcodes[block->start].lineno);
 		new += pcopy_estimated_num_copies(&ctx->blocks[i].early);
 
 		while (old < &op_array->opcodes[block->end]) {
@@ -513,12 +554,14 @@ static void insert_copies(context *ctx) {
 		// TODO This is pretty ugly
 		has_jump = has_jump_instr(op_array, block);
 		if (has_jump) {
-			pcopy_sequentialize(new, &ctx->blocks[i].late, op_array->opcodes[block->end].lineno);
+			pcopy_sequentialize(ctx, new, &ctx->blocks[i].late,
+				op_array->opcodes[block->end].lineno);
 			new += pcopy_estimated_num_copies(&ctx->blocks[i].late);
 			copy_instr(new++, old++, op_array, new_opcodes, shiftlist, tmp_var_offset);
 		} else {
 			copy_instr(new++, old++, op_array, new_opcodes, shiftlist, tmp_var_offset);
-			pcopy_sequentialize(new, &ctx->blocks[i].late, op_array->opcodes[block->end].lineno);
+			pcopy_sequentialize(ctx, new, &ctx->blocks[i].late,
+				op_array->opcodes[block->end].lineno);
 			new += pcopy_estimated_num_copies(&ctx->blocks[i].late);
 		}
 	}
@@ -615,6 +658,10 @@ static void ssa_destroy(ssa_opt_ctx *ssa_ctx) {
 	ctx.blocks = zend_arena_alloc(&ssa_ctx->opt_ctx->arena,
 			sizeof(block_info) * ssa->cfg.blocks_count);
 	ctx.shiftlist = zend_arena_alloc(&ssa_ctx->opt_ctx->arena, sizeof(int) * op_array->last);
+	ctx.loc = zend_arena_alloc(&ssa_ctx->opt_ctx->arena, sizeof(int) * op_array->last_var);
+	ctx.pred = zend_arena_alloc(&ssa_ctx->opt_ctx->arena, sizeof(int) * op_array->last_var);
+	memset(ctx.loc, -1, sizeof(int) * op_array->last_var);
+	memset(ctx.pred, -1, sizeof(int) * op_array->last_var);
 	ctx.new_num_vars = op_array->last_var;
 	zend_stack_init(&ctx.stack, sizeof(int));
 
