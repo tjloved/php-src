@@ -8148,8 +8148,7 @@ ZEND_VM_HANDLER(190, ZEND_PHI_ASSIGN, CV, CV)
 	zval *op2 = EX_VAR(opline->op2.var);
 	ZEND_ASSERT(op1 != op2);
 	zval_ptr_dtor(op1);
-	ZVAL_COPY_VALUE(op1, op2);
-	ZVAL_UNDEF(op2);
+	ZVAL_COPY(op1, op2);
 	ZEND_VM_NEXT_OPCODE();
 }
 
