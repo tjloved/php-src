@@ -363,7 +363,7 @@ static void pcopy_sequentialize(context *ctx, zend_op *opline, const pcopy *cpy,
 		}
 		if (elem->to == loc[elem->to]) {
 			/* Break cycle */
-			int extra_var = ctx->new_num_temps++;
+			int extra_var = ctx->op_array->last_var + ctx->new_num_temps++;
 			fprintf(stderr, "cycle\n");
 			emit_assign(opline++, elem->to, extra_var, lineno, ctx->op_array);
 			loc[elem->to] = extra_var;
@@ -402,7 +402,7 @@ static void collect_pcopys(context *ctx) {
 			}
 		} else {
 			/* Ordinary, non-reference variables */
-			uint32_t var = ctx->new_num_temps++;
+			uint32_t var = ctx->op_array->last_var + ctx->new_num_temps++;
 			pcopy_add_elem(&ctx->blocks[phi->block].early, var, phi->var);
 
 			for (i = 0; i < cfg->blocks[phi->block].predecessors_count; i++) {
