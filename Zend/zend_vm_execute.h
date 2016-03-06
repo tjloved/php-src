@@ -20768,25 +20768,6 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_YIELD_SPEC_VAR_VAR_HANDLER(ZEN
 	ZEND_VM_RETURN();
 }
 
-static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_PHI_ASSIGN_SPEC_VAR_VAR_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
-{
-	/* Temporary separate opcode for assignments from phi elimination */
-	// TODO Make sure we can drop this (problem: silenced regions)
-	USE_OPLINE
-	zval *op1 = EX_VAR(opline->op1.var);
-	zval *op2 = EX_VAR(opline->op2.var);
-	ZEND_ASSERT(op1 != op2);
-	if (IS_VAR == IS_VAR) {
-		ZEND_ASSERT(IS_VAR == IS_CV);
-		ZVAL_COPY(op1, op2);
-	} else {
-		ZEND_ASSERT(IS_VAR == IS_VAR);
-		zval_ptr_dtor(op1);
-		ZVAL_COPY_VALUE(op1, op2);
-	}
-	ZEND_VM_NEXT_OPCODE();
-}
-
 static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL zend_binary_assign_op_dim_helper_SPEC_VAR_UNUSED(binary_op_type binary_op ZEND_OPCODE_HANDLER_ARGS_DC)
 {
 	USE_OPLINE
@@ -25004,25 +24985,6 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_YIELD_SPEC_VAR_CV_HANDLER(ZEND
 	SAVE_OPLINE();
 
 	ZEND_VM_RETURN();
-}
-
-static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_PHI_ASSIGN_SPEC_VAR_CV_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
-{
-	/* Temporary separate opcode for assignments from phi elimination */
-	// TODO Make sure we can drop this (problem: silenced regions)
-	USE_OPLINE
-	zval *op1 = EX_VAR(opline->op1.var);
-	zval *op2 = EX_VAR(opline->op2.var);
-	ZEND_ASSERT(op1 != op2);
-	if (IS_VAR == IS_VAR) {
-		ZEND_ASSERT(IS_CV == IS_CV);
-		ZVAL_COPY(op1, op2);
-	} else {
-		ZEND_ASSERT(IS_CV == IS_VAR);
-		zval_ptr_dtor(op1);
-		ZVAL_COPY_VALUE(op1, op2);
-	}
-	ZEND_VM_NEXT_OPCODE();
 }
 
 static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL zend_binary_assign_op_obj_helper_SPEC_VAR_TMPVAR(binary_op_type binary_op ZEND_OPCODE_HANDLER_ARGS_DC)
@@ -41497,25 +41459,6 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_YIELD_SPEC_CV_VAR_HANDLER(ZEND
 	ZEND_VM_RETURN();
 }
 
-static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_PHI_ASSIGN_SPEC_CV_VAR_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
-{
-	/* Temporary separate opcode for assignments from phi elimination */
-	// TODO Make sure we can drop this (problem: silenced regions)
-	USE_OPLINE
-	zval *op1 = EX_VAR(opline->op1.var);
-	zval *op2 = EX_VAR(opline->op2.var);
-	ZEND_ASSERT(op1 != op2);
-	if (IS_CV == IS_VAR) {
-		ZEND_ASSERT(IS_VAR == IS_CV);
-		ZVAL_COPY(op1, op2);
-	} else {
-		ZEND_ASSERT(IS_VAR == IS_VAR);
-		zval_ptr_dtor(op1);
-		ZVAL_COPY_VALUE(op1, op2);
-	}
-	ZEND_VM_NEXT_OPCODE();
-}
-
 static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL zend_binary_assign_op_dim_helper_SPEC_CV_UNUSED(binary_op_type binary_op ZEND_OPCODE_HANDLER_ARGS_DC)
 {
 	USE_OPLINE
@@ -47247,14 +47190,9 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_PHI_ASSIGN_SPEC_CV_CV_HANDLER(
 	zval *op1 = EX_VAR(opline->op1.var);
 	zval *op2 = EX_VAR(opline->op2.var);
 	ZEND_ASSERT(op1 != op2);
-	if (IS_CV == IS_VAR) {
-		ZEND_ASSERT(IS_CV == IS_CV);
-		ZVAL_COPY(op1, op2);
-	} else {
-		ZEND_ASSERT(IS_CV == IS_VAR);
-		zval_ptr_dtor(op1);
-		ZVAL_COPY_VALUE(op1, op2);
-	}
+	zval_ptr_dtor(op1);
+	ZVAL_COPY_VALUE(op1, op2);
+	ZVAL_UNDEF(op2);
 	ZEND_VM_NEXT_OPCODE();
 }
 
@@ -61381,9 +61319,6 @@ void zend_init_opcodes_handlers(void)
 		ZEND_NULL_HANDLER,
 		ZEND_NULL_HANDLER,
 		ZEND_NULL_HANDLER,
-		ZEND_PHI_ASSIGN_SPEC_VAR_VAR_HANDLER,
-		ZEND_NULL_HANDLER,
-		ZEND_PHI_ASSIGN_SPEC_VAR_CV_HANDLER,
 		ZEND_NULL_HANDLER,
 		ZEND_NULL_HANDLER,
 		ZEND_NULL_HANDLER,
@@ -61391,7 +61326,10 @@ void zend_init_opcodes_handlers(void)
 		ZEND_NULL_HANDLER,
 		ZEND_NULL_HANDLER,
 		ZEND_NULL_HANDLER,
-		ZEND_PHI_ASSIGN_SPEC_CV_VAR_HANDLER,
+		ZEND_NULL_HANDLER,
+		ZEND_NULL_HANDLER,
+		ZEND_NULL_HANDLER,
+		ZEND_NULL_HANDLER,
 		ZEND_NULL_HANDLER,
 		ZEND_PHI_ASSIGN_SPEC_CV_CV_HANDLER,
 		ZEND_ADD_INT_SPEC_CONST_CONST_HANDLER,
