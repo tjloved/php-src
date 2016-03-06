@@ -39,7 +39,7 @@ static inline zend_bool is_block_empty(
 }
 #endif
 
-static inline int num_predecessors(zend_cfg *cfg, zend_basic_block *block) {
+static inline int num_predecessors(const zend_cfg *cfg, const zend_basic_block *block) {
 	int j, count = 0, *predecessors = &cfg->predecessors[block->predecessor_offset];
 	for (j = 0; j < block->predecessors_count; j++) {
 		if (predecessors[j] >= 0) {

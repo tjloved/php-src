@@ -312,13 +312,13 @@ static void free_block_pcopys(context *ctx) {
 }
 
 static void emit_assign(
-		zend_op *opline, int from, int to, uint32_t lineno, const zend_op_array *op_array) {
+		zend_op *opline, int from, int to, uint32_t lineno, const context *ctx) {
 	ZEND_ASSERT(from >= 0 && to >= 0);
 	ZEND_ASSERT(from != to);
 	opline->opcode = ZEND_PHI_ASSIGN;
-	opline->op1_type = to < op_array->last_var ? IS_CV : IS_VAR;
+	opline->op1_type = to < ctx->new_num_vars ? IS_CV : IS_VAR;
 	opline->op1.var = NUM_VAR(to);
-	opline->op2_type = from < op_array->last_var ? IS_CV : IS_VAR;
+	opline->op2_type = from < ctx->new_num_vars ? IS_CV : IS_VAR;
 	opline->op2.var = NUM_VAR(from);
 	opline->result_type = IS_UNUSED;
 	opline->lineno = lineno;
@@ -355,7 +355,7 @@ static void pcopy_sequentialize(context *ctx, zend_op *opline, const pcopy *cpy,
 			zend_stack_del_top(ready);
 			//fprintf(stderr, "from %d (in %d) to %d\n", from, from_loc, to);
 
-			emit_assign(opline++, from_loc, to, lineno, ctx->op_array);
+			emit_assign(opline++, from_loc, to, lineno, ctx);
 			loc[from] = to;
 			if (from == from_loc && pred[from] >= 0) {
 				zend_stack_push(ready, &from);
@@ -363,9 +363,9 @@ static void pcopy_sequentialize(context *ctx, zend_op *opline, const pcopy *cpy,
 		}
 		if (elem->to == loc[elem->to]) {
 			/* Break cycle */
-			int extra_var = ctx->op_array->last_var + ctx->new_num_temps++;
+			int extra_var = ctx->new_num_vars++;
 			fprintf(stderr, "cycle\n");
-			emit_assign(opline++, elem->to, extra_var, lineno, ctx->op_array);
+			emit_assign(opline++, elem->to, extra_var, lineno, ctx);
 			loc[elem->to] = extra_var;
 			zend_stack_push(ready, &elem->to);
 		}
@@ -402,7 +402,7 @@ static void collect_pcopys(context *ctx) {
 			}
 		} else {
 			/* Ordinary, non-reference variables */
-			uint32_t var = ctx->op_array->last_var + ctx->new_num_temps++;
+			uint32_t var = ctx->new_num_vars++;
 			pcopy_add_elem(&ctx->blocks[phi->block].early, var, phi->var);
 
 			for (i = 0; i < cfg->blocks[phi->block].predecessors_count; i++) {
@@ -807,7 +807,48 @@ static void check_interferences(ssa_opt_ctx *ssa_ctx) {
 	}
 }
 
+static inline int num_predecessors(const zend_cfg *cfg, const zend_basic_block *block) {
+	int j, count = 0, *predecessors = &cfg->predecessors[block->predecessor_offset];
+	for (j = 0; j < block->predecessors_count; j++) {
+		if (predecessors[j] >= 0) {
+			count++;
+		}
+	}
+	return count;
+}
+
+static void count_critical_edges(ssa_opt_ctx *ctx) {
+	const zend_cfg *cfg = &ctx->ssa->cfg;
+	int i;
+	for (i = 0; i < cfg->blocks_count; i++) {
+		zend_basic_block *block = &cfg->blocks[i];
+		if (!(block->flags & ZEND_BB_REACHABLE)) {
+			continue;
+		}
+
+		if (block->successors[1] < 0) {
+			/* Successor edge can't be critical if there's only one */
+			if (block->successors[0] >= 0) {
+				OPT_STAT(tmp2)++;
+			}
+			continue;
+		}
+
+		if (num_predecessors(cfg, &cfg->blocks[block->successors[0]]) != 1) {
+			OPT_STAT(tmp)++;
+		} else {
+			OPT_STAT(tmp2)++;
+		}
+		if (num_predecessors(cfg, &cfg->blocks[block->successors[1]]) != 1) {
+			OPT_STAT(tmp)++;
+		} else {
+			OPT_STAT(tmp2)++;
+		}
+	}
+}
+
 void ssa_optimize_destroy_ssa(ssa_opt_ctx *ctx) {
 	check_interferences(ctx); 
+	count_critical_edges(ctx);
 	ssa_destroy(ctx);
 }
