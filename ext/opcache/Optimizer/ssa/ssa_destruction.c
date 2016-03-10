@@ -50,6 +50,7 @@ typedef struct {
 	uint32_t new_num_vars;
 	uint32_t new_num_temps;
 	uint32_t num_extra_vars;
+	uint32_t num_groups;
 	int tmp_var_offset;
 } context;
 
@@ -253,6 +254,7 @@ static void coalesce_vars(context *ctx) {
 	for (i = 0; i < ssa->vars_count; i++) {
 		zend_ssa_var *var = &ssa->vars[i];
 		ctx->groups[i].next = -1;
+		ctx->groups[i].cv = -1;
 
 		if (var->var >= op_array->last_var) {
 			/* We're only interested in CVs */
@@ -372,7 +374,7 @@ static void free_block_pcopies(context *ctx) {
 static void emit_assign(
 		zend_op *opline, int from, int to, uint32_t lineno, const context *ctx) {
 	ZEND_ASSERT(from >= 0 && to >= 0);
-	ZEND_ASSERT(from != to);
+	//ZEND_ASSERT(from != to);
 	opline->opcode = ZEND_PHI_ASSIGN;
 	opline->op1_type = to < ctx->new_num_vars ? IS_CV : IS_VAR;
 	opline->op1.var = NUM_VAR(to);
@@ -475,10 +477,12 @@ static void collect_pcopies(context *ctx) {
 			}
 		}
 	} FOREACH_PHI_END();
+}
 
 #if DEBUG
+static void debug_dump_pcopies(context *ctx) {
 	int i, j;
-	for (i = 0; i < cfg->blocks_count; i++) {
+	for (i = 0; i < ctx->ssa->cfg.blocks_count; i++) {
 		const block_info *info = &ctx->blocks[i];
 		if (info->early.num_elems) {
 			fprintf(stderr, "BB%d early: ", i);
@@ -497,8 +501,8 @@ static void collect_pcopies(context *ctx) {
 			fprintf(stderr, "\n");
 		}
 	}
-#endif
 }
+#endif
 
 static int count_groups(context *ctx) {
 	int i, count = 0;
@@ -522,6 +526,8 @@ static void assign_cvs_to_ssa_vars(context *ctx) {
 	/* Assign argument CVs first, as they must stay the same */
 	for (i = 0; i < op_array->num_args; i++) {
 		vars[j] = zend_string_copy(op_array->vars[j]);
+		/*fprintf(stderr, "Alloc CV%d($%s) to SSA %d\n",
+			j, ZSTR_VAL(vars[j]), op_array->last_var + i);*/
 		groups[groups[op_array->last_var + i].min].cv = j++;
 	}
 
@@ -529,6 +535,7 @@ static void assign_cvs_to_ssa_vars(context *ctx) {
 	if (op_array->this_var != (uint32_t) -1) {
 		int this_var = VAR_NUM(op_array->this_var);
 		vars[j] = zend_string_copy(op_array->vars[this_var]);
+		//fprintf(stderr, "Alloc CV%d($%s) to SSA %d\n", j, ZSTR_VAL(vars[j]), this_var);
 		groups[this_var].cv = j;
 		op_array->this_var = NUM_VAR(j);
 		j++;
@@ -541,6 +548,7 @@ static void assign_cvs_to_ssa_vars(context *ctx) {
 		}
 
 		vars[j] = zend_string_copy(op_array->vars[ssa->vars[i].var]);
+		//fprintf(stderr, "Alloc CV%d($%s) to SSA %d\n", j, ZSTR_VAL(vars[j]), i);
 		groups[i].cv = j++;
 	}
 
@@ -555,6 +563,7 @@ static void assign_cvs_to_ssa_vars(context *ctx) {
 		var->var = groups[groups[i].min].cv;
 	}
 
+	ZEND_ASSERT(j == num_groups);
 	for (; j < new_num_cvs; j++) {
 		vars[j] = zend_long_to_str(j - num_groups);
 	}
@@ -564,6 +573,7 @@ static void assign_cvs_to_ssa_vars(context *ctx) {
 	}
 
 	// TODO still used by assignment emission in pcopy sequentialization
+	ctx->num_groups = num_groups;
 	ctx->new_num_vars = new_num_cvs;
 	ctx->tmp_var_offset = new_num_cvs - op_array->last_var;
 
@@ -580,8 +590,7 @@ static inline int get_cv(const context *ctx, int ssa_var) {
 	if (ssa_var < ssa->vars_count) {
 		return ssa->vars[ssa_var].var;
 	} else {
-		// TODO The var count state management is very ugly
-		return ssa_var - ssa->vars_count + ctx->new_num_vars - ctx->tmp_var_offset;
+		return ssa_var - ssa->vars_count + ctx->num_groups;
 	}
 }
 
@@ -864,9 +873,17 @@ static void insert_pcopies(context *ctx) {
 	ctx->num_extra_vars = 0;
 	collect_pcopies(ctx);
 
+#if DEBUG
+	debug_dump_pcopies(ctx);
+#endif
+
 	ctx->new_num_vars = 0;
 	assign_cvs_to_ssa_vars(ctx);
 	convert_pcopies_to_cvs(ctx);
+
+#if DEBUG
+	debug_dump_pcopies(ctx);
+#endif
 
 	ctx->shiftlist = zend_arena_alloc(&ctx->arena, sizeof(int) * op_array->last);
 	compute_shiftlist(ctx);
