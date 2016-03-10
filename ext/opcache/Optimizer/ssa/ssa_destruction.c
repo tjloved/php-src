@@ -100,9 +100,9 @@ static int compute_dominance_preorder_recursive(context *ctx, int num, int block
 	}
 	return num;
 }
-static void compute_dominance_preorder(context *ctx, ssa_opt_ctx *ssa_ctx) {
+static void compute_dominance_preorder(context *ctx) {
 	int i;
-	for (i = 0; i < ssa_ctx->op_array->last_var; i++) {
+	for (i = 0; i < ctx->op_array->last_var; i++) {
 		ctx->predom[i] = i;
 	}
 	compute_dominance_preorder_recursive(ctx, i, 0);
@@ -239,6 +239,54 @@ static inline void try_merge(context *ctx, int a, int b) {
 	}
 
 	merge_groups(ctx, a, b);
+}
+
+static void coalesce_vars(context *ctx) {
+	const zend_ssa *ssa = ctx->ssa;
+	const zend_op_array *op_array = ctx->op_array;
+	zend_ssa_phi *phi;
+	int i;
+
+	/* Start with identity groups */
+	for (i = 0; i < ssa->vars_count; i++) {
+		zend_ssa_var *var = &ssa->vars[i];
+		ctx->groups[i].next = -1;
+		if (var->definition >= 0 || var->definition_phi) {
+			ctx->groups[i].min = i;
+		} else {
+			ctx->groups[i].min = -1;
+		}
+	}
+
+	FOREACH_PHI(phi) {
+		int source;
+		FOREACH_PHI_SOURCE(phi, source) {
+			try_merge(ctx, phi->ssa_var, source);
+		} FOREACH_PHI_SOURCE_END();
+	} FOREACH_PHI_END();
+
+	for (i = 0; i < op_array->last; i++) {
+		zend_ssa_op *ssa_op = &ssa->ops[i];
+		if (ssa_op->result_use >= 0 && ssa_op->result_def >= 0) {
+			try_merge(ctx, ssa_op->result_use, ssa_op->result_def);
+		}
+		if (ssa_op->op1_use >= 0 && ssa_op->op1_def >= 0) {
+			try_merge(ctx, ssa_op->op1_use, ssa_op->op1_def);
+		}
+		if (ssa_op->op2_use >= 0 && ssa_op->op2_def >= 0) {
+			try_merge(ctx, ssa_op->op2_use, ssa_op->op2_def);
+		}
+	}
+
+	for (i = 0; i < ssa->vars_count; i++) {
+		if (ctx->groups[i].min != i) {
+			continue;
+		}
+
+		if (group_has_interference(ctx, i)) {
+			fprintf(stderr, "Interference in group %d\n", i);
+		}
+	}
 }
 
 static void remove_essa_pis(zend_ssa *ssa) {
@@ -681,7 +729,16 @@ static void add_extra_vars(context *ctx) {
 }
 
 static void insert_pcopys(context *ctx) {
+	zend_ssa *ssa = ctx->ssa;
 	zend_op_array *op_array = ctx->op_array;
+
+	ctx->predom = zend_arena_alloc(&ctx->arena, sizeof(int) * ssa->vars_count);
+	compute_dominance_preorder(ctx);
+
+	ctx->groups = zend_arena_alloc(&ctx->arena, sizeof(group) * ssa->vars_count);
+	coalesce_vars(ctx);
+
+	ctx->blocks = zend_arena_alloc(&ctx->arena, sizeof(block_info) * ssa->cfg.blocks_count);
 	init_block_pcopys(ctx);
 
 	ctx->new_num_vars = op_array->last_var;
@@ -711,68 +768,15 @@ static void insert_pcopys(context *ctx) {
 }
 
 static void ssa_destroy(ssa_opt_ctx *ssa_ctx) {
-	zend_ssa *ssa = ssa_ctx->ssa;
-	zend_op_array *op_array = ssa_ctx->op_array;
-	zend_ssa_phi *phi;
-	int i;
-
 	context ctx;
 	ctx.arena = ssa_ctx->opt_ctx->arena;
-	ctx.op_array = op_array;
-	ctx.ssa = ssa;
+	ctx.op_array = ssa_ctx->op_array;
+	ctx.ssa = ssa_ctx->ssa;
 	ctx.info = ssa_ctx->cfg_info;
 	ctx.liveness = ssa_ctx->liveness;
-	ctx.predom = zend_arena_alloc(&ssa_ctx->opt_ctx->arena, sizeof(int) * ssa->vars_count);
-	ctx.groups = zend_arena_alloc(&ssa_ctx->opt_ctx->arena, sizeof(group) * ssa->vars_count);
-	ctx.blocks = zend_arena_alloc(&ssa_ctx->opt_ctx->arena,
-			sizeof(block_info) * ssa->cfg.blocks_count);
 	zend_stack_init(&ctx.stack, sizeof(int));
 
-	remove_essa_pis(ssa);
-
-	compute_dominance_preorder(&ctx, ssa_ctx);
-
-	/* Start with identity groups */
-	for (i = 0; i < ssa->vars_count; i++) {
-		zend_ssa_var *var = &ssa->vars[i];
-		ctx.groups[i].next = -1;
-		if (var->definition >= 0 || var->definition_phi) {
-			ctx.groups[i].min = i;
-		} else {
-			ctx.groups[i].min = -1;
-		}
-	}
-
-	FOREACH_PHI(phi) {
-		int source;
-		FOREACH_PHI_SOURCE(phi, source) {
-			try_merge(&ctx, phi->ssa_var, source);
-		} FOREACH_PHI_SOURCE_END();
-	} FOREACH_PHI_END();
-
-	for (i = 0; i < op_array->last; i++) {
-		zend_ssa_op *ssa_op = &ssa->ops[i];
-		if (ssa_op->result_use >= 0 && ssa_op->result_def >= 0) {
-			try_merge(&ctx, ssa_op->result_use, ssa_op->result_def);
-		}
-		if (ssa_op->op1_use >= 0 && ssa_op->op1_def >= 0) {
-			try_merge(&ctx, ssa_op->op1_use, ssa_op->op1_def);
-		}
-		if (ssa_op->op2_use >= 0 && ssa_op->op2_def >= 0) {
-			try_merge(&ctx, ssa_op->op2_use, ssa_op->op2_def);
-		}
-	}
-
-	for (i = 0; i < ssa->vars_count; i++) {
-		if (ctx.groups[i].min != i) {
-			continue;
-		}
-
-		if (group_has_interference(&ctx, i)) {
-			fprintf(stderr, "Interference in group %d\n", i);
-		}
-	}
-
+	remove_essa_pis(ctx.ssa);
 	insert_pcopys(&ctx);
 
 	zend_stack_destroy(&ctx.stack);
