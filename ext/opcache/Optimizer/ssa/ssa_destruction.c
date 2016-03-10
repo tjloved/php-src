@@ -525,12 +525,21 @@ static void assign_cvs_to_ssa_vars(context *ctx) {
 		groups[groups[op_array->last_var + i].min].cv = j++;
 	}
 
+	/* Explicitly handle $this, so we can update this_var */
+	if (op_array->this_var != (uint32_t) -1) {
+		int this_var = VAR_NUM(op_array->this_var);
+		vars[j] = zend_string_copy(op_array->vars[this_var]);
+		groups[this_var].cv = j;
+		op_array->this_var = NUM_VAR(j);
+		j++;
+	}
+
 	/* Assign CVs for all other groups */
 	for (i = 0; i < ssa->vars_count; i++) {
-		int min = groups[i].min;
-		if (min != i || groups[min].cv != -1) {
+		if (groups[i].min != i || groups[i].cv != -1) {
 			continue;
 		}
+
 		vars[j] = zend_string_copy(op_array->vars[ssa->vars[i].var]);
 		groups[i].cv = j++;
 	}
