@@ -396,6 +396,15 @@ zend_bool var_dominates(
 		if (var_b->definition_phi) {
 			return 0;
 		}
+
+		if (var_a->definition < 0) {
+			/* We just define an earlier implicit var to dominate a later one */
+			if (var_b->definition < 0) {
+				return var_a < var_b;
+			}
+			return 1;
+		}
+
 		if (var_a->definition == var_b->definition) {
 			/* Very crazy case where one op defines the same variable twice -- in this case the
 			 * second definition wins */
