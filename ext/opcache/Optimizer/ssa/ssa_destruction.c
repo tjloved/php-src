@@ -262,7 +262,8 @@ static void coalesce_vars(context *ctx) {
 			continue;
 		}
 
-		if (var->definition >= 0 || var->definition_phi || i < op_array->last_var) {
+		if (var->definition >= 0 || var->definition_phi
+				|| (i < op_array->last_var && (var->use_chain >= 0 || var->phi_use_chain))) {
 			/* Start with identity groups */
 			ctx->groups[i].min = i;
 		} else {
