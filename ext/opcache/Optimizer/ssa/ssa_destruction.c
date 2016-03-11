@@ -514,6 +514,13 @@ static int count_groups(context *ctx) {
 	return count;
 }
 
+static inline void map_cv(zend_string **vars, uint32_t *new_this_var, const zend_op_array *op_array, int to, int from) {
+	vars[to] = zend_string_copy(op_array->vars[from]);
+	if (op_array->this_var == NUM_VAR(from)) {
+		*new_this_var = NUM_VAR(to);
+	}
+}
+
 static void assign_cvs_to_ssa_vars(context *ctx) {
 	zend_ssa *ssa = ctx->ssa;
 	zend_op_array *op_array = ctx->op_array;
@@ -521,24 +528,15 @@ static void assign_cvs_to_ssa_vars(context *ctx) {
 	int num_groups = count_groups(ctx);
 	int new_num_cvs = num_groups + ctx->num_extra_vars;
 	zend_string **vars = emalloc(sizeof(zend_string *) * new_num_cvs);
+	uint32_t new_this_var = (uint32_t) - 1;
 	int i, j = 0;
 
 	/* Assign argument CVs first, as they must stay the same */
 	for (i = 0; i < op_array->num_args; i++) {
-		vars[j] = zend_string_copy(op_array->vars[j]);
+		map_cv(vars, &new_this_var, op_array, j, j);
 		/*fprintf(stderr, "Alloc CV%d($%s) to SSA %d\n",
 			j, ZSTR_VAL(vars[j]), op_array->last_var + i);*/
 		groups[groups[op_array->last_var + i].min].cv = j++;
-	}
-
-	/* Explicitly handle $this, so we can update this_var */
-	if (op_array->this_var != (uint32_t) -1) {
-		int this_var = VAR_NUM(op_array->this_var);
-		vars[j] = zend_string_copy(op_array->vars[this_var]);
-		//fprintf(stderr, "Alloc CV%d($%s) to SSA %d\n", j, ZSTR_VAL(vars[j]), this_var);
-		groups[this_var].cv = j;
-		op_array->this_var = NUM_VAR(j);
-		j++;
 	}
 
 	/* Assign CVs for all other groups */
@@ -547,7 +545,7 @@ static void assign_cvs_to_ssa_vars(context *ctx) {
 			continue;
 		}
 
-		vars[j] = zend_string_copy(op_array->vars[ssa->vars[i].var]);
+		map_cv(vars, &new_this_var, op_array, j, ssa->vars[i].var);
 		//fprintf(stderr, "Alloc CV%d($%s) to SSA %d\n", j, ZSTR_VAL(vars[j]), i);
 		groups[i].cv = j++;
 	}
@@ -580,6 +578,7 @@ static void assign_cvs_to_ssa_vars(context *ctx) {
 	efree(op_array->vars);
 	op_array->vars = vars;
 	op_array->last_var = new_num_cvs;
+	op_array->this_var = new_this_var;
 
 	// TODO Make sure we never hit VAR phis
 	// TODO new_num_vars unused
