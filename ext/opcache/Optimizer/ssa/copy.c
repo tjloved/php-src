@@ -142,19 +142,25 @@ static int try_propagate_cv_assignment(ssa_opt_ctx *ctx, zend_op *opline, zend_s
 		if (use_op->op1_use == lhs_var_num) {
 			use_opline->op1.var = NUM_VAR(rhs_var->var);
 			use_opline->op1_type = IS_CV;
+			set_op1_use(ssa, use_op, rhs_var_num);
 		}
 		if (use_op->op2_use == lhs_var_num) {
 			use_opline->op2.var = NUM_VAR(rhs_var->var);
 			use_opline->op2_type = IS_CV;
+			set_op2_use(ssa, use_op, rhs_var_num);
 		}
 		if (use_op->result_use == lhs_var_num) {
 			use_opline->result.var = NUM_VAR(rhs_var->var);
 			use_opline->result_type = IS_CV;
+			set_result_use(ssa, use_op, rhs_var_num);
 		}
 	} FOREACH_USE_END();
 
+	/* All remaining uses must be in noval phis, change them to the previous LHS num */
+	ZEND_ASSERT(lhs_var->use_chain < 0);
+	rename_var_uses(ssa, lhs_var_num, old_lhs_var_num);
+
 	/* Remove assignment instruction */
-	rename_var_uses(ssa, lhs_var_num, rhs_var_num);
 	if (opline->opcode == ZEND_ASSIGN) {
 		remove_op1_def(ssa, ssa_op);
 	} else {
@@ -242,9 +248,9 @@ void try_propagate_cv_tmp_assignment(
 		ssa_opt_ctx *ctx, zend_op *opline, zend_ssa_op *ssa_op, int op_num) {
 	zend_ssa *ssa = ctx->ssa;
 	zend_op_array *op_array = ctx->op_array;
-	int lhs_var_num = ssa_op->op1_def;
-	zend_ssa_var *rhs_var = &ssa->vars[ssa_op->op2_use];
-	zend_ssa_var *lhs_var = &ssa->vars[ssa_op->op1_def];
+	int lhs_var_num = ssa_op->op1_def, rhs_var_num = ssa_op->op2_use;
+	zend_ssa_var *rhs_var = &ssa->vars[rhs_var_num];
+	zend_ssa_var *lhs_var = &ssa->vars[lhs_var_num];
 	int use;
 	zend_basic_block *block;
 	zend_bool found_use = 0;
@@ -253,12 +259,12 @@ void try_propagate_cv_tmp_assignment(
 		return;
 	}
 
-	if (ssa->var_info[ssa_op->op2_use].type & MAY_BE_REF) {
+	if (ssa->var_info[rhs_var_num].type & MAY_BE_REF) {
 		/* The assignment will deref the value. */
 		return;
 	}
 
-	if (!ctx->reorder_dtor_effects && (ssa->var_info[ssa_op->op2_use].type & MAY_HAVE_DTOR)) {
+	if (!ctx->reorder_dtor_effects && (ssa->var_info[rhs_var_num].type & MAY_HAVE_DTOR)) {
 		/* Dropping the assignment might shorten the RHS lifetime */
 		return;
 	}
@@ -316,17 +322,22 @@ void try_propagate_cv_tmp_assignment(
 		zend_op *use_opline = &op_array->opcodes[use];
 		rename_improper_use(ssa, use_opline, use_op, ssa_op->op1_use, lhs_var_num);
 		if (use_op->op1_use == lhs_var_num) {
+			set_op1_use(ssa, use_op, rhs_var_num);
 			COPY_NODE(use_opline->op1, opline->op2);
 			if (use_opline->opcode == ZEND_SEND_VAR && use_opline->op1_type == IS_TMP_VAR) {
 				use_opline->opcode = ZEND_SEND_VAL;
 			}
 		} else if (use_op->op2_use == lhs_var_num) {
+			set_op2_use(ssa, use_op, rhs_var_num);
 			COPY_NODE(use_opline->op2, opline->op2);
 		}
 	} FOREACH_USE_END();
 
+	/* All remaining uses must be in noval phis, change them to the previous LHS num */
+	ZEND_ASSERT(lhs_var->use_chain < 0);
+	rename_var_uses(ssa, lhs_var_num, ssa_op->op1_use);
+
 	/* Remove assignment */
-	rename_var_uses(ssa, lhs_var_num, ssa_op->op2_use);
 	remove_op1_def(ssa, ssa_op);
 	remove_instr(ssa, opline, ssa_op);
 

@@ -258,6 +258,9 @@ int ssa_verify_integrity(zend_ssa *ssa, const char *extra) {
 			if (!is_in_phi_use_chain(ssa, source, phi)) {
 				FAIL(VARFMT " not in phi use chain of %d\n", VAR(phi->ssa_var), source);
 			}
+			if (ssa->vars[source].var != ssa->vars[phi->ssa_var].var) {
+				FAIL(VARFMT " source of phi for " VARFMT "\n", VAR(source), VAR(phi->ssa_var));
+			}
 		} FOREACH_PHI_SOURCE_END();
 		if (ssa->vars[phi->ssa_var].definition_phi != phi) {
 			FAIL(VARFMT " does not define this phi\n", VAR(phi->ssa_var));
