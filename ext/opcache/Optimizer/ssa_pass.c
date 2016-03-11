@@ -364,12 +364,15 @@ static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) 
 
 	debug_dump(op_array, &info->ssa, "after SSA pass", 1);
 
-	ssa_optimize_destroy_ssa(&ssa_ctx);
+	//ssa_optimize_destroy_ssa(&ssa_ctx);
 	ssa_optimize_compact_vars(&ssa_ctx);
 
 	if (should_dump(op_array, 512)) {
 		/* Rebuild the CFG, so SSA destruction doesn't have to maintain it */
 		if (zend_build_cfg(&ctx->arena, op_array, 0, &info->ssa.cfg, &info->flags) != SUCCESS) {
+			return;
+		}
+		if (zend_cfg_build_predecessors(&ctx->arena, &info->ssa.cfg) != SUCCESS) {
 			return;
 		}
 		zend_dump_op_array(op_array, ZEND_DUMP_CFG, "after SSA finalization", &info->ssa.cfg);
