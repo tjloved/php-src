@@ -364,7 +364,7 @@ static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) 
 
 	debug_dump(op_array, &info->ssa, "after SSA pass", 1);
 
-	//ssa_optimize_destroy_ssa(&ssa_ctx);
+	ssa_optimize_destroy_ssa(&ssa_ctx);
 	ssa_optimize_compact_vars(&ssa_ctx);
 
 	if (should_dump(op_array, 512)) {

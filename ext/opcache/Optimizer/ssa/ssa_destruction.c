@@ -459,6 +459,7 @@ static void collect_pcopies(context *ctx) {
 						pcopy_add_elem(
 							&ctx->blocks[predecessors[i]].late,
 							phi->sources[i], phi->ssa_var);
+						OPT_STAT(tmp3)++;
 					}
 				}
 			}
@@ -470,6 +471,7 @@ static void collect_pcopies(context *ctx) {
 					pcopy_add_elem(
 						&ctx->blocks[predecessors[i]].late,
 						phi->sources[i], phi->ssa_var);
+					OPT_STAT(tmp3)++;
 				}
 			}
 		}
