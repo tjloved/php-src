@@ -374,7 +374,7 @@ static void free_block_pcopies(context *ctx) {
 static void emit_assign(
 		zend_op *opline, int from, int to, uint32_t lineno, const context *ctx) {
 	ZEND_ASSERT(from >= 0 && to >= 0);
-	//ZEND_ASSERT(from != to);
+	ZEND_ASSERT(from != to);
 	opline->opcode = ZEND_PHI_ASSIGN;
 	opline->op1_type = to < ctx->new_num_vars ? IS_CV : IS_VAR;
 	opline->op1.var = NUM_VAR(to);
@@ -455,8 +455,7 @@ static void collect_pcopies(context *ctx) {
 			 * insert copies if one of the source operands is a non-ref. */
 			for (i = 0; i < cfg->blocks[phi->block].predecessors_count; i++) {
 				if (phi->sources[i] >= 0 && !(ssa->var_info[phi->sources[i]].type & MAY_BE_REF)) {
-					// TODO
-					if (ssa->vars[phi->sources[i]].var != phi->var) {
+					if (ctx->groups[phi->sources[i]].min != ctx->groups[phi->ssa_var].min) {
 						pcopy_add_elem(
 							&ctx->blocks[predecessors[i]].late,
 							phi->sources[i], phi->ssa_var);
@@ -465,14 +464,12 @@ static void collect_pcopies(context *ctx) {
 			}
 		} else {
 			/* Ordinary, non-reference variables */
-			uint32_t phi_var = ssa->vars_count + ctx->num_extra_vars++;
-			pcopy_add_elem(&ctx->blocks[phi->block].early, phi_var, phi->ssa_var);
-
 			for (i = 0; i < cfg->blocks[phi->block].predecessors_count; i++) {
-				if (phi->sources[i] >= 0) {
+				if (phi->sources[i] >= 0
+						&& ctx->groups[phi->sources[i]].min != ctx->groups[phi->ssa_var].min) {
 					pcopy_add_elem(
 						&ctx->blocks[predecessors[i]].late,
-						phi->sources[i], phi_var);
+						phi->sources[i], phi->ssa_var);
 				}
 			}
 		}
