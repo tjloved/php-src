@@ -116,6 +116,47 @@ void ssa_optimize_type_specialization(ssa_opt_ctx *ctx) {
 					OPT_STAT(type_spec_arithm)++;
 				}
 				break;
+			case ZEND_IS_SMALLER:
+				if (opline->op1_type == IS_CONST && opline->op2_type == IS_CONST) {
+					break;
+				}
+				normalize_op1_type(op_array, opline, &t1, t2);
+				normalize_op2_type(op_array, opline, t1, &t2);
+				if (MUST_BE(t1, MAY_BE_LONG) && MUST_BE(t2, MAY_BE_LONG)) {
+					opline->opcode = ZEND_IS_SMALLER_INT;;
+					OPT_STAT(type_spec_arithm)++;
+				} else if (MUST_BE(t1, MAY_BE_DOUBLE) && MUST_BE(t2, MAY_BE_DOUBLE)) {
+					opline->opcode = ZEND_IS_SMALLER_DOUBLE;
+					OPT_STAT(type_spec_arithm)++;
+				}
+				break;
+			case ZEND_IS_SMALLER_OR_EQUAL:
+				if (opline->op1_type == IS_CONST && opline->op2_type == IS_CONST) {
+					break;
+				}
+				if (MUST_BE(t1, MAY_BE_LONG) && MUST_BE(t2, MAY_BE_LONG)) {
+					/* Convert to IS_SMALLER if one operand is constant */
+					if (opline->op2_type == IS_CONST) {
+						zval *op2 = CT_CONSTANT_EX(op_array, opline->op2.constant);
+						if (Z_LVAL_P(op2) == ZEND_LONG_MAX) {
+							break;
+						}
+
+						Z_LVAL_P(op2)++;
+						opline->opcode = ZEND_IS_SMALLER_INT;
+						OPT_STAT(type_spec_arithm)++;
+					} else if (opline->op1_type == IS_CONST) {
+						zval *op1 = CT_CONSTANT_EX(op_array, opline->op1.constant);
+						if (Z_LVAL_P(op1) == ZEND_LONG_MIN) {
+							break;
+						}
+
+						Z_LVAL_P(op1)--;
+						opline->opcode = ZEND_IS_SMALLER_INT;
+						OPT_STAT(type_spec_arithm)++;
+					}
+				}
+				break;
 			case ZEND_PRE_INC:
 			case ZEND_PRE_DEC:
 				if (!RESULT_UNUSED(opline) || opline->op1_type != IS_CV

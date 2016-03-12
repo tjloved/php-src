@@ -253,6 +253,8 @@ END_EXTERN_C()
 #define ZEND_FETCH_THIS                      184
 #define ZEND_ISSET_ISEMPTY_THIS              186
 #define ZEND_PHI_ASSIGN                      190
+#define ZEND_IS_SMALLER_DOUBLE               191
+#define ZEND_IS_SMALLER_INT                  192
 #define ZEND_ADD_INT                         200
 #define ZEND_SUB_INT                         201
 #define ZEND_ADD_DOUBLE                      202
