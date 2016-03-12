@@ -141,14 +141,16 @@ void ssa_optimize_type_specialization(ssa_opt_ctx *ctx) {
 				break;
 			case ZEND_ASSIGN_ADD:
 				if (!RESULT_UNUSED(opline) || opline->op1_type != IS_CV
-						|| opline->extended_value != 0
-						|| !(MUST_BE(t1, MAY_BE_LONG) || MUST_BE(t1, MAY_BE_DOUBLE))) {
+						|| opline->extended_value != 0) {
 					break;
 				}
-				if (MUST_BE(t1, MAY_BE_LONG)) {
+				normalize_op2_type(op_array, opline, t1, &t2);
+				if (MUST_BE(t1, MAY_BE_LONG) && MUST_BE(t2, MAY_BE_LONG)) {
 					opline->opcode = ZEND_ADD_INT;
-				} else if (MUST_BE(t1, MAY_BE_DOUBLE)) {
+				} else if (MUST_BE(t1, MAY_BE_DOUBLE) && MUST_BE(t2, MAY_BE_DOUBLE)) {
 					opline->opcode = ZEND_ADD_DOUBLE;
+				} else {
+					break;
 				}
 				COPY_NODE(opline->result, opline->op1);
 				ssa_op->result_def = ssa_op->op1_def;
@@ -157,14 +159,16 @@ void ssa_optimize_type_specialization(ssa_opt_ctx *ctx) {
 				break;
 			case ZEND_ASSIGN_SUB:
 				if (!RESULT_UNUSED(opline) || opline->op1_type != IS_CV
-						|| opline->extended_value != 0
-						|| !(MUST_BE(t1, MAY_BE_LONG) || MUST_BE(t1, MAY_BE_DOUBLE))) {
+						|| opline->extended_value != 0) {
 					break;
 				}
-				if (MUST_BE(t1, MAY_BE_LONG)) {
+				normalize_op2_type(op_array, opline, t1, &t2);
+				if (MUST_BE(t1, MAY_BE_LONG) && MUST_BE(t2, MAY_BE_LONG)) {
 					opline->opcode = ZEND_SUB_INT;
-				} else if (MUST_BE(t1, MAY_BE_DOUBLE)) {
+				} else if (MUST_BE(t1, MAY_BE_DOUBLE) && MUST_BE(t2, MAY_BE_LONG)) {
 					opline->opcode = ZEND_SUB_DOUBLE;
+				} else {
+					break;
 				}
 				COPY_NODE(opline->result, opline->op1);
 				ssa_op->result_def = ssa_op->op1_def;
