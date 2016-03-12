@@ -86,28 +86,6 @@ int zend_optimizer_get_persistent_constant(zend_string *name, zval *result, int 
 		convert_to_string((v)); \
 	}
 
-static inline zend_bool can_smart_branch(zend_op *opline) {
-	switch (opline->opcode) {
-		case ZEND_IS_IDENTICAL:
-		case ZEND_IS_NOT_IDENTICAL:
-		case ZEND_IS_EQUAL:
-		case ZEND_IS_NOT_EQUAL:
-		case ZEND_IS_SMALLER:
-		case ZEND_IS_SMALLER_OR_EQUAL:
-		case ZEND_CASE:
-		case ZEND_ISSET_ISEMPTY_VAR:
-		case ZEND_ISSET_ISEMPTY_STATIC_PROP:
-		case ZEND_ISSET_ISEMPTY_DIM_OBJ:
-		case ZEND_ISSET_ISEMPTY_PROP_OBJ:
-		case ZEND_INSTANCEOF:
-		case ZEND_TYPE_CHECK:
-		case ZEND_DEFINED:
-			return 1;
-		default:
-			return 0;
-	}
-}
-
 static void strip_leading_nops(zend_op_array *op_array, zend_basic_block *b)
 {
 	zend_op *opcodes = op_array->opcodes;
@@ -139,8 +117,7 @@ static void strip_nops(zend_op_array *op_array, zend_basic_block *b)
 	/* strip the inside NOPs */
 	i = j = b->start + 1;
 	while (i < b->start + b->len) {
-		zend_op *opline = &op_array->opcodes[i];
-		if (opline->opcode != ZEND_NOP) {
+		if (op_array->opcodes[i].opcode != ZEND_NOP) {
 			if (i != j) {
 				op_array->opcodes[j] = op_array->opcodes[i];
 			}
