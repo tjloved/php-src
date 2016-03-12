@@ -8039,62 +8039,57 @@ ZEND_VM_HANDLER(51, ZEND_MAKE_REF, VAR|CV, UNUSED)
 	ZEND_VM_NEXT_OPCODE();
 }
 
-ZEND_VM_HANDLER(200, ZEND_ADD_INT, CONST|TMPVAR|CV, CONST|TMPVAR|CV)
+ZEND_VM_HANDLER(200, ZEND_ADD_INT, CONST|TMPVARCV, CONST|TMPVARCV)
 {
 	USE_OPLINE
-	zval *op1, *op2, *result;
-	op1 = OP1_TYPE == IS_CONST ? EX_CONSTANT(opline->op1) : EX_VAR(opline->op1.var);
-	op2 = OP2_TYPE == IS_CONST ? EX_CONSTANT(opline->op2) : EX_VAR(opline->op2.var);
-	result = EX_VAR(opline->result.var);
+	zval *op1 = GET_OP1_ZVAL_PTR_UNDEF(BP_VAR_R);
+	zval *op2 = GET_OP2_ZVAL_PTR_UNDEF(BP_VAR_R);
+	zval *result = EX_VAR(opline->result.var);
 	fast_long_add_function(result, op1, op2);
 	ZEND_VM_NEXT_OPCODE();
 }
 
-ZEND_VM_HANDLER(201, ZEND_SUB_INT, CONST|TMPVAR|CV, CONST|TMPVAR|CV)
+ZEND_VM_HANDLER(201, ZEND_SUB_INT, CONST|TMPVARCV, CONST|TMPVARCV)
 {
 	USE_OPLINE
-	zval *op1, *op2, *result;
-	op1 = OP1_TYPE == IS_CONST ? EX_CONSTANT(opline->op1) : EX_VAR(opline->op1.var);
-	op2 = OP2_TYPE == IS_CONST ? EX_CONSTANT(opline->op2) : EX_VAR(opline->op2.var);
-	result = EX_VAR(opline->result.var);
+	zval *op1 = GET_OP1_ZVAL_PTR_UNDEF(BP_VAR_R);
+	zval *op2 = GET_OP2_ZVAL_PTR_UNDEF(BP_VAR_R);
+	zval *result = EX_VAR(opline->result.var);
 	fast_long_sub_function(result, op1, op2);
 	ZEND_VM_NEXT_OPCODE();
 }
 
-ZEND_VM_HANDLER(202, ZEND_ADD_DOUBLE, CONST|TMPVAR|CV, CONST|TMPVAR|CV)
+ZEND_VM_HANDLER(202, ZEND_ADD_DOUBLE, CONST|TMPVARCV, CONST|TMPVARCV)
 {
 	USE_OPLINE
-	zval *op1, *op2, *result;
-	op1 = OP1_TYPE == IS_CONST ? EX_CONSTANT(opline->op1) : EX_VAR(opline->op1.var);
-	op2 = OP2_TYPE == IS_CONST ? EX_CONSTANT(opline->op2) : EX_VAR(opline->op2.var);
-	result = EX_VAR(opline->result.var);
+	zval *op1 = GET_OP1_ZVAL_PTR_UNDEF(BP_VAR_R);
+	zval *op2 = GET_OP2_ZVAL_PTR_UNDEF(BP_VAR_R);
+	zval *result = EX_VAR(opline->result.var);
 	ZVAL_DOUBLE(result, Z_DVAL_P(op1) + Z_DVAL_P(op2));
 	ZEND_VM_NEXT_OPCODE();
 }
 
-ZEND_VM_HANDLER(203, ZEND_SUB_DOUBLE, CONST|TMPVAR|CV, CONST|TMPVAR|CV)
+ZEND_VM_HANDLER(203, ZEND_SUB_DOUBLE, CONST|TMPVARCV, CONST|TMPVARCV)
 {
 	USE_OPLINE
-	zval *op1, *op2, *result;
-	op1 = OP1_TYPE == IS_CONST ? EX_CONSTANT(opline->op1) : EX_VAR(opline->op1.var);
-	op2 = OP2_TYPE == IS_CONST ? EX_CONSTANT(opline->op2) : EX_VAR(opline->op2.var);
-	result = EX_VAR(opline->result.var);
+	zval *op1 = GET_OP1_ZVAL_PTR_UNDEF(BP_VAR_R);
+	zval *op2 = GET_OP2_ZVAL_PTR_UNDEF(BP_VAR_R);
+	zval *result = EX_VAR(opline->result.var);
 	ZVAL_DOUBLE(result, Z_DVAL_P(op1) - Z_DVAL_P(op2));
 	ZEND_VM_NEXT_OPCODE();
 }
 
-ZEND_VM_HANDLER(204, ZEND_MUL_DOUBLE, CONST|TMPVAR|CV, CONST|TMPVAR|CV)
+ZEND_VM_HANDLER(204, ZEND_MUL_DOUBLE, CONST|TMPVARCV, CONST|TMPVARCV)
 {
 	USE_OPLINE
-	zval *op1, *op2, *result;
-	op1 = OP1_TYPE == IS_CONST ? EX_CONSTANT(opline->op1) : EX_VAR(opline->op1.var);
-	op2 = OP2_TYPE == IS_CONST ? EX_CONSTANT(opline->op2) : EX_VAR(opline->op2.var);
-	result = EX_VAR(opline->result.var);
+	zval *op1 = GET_OP1_ZVAL_PTR_UNDEF(BP_VAR_R);
+	zval *op2 = GET_OP2_ZVAL_PTR_UNDEF(BP_VAR_R);
+	zval *result = EX_VAR(opline->result.var);
 	ZVAL_DOUBLE(result, Z_DVAL_P(op1) * Z_DVAL_P(op2));
 	ZEND_VM_NEXT_OPCODE();
 }
 
-ZEND_VM_HANDLER(189, ZEND_FETCH_OBJ_R_FIXED, TMPVAR|UNUSED|THIS|CV, CONST, NUM)
+ZEND_VM_HANDLER(205, ZEND_FETCH_OBJ_R_FIXED, TMPVAR|UNUSED|THIS|CV, CONST, NUM)
 {
 	USE_OPLINE
 	zend_free_op free_op1;
