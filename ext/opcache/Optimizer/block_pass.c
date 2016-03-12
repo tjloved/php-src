@@ -86,47 +86,11 @@ int zend_optimizer_get_persistent_constant(zend_string *name, zval *result, int 
 		convert_to_string((v)); \
 	}
 
-static inline zend_bool can_smart_branch(zend_op *opline) {
-	switch (opline->opcode) {
-		case ZEND_IS_IDENTICAL:
-		case ZEND_IS_NOT_IDENTICAL:
-		case ZEND_IS_EQUAL:
-		case ZEND_IS_NOT_EQUAL:
-		case ZEND_IS_SMALLER:
-		case ZEND_IS_SMALLER_OR_EQUAL:
-		case ZEND_CASE:
-		case ZEND_ISSET_ISEMPTY_VAR:
-		case ZEND_ISSET_ISEMPTY_STATIC_PROP:
-		case ZEND_ISSET_ISEMPTY_DIM_OBJ:
-		case ZEND_ISSET_ISEMPTY_PROP_OBJ:
-		case ZEND_INSTANCEOF:
-		case ZEND_TYPE_CHECK:
-		case ZEND_DEFINED:
-			return 1;
-		default:
-			return 0;
-	}
-}
-
-/* Don't skip NOPs if it will result in a smart branch */
-static inline zend_bool can_skip_nop(zend_op_array *op_array, zend_op *opline) {
-	zend_op *end = op_array->opcodes + op_array->last;
-	if (opline == op_array->opcodes || !can_smart_branch(opline -1)) {
-		return 1;
-	}
-
-	while (opline < end && opline->opcode == ZEND_NOP) {
-		opline++;
-	}
-	return opline->opcode != ZEND_JMPZ && opline->opcode != ZEND_JMPNZ;
-}
-
 static void strip_leading_nops(zend_op_array *op_array, zend_basic_block *b)
 {
 	zend_op *opcodes = op_array->opcodes;
 
-	while (b->len > 0 && opcodes[b->start].opcode == ZEND_NOP
-			&& can_skip_nop(op_array, &opcodes[b->start])) {
+	while (b->len > 0 && opcodes[b->start].opcode == ZEND_NOP) {
 		b->start++;
 		b->len--;
 	}
@@ -144,8 +108,7 @@ static void strip_nops(zend_op_array *op_array, zend_basic_block *b)
 	/* strip the inside NOPs */
 	i = j = b->start + 1;
 	while (i < b->start + b->len) {
-		zend_op *opline = &op_array->opcodes[i];
-		if (opline->opcode != ZEND_NOP || !can_skip_nop(op_array, opline)) {
+		if (op_array->opcodes[i].opcode != ZEND_NOP) {
 			if (i != j) {
 				op_array->opcodes[j] = op_array->opcodes[i];
 			}
