@@ -75,7 +75,11 @@ void ssa_optimize_type_specialization(ssa_opt_ctx *ctx) {
 				normalize_op1_type(op_array, opline, &t1, t2);
 				normalize_op2_type(op_array, opline, t1, &t2);
 				if (MUST_BE(t1, MAY_BE_LONG) && MUST_BE(t2, MAY_BE_LONG)) {
-					opline->opcode = ZEND_ADD_INT;
+					if (MUST_BE(RES_INFO(), MAY_BE_LONG)) {
+						opline->opcode = ZEND_ADD_INT_NO_OVERFLOW;
+					} else {
+						opline->opcode = ZEND_ADD_INT;
+					}
 					OPT_STAT(type_spec_arithm)++;
 				} else if (MUST_BE(t1, MAY_BE_DOUBLE) && MUST_BE(t2, MAY_BE_DOUBLE)) {
 					opline->opcode = ZEND_ADD_DOUBLE;
@@ -164,7 +168,15 @@ void ssa_optimize_type_specialization(ssa_opt_ctx *ctx) {
 					break;
 				}
 				if (MUST_BE(t1, MAY_BE_LONG)) {
-					opline->opcode = opline->opcode == ZEND_PRE_INC ? ZEND_ADD_INT : ZEND_SUB_INT;
+					if (opline->opcode == ZEND_PRE_INC) {
+						if (MUST_BE(ssa->var_info[ssa_op->op1_def].type, MAY_BE_LONG)) {
+							opline->opcode = ZEND_ADD_INT_NO_OVERFLOW;
+						} else {
+							opline->opcode = ZEND_ADD_INT;
+						}
+					} else {
+						opline->opcode = ZEND_SUB_INT;
+					}
 					opline->op2_type = IS_CONST;
 					LITERAL_LONG(opline->op2, 1);
 				} else if (MUST_BE(t1, MAY_BE_DOUBLE)) {
@@ -187,7 +199,11 @@ void ssa_optimize_type_specialization(ssa_opt_ctx *ctx) {
 				}
 				normalize_op2_type(op_array, opline, t1, &t2);
 				if (MUST_BE(t1, MAY_BE_LONG) && MUST_BE(t2, MAY_BE_LONG)) {
-					opline->opcode = ZEND_ADD_INT;
+					if (MUST_BE(ssa->var_info[ssa_op->op1_def].type, MAY_BE_LONG)) {
+						opline->opcode = ZEND_ADD_INT_NO_OVERFLOW;
+					} else {
+						opline->opcode = ZEND_ADD_INT;
+					}
 				} else if (MUST_BE(t1, MAY_BE_DOUBLE) && MUST_BE(t2, MAY_BE_DOUBLE)) {
 					opline->opcode = ZEND_ADD_DOUBLE;
 				} else {
@@ -215,6 +231,14 @@ void ssa_optimize_type_specialization(ssa_opt_ctx *ctx) {
 				ssa_op->result_def = ssa_op->op1_def;
 				ssa_op->op1_def = -1;
 				OPT_STAT(type_spec_arithm)++;
+				break;
+			case ZEND_FETCH_DIM_R:
+				if (!MUST_BE(t1, MAY_BE_ARRAY) || opline->op1_type == IS_CONST) {
+					break;
+				}
+				if (MUST_BE(t2, MAY_BE_LONG)) {
+					opline->opcode = ZEND_FETCH_DIM_INT;
+				}
 				break;
 			//case ZEND_FETCH_DIM_R:
 			case ZEND_ASSIGN_DIM:
