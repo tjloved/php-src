@@ -222,7 +222,7 @@ void ssa_optimize_type_specialization(ssa_opt_ctx *ctx) {
 				normalize_op2_type(op_array, opline, t1, &t2);
 				if (MUST_BE(t1, MAY_BE_LONG) && MUST_BE(t2, MAY_BE_LONG)) {
 					opline->opcode = ZEND_SUB_INT;
-				} else if (MUST_BE(t1, MAY_BE_DOUBLE) && MUST_BE(t2, MAY_BE_LONG)) {
+				} else if (MUST_BE(t1, MAY_BE_DOUBLE) && MUST_BE(t2, MAY_BE_DOUBLE)) {
 					opline->opcode = ZEND_SUB_DOUBLE;
 				} else {
 					break;
