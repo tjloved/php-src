@@ -55,6 +55,9 @@ void ssa_optimize_type_specialization(ssa_opt_ctx *ctx) {
 					zval *op1 = CT_CONSTANT_EX(op_array, opline->op1.constant);
 					convert_to_double(op1);
 				}
+				if (!(t1 & MAY_BE_UNDEF) && !CAN_BE(t1, MAY_BE_REFCOUNTED)) {
+					opline->opcode = ZEND_MOV_UNCOUNTED;
+				}
 				break;
 			case ZEND_ASSIGN:
 				if (opline->op2_type == IS_CONST && MUST_BE(t2, MAY_BE_LONG)
