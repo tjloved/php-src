@@ -26,6 +26,7 @@ void ssa_optimize_type_specialization(ssa_opt_ctx *ctx);
 void ssa_optimize_object_specialization(ssa_opt_ctx *ctx);
 void ssa_optimize_compact_vars(ssa_opt_ctx *ctx);
 void ssa_optimize_destroy_ssa(ssa_opt_ctx *ctx);
+void ssa_optimize_misc(ssa_opt_ctx *ctx);
 
 int ssa_verify_integrity(zend_ssa *ssa, const char *extra);
 

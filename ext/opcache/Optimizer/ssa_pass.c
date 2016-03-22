@@ -355,6 +355,7 @@ static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) 
 	run_pass(&ssa_ctx, ssa_optimize_assign, "after assignment contraction", 256);
 
 	//ssa_optimize_cv_to_tmp(&ssa_ctx);
+	ssa_optimize_misc(&ssa_ctx);
 	ssa_optimize_type_specialization(&ssa_ctx);
 	ssa_optimize_object_specialization(&ssa_ctx);
 
