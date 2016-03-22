@@ -123,6 +123,17 @@ void ssa_optimize_type_specialization(ssa_opt_ctx *ctx) {
 					OPT_STAT(type_spec_arithm)++;
 				}
 				break;
+			case ZEND_DIV:
+				if (opline->op1_type == IS_CONST && opline->op2_type == IS_CONST) {
+					break;
+				}
+				normalize_op1_type(op_array, opline, &t1, t2);
+				normalize_op2_type(op_array, opline, t1, &t2);
+				if (MUST_BE(t1, MAY_BE_DOUBLE) && MUST_BE(t2, MAY_BE_DOUBLE)) {
+					opline->opcode = ZEND_DIV_DOUBLE;
+					OPT_STAT(type_spec_arithm)++;
+				}
+				break;
 			case ZEND_IS_SMALLER:
 				if (opline->op1_type == IS_CONST && opline->op2_type == IS_CONST) {
 					break;
