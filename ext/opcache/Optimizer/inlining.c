@@ -199,6 +199,25 @@ static zend_bool can_inline_from(
 	return can_inline_opcodes(op_array, rt_constants, 1);
 }
 
+static zend_bool can_inline_scope(zend_op_array *from, zend_op_array *into) {
+	if (!from->scope) {
+		/* Non-methods can always be inlined */
+		return 1;
+	}
+
+	if (into->scope != from->scope) {
+		/* Different scopes, can't inline for now */
+		return 0;
+	}
+
+	if (into->scope->ce_flags & ZEND_ACC_TRAIT) {
+		/* Scope in traits is not known */
+		return 0;
+	}
+
+	return 1;
+}
+
 static uint32_t num_returns(zend_op_array *op_array) {
 	uint32_t i, num = 0;
 	for (i = 0; i < op_array->last; i++) {
@@ -267,7 +286,7 @@ static zend_op *find_call_opline(zend_op *opline) {
 }
 
 /* RETURN_BY_REF and ASSIGN_REF check a u2 var flag, which will not be cleared if we use
- * inling, so prohibit inlining of calls used by these opcodes. */
+ * inlining, so prohibit inlining of calls used by these opcodes. */
 zend_bool used_in_ref_context(zend_op *opline) {
 	uint32_t var = opline->result.var;
 	zend_uchar var_type = opline->result_type;
@@ -288,11 +307,32 @@ static inline_info *find_inlinable_calls(zend_op_array *op_array, zend_optimizer
 	zend_op *end = opline + op_array->last;
 	inline_info *info_head = NULL, *info_tail = NULL;
 	for (; opline != end; opline++) {
+		zend_op_array *fbc = NULL;
+
+		/* Check for function call those target we can determine statically */
 		if (opline->opcode == ZEND_INIT_FCALL) {
 			zend_string *name = Z_STR(ZEND_OP2_LITERAL(opline));
-			zend_op_array *fbc = zend_hash_find_ptr(&ctx->script->function_table, name);
+			fbc = zend_hash_find_ptr(&ctx->script->function_table, name);
+		} else if (opline->opcode == ZEND_INIT_STATIC_METHOD_CALL
+				&& opline->op2_type == IS_CONST && Z_TYPE(ZEND_OP2_LITERAL(opline)) == IS_STRING) {
+			zend_class_entry *ce = NULL;
+			if (opline->op1_type == IS_CONST && Z_TYPE(ZEND_OP1_LITERAL(opline)) == IS_STRING) {
+				zend_string *class_name = Z_STR_P(&ZEND_OP1_LITERAL(opline) + 1);
+				ce = zend_hash_find_ptr(&ctx->script->class_table, class_name);
+			} else if (opline->op1_type == IS_UNUSED && op_array->scope
+					&& (opline->op1.num & ZEND_FETCH_CLASS_MASK) == ZEND_FETCH_CLASS_SELF) {
+				ce = op_array->scope;
+			}
+			if (ce) {
+				zend_string *func_name = Z_STR_P(&ZEND_OP2_LITERAL(opline) + 1);
+				fbc = zend_hash_find_ptr(&ce->function_table, func_name);
+			}
+		}
+
+		if (fbc) {
 			uint32_t num_args_passed = opline->extended_value;
-			if (fbc && should_inline(op_array, fbc)
+			if (should_inline(op_array, fbc)
+					&& can_inline_scope(fbc, op_array)
 					&& can_inline_from(fbc, num_args_passed, fbc != op_array)) {
 				inline_info *info;
 				zend_op *call_opline = find_call_opline(opline);
