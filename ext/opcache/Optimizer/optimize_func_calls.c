@@ -86,10 +86,26 @@ void zend_optimize_func_calls(zend_op_array *op_array, zend_optimizer_ctx *ctx)
 						call_stack[call].func = zend_hash_find_ptr(&ce->function_table, func_name);
 					}
 				}
+				call_stack[call].opline = opline;
+				call++;
+				break;
+			case ZEND_INIT_METHOD_CALL:
+				if (opline->op1_type == IS_UNUSED && ZEND_OP2_IS_CONST_STRING(opline)
+						&& op_array->scope && !(op_array->scope->ce_flags & ZEND_ACC_TRAIT)) {
+					zend_string *method_name = Z_STR_P(&ZEND_OP2_LITERAL(opline) + 1);
+					zend_function *fbc = zend_hash_find_ptr(
+						&op_array->scope->function_table, method_name);
+					if (fbc) {
+						if ((fbc->common.fn_flags & ZEND_ACC_FINAL)
+								|| ((fbc->common.fn_flags & ZEND_ACC_PRIVATE)
+									&& fbc->common.scope == op_array->scope)) {
+							call_stack[call].func = fbc;
+						}
+					}
+				}
 				/* break missing intentionally */
 			case ZEND_NEW:
 			case ZEND_INIT_DYNAMIC_CALL:
-			case ZEND_INIT_METHOD_CALL:
 			case ZEND_INIT_FCALL:
 			case ZEND_INIT_USER_CALL:
 				call_stack[call].opline = opline;
@@ -118,7 +134,8 @@ void zend_optimize_func_calls(zend_op_array *op_array, zend_optimizer_ctx *ctx)
 						literal_dtor(&op_array->literals[fcall->op2.constant + 2]);
 						fcall->op2.constant = fcall->op2.constant + 1;
 						opline->opcode = zend_get_call_op(ZEND_INIT_FCALL, call_stack[call].func);
-					} else if (fcall->opcode == ZEND_INIT_STATIC_METHOD_CALL) {
+					} else if (fcall->opcode == ZEND_INIT_STATIC_METHOD_CALL
+							|| fcall->opcode == ZEND_INIT_METHOD_CALL) {
 						/* We don't have specialized opcodes for this, do nothing */
 					} else {
 						ZEND_ASSERT(0);
