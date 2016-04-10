@@ -611,7 +611,6 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_DO_ICALL_SPEC_RETVAL_UNUSED_HA
 
 	ret = 0 ? EX_VAR(opline->result.var) : &retval;
 	ZVAL_NULL(ret);
-	Z_VAR_FLAGS_P(ret) = 0;
 
 	fbc->internal_function.handler(call, ret);
 
@@ -620,6 +619,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_DO_ICALL_SPEC_RETVAL_UNUSED_HA
 		EG(exception) || !call->func ||
 		!(call->func->common.fn_flags & ZEND_ACC_HAS_RETURN_TYPE) ||
 		zend_verify_internal_return_type(call->func, ret));
+	ZEND_ASSERT(!Z_ISREF_P(ret));
 #endif
 
 	EG(current_execute_data) = call->prev_execute_data;
@@ -658,7 +658,6 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_DO_ICALL_SPEC_RETVAL_USED_HAND
 
 	ret = 1 ? EX_VAR(opline->result.var) : &retval;
 	ZVAL_NULL(ret);
-	Z_VAR_FLAGS_P(ret) = 0;
 
 	fbc->internal_function.handler(call, ret);
 
@@ -667,6 +666,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_DO_ICALL_SPEC_RETVAL_USED_HAND
 		EG(exception) || !call->func ||
 		!(call->func->common.fn_flags & ZEND_ACC_HAS_RETURN_TYPE) ||
 		zend_verify_internal_return_type(call->func, ret));
+	ZEND_ASSERT(!Z_ISREF_P(ret));
 #endif
 
 	EG(current_execute_data) = call->prev_execute_data;
@@ -705,7 +705,6 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_DO_UCALL_SPEC_RETVAL_UNUSED_HA
 	if (0) {
 		ret = EX_VAR(opline->result.var);
 		ZVAL_NULL(ret);
-		Z_VAR_FLAGS_P(ret) = 0;
 	}
 
 	call->prev_execute_data = execute_data;
@@ -730,7 +729,6 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_DO_UCALL_SPEC_RETVAL_USED_HAND
 	if (1) {
 		ret = EX_VAR(opline->result.var);
 		ZVAL_NULL(ret);
-		Z_VAR_FLAGS_P(ret) = 0;
 	}
 
 	call->prev_execute_data = execute_data;
@@ -755,7 +753,6 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_DO_FCALL_BY_NAME_SPEC_RETVAL_U
 			if (EXPECTED(0)) {
 				ret = EX_VAR(opline->result.var);
 				zend_generator_create_zval(call, &fbc->op_array, ret);
-				Z_VAR_FLAGS_P(ret) = 0;
 			} else {
 				zend_vm_stack_free_args(call);
 			}
@@ -767,7 +764,6 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_DO_FCALL_BY_NAME_SPEC_RETVAL_U
 			if (0) {
 				ret = EX_VAR(opline->result.var);
 				ZVAL_NULL(ret);
-				Z_VAR_FLAGS_P(ret) = 0;
 			}
 
 			call->prev_execute_data = execute_data;
@@ -812,15 +808,16 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_DO_FCALL_BY_NAME_SPEC_RETVAL_U
 
 		ret = 0 ? EX_VAR(opline->result.var) : &retval;
 		ZVAL_NULL(ret);
-		Z_VAR_FLAGS_P(ret) = (fbc->common.fn_flags & ZEND_ACC_RETURN_REFERENCE) != 0 ? IS_VAR_RET_REF : 0;
 
 		fbc->internal_function.handler(call, ret);
 
 #if ZEND_DEBUG
-		ZEND_ASSERT(
-			EG(exception) || !call->func ||
-			!(call->func->common.fn_flags & ZEND_ACC_HAS_RETURN_TYPE) ||
-			zend_verify_internal_return_type(call->func, ret));
+		if (!EG(exception) && call->func) {
+			ZEND_ASSERT(!(call->func->common.fn_flags & ZEND_ACC_HAS_RETURN_TYPE) ||
+				zend_verify_internal_return_type(call->func, ret));
+			ZEND_ASSERT((call->func->common.fn_flags & ZEND_ACC_RETURN_REFERENCE)
+				? Z_ISREF_P(ret) : !Z_ISREF_P(ret));
+		}
 #endif
 
 		EG(current_execute_data) = call->prev_execute_data;
@@ -859,7 +856,6 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_DO_FCALL_BY_NAME_SPEC_RETVAL_U
 			if (EXPECTED(1)) {
 				ret = EX_VAR(opline->result.var);
 				zend_generator_create_zval(call, &fbc->op_array, ret);
-				Z_VAR_FLAGS_P(ret) = 0;
 			} else {
 				zend_vm_stack_free_args(call);
 			}
@@ -871,7 +867,6 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_DO_FCALL_BY_NAME_SPEC_RETVAL_U
 			if (1) {
 				ret = EX_VAR(opline->result.var);
 				ZVAL_NULL(ret);
-				Z_VAR_FLAGS_P(ret) = 0;
 			}
 
 			call->prev_execute_data = execute_data;
@@ -916,15 +911,16 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_DO_FCALL_BY_NAME_SPEC_RETVAL_U
 
 		ret = 1 ? EX_VAR(opline->result.var) : &retval;
 		ZVAL_NULL(ret);
-		Z_VAR_FLAGS_P(ret) = (fbc->common.fn_flags & ZEND_ACC_RETURN_REFERENCE) != 0 ? IS_VAR_RET_REF : 0;
 
 		fbc->internal_function.handler(call, ret);
 
 #if ZEND_DEBUG
-		ZEND_ASSERT(
-			EG(exception) || !call->func ||
-			!(call->func->common.fn_flags & ZEND_ACC_HAS_RETURN_TYPE) ||
-			zend_verify_internal_return_type(call->func, ret));
+		if (!EG(exception) && call->func) {
+			ZEND_ASSERT(!(call->func->common.fn_flags & ZEND_ACC_HAS_RETURN_TYPE) ||
+				zend_verify_internal_return_type(call->func, ret));
+			ZEND_ASSERT((call->func->common.fn_flags & ZEND_ACC_RETURN_REFERENCE)
+				? Z_ISREF_P(ret) : !Z_ISREF_P(ret));
+		}
 #endif
 
 		EG(current_execute_data) = call->prev_execute_data;
@@ -981,7 +977,6 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_DO_FCALL_SPEC_RETVAL_UNUSED_HA
 			if (EXPECTED(0)) {
 				ret = EX_VAR(opline->result.var);
 				zend_generator_create_zval(call, &fbc->op_array, ret);
-				Z_VAR_FLAGS_P(ret) = 0;
 			} else {
 				if (UNEXPECTED(ZEND_CALL_INFO(call) & ZEND_CALL_CLOSURE)) {
 					OBJ_RELEASE((zend_object*)fbc->op_array.prototype);
@@ -994,7 +989,6 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_DO_FCALL_SPEC_RETVAL_UNUSED_HA
 			if (0) {
 				ret = EX_VAR(opline->result.var);
 				ZVAL_NULL(ret);
-				Z_VAR_FLAGS_P(ret) = 0;
 			}
 
 			call->prev_execute_data = execute_data;
@@ -1043,7 +1037,6 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_DO_FCALL_SPEC_RETVAL_UNUSED_HA
 
 		ret = 0 ? EX_VAR(opline->result.var) : &retval;
 		ZVAL_NULL(ret);
-		Z_VAR_FLAGS_P(ret) = (fbc->common.fn_flags & ZEND_ACC_RETURN_REFERENCE) != 0 ? IS_VAR_RET_REF : 0;
 
 		if (!zend_execute_internal) {
 			/* saves one function call if zend_execute_internal is not used */
@@ -1053,10 +1046,12 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_DO_FCALL_SPEC_RETVAL_UNUSED_HA
 		}
 
 #if ZEND_DEBUG
-		ZEND_ASSERT(
-			EG(exception) || !call->func ||
-			!(call->func->common.fn_flags & ZEND_ACC_HAS_RETURN_TYPE) ||
-			zend_verify_internal_return_type(call->func, ret));
+		if (!EG(exception) && call->func) {
+			ZEND_ASSERT(!(call->func->common.fn_flags & ZEND_ACC_HAS_RETURN_TYPE) ||
+				zend_verify_internal_return_type(call->func, ret));
+			ZEND_ASSERT((call->func->common.fn_flags & ZEND_ACC_RETURN_REFERENCE)
+					? Z_ISREF_P(ret) : !Z_ISREF_P(ret));
+		}
 #endif
 
 		EG(current_execute_data) = call->prev_execute_data;
@@ -1106,8 +1101,6 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_DO_FCALL_SPEC_RETVAL_UNUSED_HA
 
 		if (!0) {
 			zval_ptr_dtor(ret);
-		} else {
-			Z_VAR_FLAGS_P(ret) = 0;
 		}
 	}
 
@@ -1176,7 +1169,6 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_DO_FCALL_SPEC_RETVAL_USED_HAND
 			if (EXPECTED(1)) {
 				ret = EX_VAR(opline->result.var);
 				zend_generator_create_zval(call, &fbc->op_array, ret);
-				Z_VAR_FLAGS_P(ret) = 0;
 			} else {
 				if (UNEXPECTED(ZEND_CALL_INFO(call) & ZEND_CALL_CLOSURE)) {
 					OBJ_RELEASE((zend_object*)fbc->op_array.prototype);
@@ -1189,7 +1181,6 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_DO_FCALL_SPEC_RETVAL_USED_HAND
 			if (1) {
 				ret = EX_VAR(opline->result.var);
 				ZVAL_NULL(ret);
-				Z_VAR_FLAGS_P(ret) = 0;
 			}
 
 			call->prev_execute_data = execute_data;
@@ -1238,7 +1229,6 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_DO_FCALL_SPEC_RETVAL_USED_HAND
 
 		ret = 1 ? EX_VAR(opline->result.var) : &retval;
 		ZVAL_NULL(ret);
-		Z_VAR_FLAGS_P(ret) = (fbc->common.fn_flags & ZEND_ACC_RETURN_REFERENCE) != 0 ? IS_VAR_RET_REF : 0;
 
 		if (!zend_execute_internal) {
 			/* saves one function call if zend_execute_internal is not used */
@@ -1248,10 +1238,12 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_DO_FCALL_SPEC_RETVAL_USED_HAND
 		}
 
 #if ZEND_DEBUG
-		ZEND_ASSERT(
-			EG(exception) || !call->func ||
-			!(call->func->common.fn_flags & ZEND_ACC_HAS_RETURN_TYPE) ||
-			zend_verify_internal_return_type(call->func, ret));
+		if (!EG(exception) && call->func) {
+			ZEND_ASSERT(!(call->func->common.fn_flags & ZEND_ACC_HAS_RETURN_TYPE) ||
+				zend_verify_internal_return_type(call->func, ret));
+			ZEND_ASSERT((call->func->common.fn_flags & ZEND_ACC_RETURN_REFERENCE)
+					? Z_ISREF_P(ret) : !Z_ISREF_P(ret));
+		}
 #endif
 
 		EG(current_execute_data) = call->prev_execute_data;
@@ -1301,8 +1293,6 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_DO_FCALL_SPEC_RETVAL_USED_HAND
 
 		if (!1) {
 			zval_ptr_dtor(ret);
-		} else {
-			Z_VAR_FLAGS_P(ret) = 0;
 		}
 	}
 
@@ -2173,7 +2163,6 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_CALL_TRAMPOLINE_SPEC_HANDLER(Z
 			ZVAL_NULL(&retval);
 			ret = &retval;
 		}
-		Z_VAR_FLAGS_P(ret) = (fbc->common.fn_flags & ZEND_ACC_RETURN_REFERENCE) != 0 ? IS_VAR_RET_REF : 0;
 
 		if (!zend_execute_internal) {
 			/* saves one function call if zend_execute_internal is not used */
@@ -3060,14 +3049,16 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_RETURN_BY_REF_SPEC_CONST_HANDL
 
 			retval_ptr = EX_CONSTANT(opline->op1);
 			if (!EX(return_value)) {
-				if (IS_CONST == IS_TMP_VAR) {
 
-				}
 			} else {
-				ZVAL_COPY_VALUE(EX(return_value), retval_ptr);
-				Z_VAR_FLAGS_P(EX(return_value)) = IS_VAR_RET_REF;
-				if (IS_CONST != IS_TMP_VAR) {
-					zval_opt_copy_ctor_no_imm(EX(return_value));
+				if (IS_CONST == IS_VAR && UNEXPECTED(Z_ISREF_P(retval_ptr))) {
+					ZVAL_COPY_VALUE(EX(return_value), retval_ptr);
+					break;
+				}
+
+				ZVAL_NEW_REF(EX(return_value), retval_ptr);
+				if (IS_CONST == IS_CONST) {
+					if (Z_REFCOUNTED_P(retval_ptr)) Z_ADDREF_P(retval_ptr);
 				}
 			}
 			break;
@@ -3077,13 +3068,12 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_RETURN_BY_REF_SPEC_CONST_HANDL
 
 		if (IS_CONST == IS_VAR) {
 			if (retval_ptr == &EG(uninitialized_zval) ||
-			    (opline->extended_value == ZEND_RETURNS_FUNCTION &&
-			     !(Z_VAR_FLAGS_P(retval_ptr) & IS_VAR_RET_REF))) {
+			    (opline->extended_value == ZEND_RETURNS_FUNCTION && !Z_ISREF_P(retval_ptr))) {
 				zend_error(E_NOTICE, "Only variable references should be returned by reference");
 				if (EX(return_value)) {
 					ZVAL_NEW_REF(EX(return_value), retval_ptr);
-					Z_VAR_FLAGS_P(EX(return_value)) = IS_VAR_RET_REF;
-					if (Z_REFCOUNTED_P(retval_ptr)) Z_ADDREF_P(retval_ptr);
+				} else {
+
 				}
 				break;
 			}
@@ -3093,8 +3083,8 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_RETURN_BY_REF_SPEC_CONST_HANDL
 			ZVAL_MAKE_REF(retval_ptr);
 			Z_ADDREF_P(retval_ptr);
 			ZVAL_REF(EX(return_value), Z_REF_P(retval_ptr));
-			Z_VAR_FLAGS_P(EX(return_value)) = IS_VAR_RET_REF;
 		}
+
 	} while (0);
 
 	ZEND_VM_TAIL_CALL(zend_leave_helper_SPEC(ZEND_OPCODE_HANDLER_ARGS_PASSTHRU));
@@ -6488,7 +6478,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_YIELD_SPEC_CONST_CONST_HANDLER
 				if (IS_CONST == IS_VAR &&
 				    (value_ptr == &EG(uninitialized_zval) ||
 				     (opline->extended_value == ZEND_RETURNS_FUNCTION &&
-				      !(Z_VAR_FLAGS_P(value_ptr) & IS_VAR_RET_REF)))) {
+				      !Z_ISREF_P(value_ptr)))) {
 					zend_error(E_NOTICE, "Only variable references should be yielded by reference");
 				} else {
 					ZVAL_MAKE_REF(value_ptr);
@@ -6659,7 +6649,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_YIELD_SPEC_CONST_TMP_HANDLER(Z
 				if (IS_CONST == IS_VAR &&
 				    (value_ptr == &EG(uninitialized_zval) ||
 				     (opline->extended_value == ZEND_RETURNS_FUNCTION &&
-				      !(Z_VAR_FLAGS_P(value_ptr) & IS_VAR_RET_REF)))) {
+				      !Z_ISREF_P(value_ptr)))) {
 					zend_error(E_NOTICE, "Only variable references should be yielded by reference");
 				} else {
 					ZVAL_MAKE_REF(value_ptr);
@@ -7110,7 +7100,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_YIELD_SPEC_CONST_VAR_HANDLER(Z
 				if (IS_CONST == IS_VAR &&
 				    (value_ptr == &EG(uninitialized_zval) ||
 				     (opline->extended_value == ZEND_RETURNS_FUNCTION &&
-				      !(Z_VAR_FLAGS_P(value_ptr) & IS_VAR_RET_REF)))) {
+				      !Z_ISREF_P(value_ptr)))) {
 					zend_error(E_NOTICE, "Only variable references should be yielded by reference");
 				} else {
 					ZVAL_MAKE_REF(value_ptr);
@@ -8165,7 +8155,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_YIELD_SPEC_CONST_UNUSED_HANDLE
 				if (IS_CONST == IS_VAR &&
 				    (value_ptr == &EG(uninitialized_zval) ||
 				     (opline->extended_value == ZEND_RETURNS_FUNCTION &&
-				      !(Z_VAR_FLAGS_P(value_ptr) & IS_VAR_RET_REF)))) {
+				      !Z_ISREF_P(value_ptr)))) {
 					zend_error(E_NOTICE, "Only variable references should be yielded by reference");
 				} else {
 					ZVAL_MAKE_REF(value_ptr);
@@ -10120,7 +10110,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_YIELD_SPEC_CONST_CV_HANDLER(ZE
 				if (IS_CONST == IS_VAR &&
 				    (value_ptr == &EG(uninitialized_zval) ||
 				     (opline->extended_value == ZEND_RETURNS_FUNCTION &&
-				      !(Z_VAR_FLAGS_P(value_ptr) & IS_VAR_RET_REF)))) {
+				      !Z_ISREF_P(value_ptr)))) {
 					zend_error(E_NOTICE, "Only variable references should be yielded by reference");
 				} else {
 					ZVAL_MAKE_REF(value_ptr);
@@ -12474,14 +12464,16 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_RETURN_BY_REF_SPEC_TMP_HANDLER
 
 			retval_ptr = _get_zval_ptr_tmp(opline->op1.var, execute_data, &free_op1);
 			if (!EX(return_value)) {
-				if (IS_TMP_VAR == IS_TMP_VAR) {
-					zval_ptr_dtor_nogc(free_op1);
-				}
+				zval_ptr_dtor_nogc(free_op1);
 			} else {
-				ZVAL_COPY_VALUE(EX(return_value), retval_ptr);
-				Z_VAR_FLAGS_P(EX(return_value)) = IS_VAR_RET_REF;
-				if (IS_TMP_VAR != IS_TMP_VAR) {
-					zval_opt_copy_ctor_no_imm(EX(return_value));
+				if (IS_TMP_VAR == IS_VAR && UNEXPECTED(Z_ISREF_P(retval_ptr))) {
+					ZVAL_COPY_VALUE(EX(return_value), retval_ptr);
+					break;
+				}
+
+				ZVAL_NEW_REF(EX(return_value), retval_ptr);
+				if (IS_TMP_VAR == IS_CONST) {
+					if (Z_REFCOUNTED_P(retval_ptr)) Z_ADDREF_P(retval_ptr);
 				}
 			}
 			break;
@@ -12491,13 +12483,12 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_RETURN_BY_REF_SPEC_TMP_HANDLER
 
 		if (IS_TMP_VAR == IS_VAR) {
 			if (retval_ptr == &EG(uninitialized_zval) ||
-			    (opline->extended_value == ZEND_RETURNS_FUNCTION &&
-			     !(Z_VAR_FLAGS_P(retval_ptr) & IS_VAR_RET_REF))) {
+			    (opline->extended_value == ZEND_RETURNS_FUNCTION && !Z_ISREF_P(retval_ptr))) {
 				zend_error(E_NOTICE, "Only variable references should be returned by reference");
 				if (EX(return_value)) {
 					ZVAL_NEW_REF(EX(return_value), retval_ptr);
-					Z_VAR_FLAGS_P(EX(return_value)) = IS_VAR_RET_REF;
-					if (Z_REFCOUNTED_P(retval_ptr)) Z_ADDREF_P(retval_ptr);
+				} else {
+
 				}
 				break;
 			}
@@ -12507,8 +12498,8 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_RETURN_BY_REF_SPEC_TMP_HANDLER
 			ZVAL_MAKE_REF(retval_ptr);
 			Z_ADDREF_P(retval_ptr);
 			ZVAL_REF(EX(return_value), Z_REF_P(retval_ptr));
-			Z_VAR_FLAGS_P(EX(return_value)) = IS_VAR_RET_REF;
 		}
+
 	} while (0);
 
 	ZEND_VM_TAIL_CALL(zend_leave_helper_SPEC(ZEND_OPCODE_HANDLER_ARGS_PASSTHRU));
@@ -13735,7 +13726,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_YIELD_SPEC_TMP_CONST_HANDLER(Z
 				if (IS_TMP_VAR == IS_VAR &&
 				    (value_ptr == &EG(uninitialized_zval) ||
 				     (opline->extended_value == ZEND_RETURNS_FUNCTION &&
-				      !(Z_VAR_FLAGS_P(value_ptr) & IS_VAR_RET_REF)))) {
+				      !Z_ISREF_P(value_ptr)))) {
 					zend_error(E_NOTICE, "Only variable references should be yielded by reference");
 				} else {
 					ZVAL_MAKE_REF(value_ptr);
@@ -13906,7 +13897,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_YIELD_SPEC_TMP_TMP_HANDLER(ZEN
 				if (IS_TMP_VAR == IS_VAR &&
 				    (value_ptr == &EG(uninitialized_zval) ||
 				     (opline->extended_value == ZEND_RETURNS_FUNCTION &&
-				      !(Z_VAR_FLAGS_P(value_ptr) & IS_VAR_RET_REF)))) {
+				      !Z_ISREF_P(value_ptr)))) {
 					zend_error(E_NOTICE, "Only variable references should be yielded by reference");
 				} else {
 					ZVAL_MAKE_REF(value_ptr);
@@ -14077,7 +14068,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_YIELD_SPEC_TMP_VAR_HANDLER(ZEN
 				if (IS_TMP_VAR == IS_VAR &&
 				    (value_ptr == &EG(uninitialized_zval) ||
 				     (opline->extended_value == ZEND_RETURNS_FUNCTION &&
-				      !(Z_VAR_FLAGS_P(value_ptr) & IS_VAR_RET_REF)))) {
+				      !Z_ISREF_P(value_ptr)))) {
 					zend_error(E_NOTICE, "Only variable references should be yielded by reference");
 				} else {
 					ZVAL_MAKE_REF(value_ptr);
@@ -14429,7 +14420,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_YIELD_SPEC_TMP_UNUSED_HANDLER(
 				if (IS_TMP_VAR == IS_VAR &&
 				    (value_ptr == &EG(uninitialized_zval) ||
 				     (opline->extended_value == ZEND_RETURNS_FUNCTION &&
-				      !(Z_VAR_FLAGS_P(value_ptr) & IS_VAR_RET_REF)))) {
+				      !Z_ISREF_P(value_ptr)))) {
 					zend_error(E_NOTICE, "Only variable references should be yielded by reference");
 				} else {
 					ZVAL_MAKE_REF(value_ptr);
@@ -14957,7 +14948,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_YIELD_SPEC_TMP_CV_HANDLER(ZEND
 				if (IS_TMP_VAR == IS_VAR &&
 				    (value_ptr == &EG(uninitialized_zval) ||
 				     (opline->extended_value == ZEND_RETURNS_FUNCTION &&
-				      !(Z_VAR_FLAGS_P(value_ptr) & IS_VAR_RET_REF)))) {
+				      !Z_ISREF_P(value_ptr)))) {
 					zend_error(E_NOTICE, "Only variable references should be yielded by reference");
 				} else {
 					ZVAL_MAKE_REF(value_ptr);
@@ -15741,14 +15732,16 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_RETURN_BY_REF_SPEC_VAR_HANDLER
 
 			retval_ptr = _get_zval_ptr_var(opline->op1.var, execute_data, &free_op1);
 			if (!EX(return_value)) {
-				if (IS_VAR == IS_TMP_VAR) {
-					zval_ptr_dtor_nogc(free_op1);
-				}
+				zval_ptr_dtor_nogc(free_op1);
 			} else {
-				ZVAL_COPY_VALUE(EX(return_value), retval_ptr);
-				Z_VAR_FLAGS_P(EX(return_value)) = IS_VAR_RET_REF;
-				if (IS_VAR != IS_TMP_VAR) {
-					zval_opt_copy_ctor_no_imm(EX(return_value));
+				if (IS_VAR == IS_VAR && UNEXPECTED(Z_ISREF_P(retval_ptr))) {
+					ZVAL_COPY_VALUE(EX(return_value), retval_ptr);
+					break;
+				}
+
+				ZVAL_NEW_REF(EX(return_value), retval_ptr);
+				if (IS_VAR == IS_CONST) {
+					if (Z_REFCOUNTED_P(retval_ptr)) Z_ADDREF_P(retval_ptr);
 				}
 			}
 			break;
@@ -15758,13 +15751,12 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_RETURN_BY_REF_SPEC_VAR_HANDLER
 
 		if (IS_VAR == IS_VAR) {
 			if (retval_ptr == &EG(uninitialized_zval) ||
-			    (opline->extended_value == ZEND_RETURNS_FUNCTION &&
-			     !(Z_VAR_FLAGS_P(retval_ptr) & IS_VAR_RET_REF))) {
+			    (opline->extended_value == ZEND_RETURNS_FUNCTION && !Z_ISREF_P(retval_ptr))) {
 				zend_error(E_NOTICE, "Only variable references should be returned by reference");
 				if (EX(return_value)) {
 					ZVAL_NEW_REF(EX(return_value), retval_ptr);
-					Z_VAR_FLAGS_P(EX(return_value)) = IS_VAR_RET_REF;
-					if (Z_REFCOUNTED_P(retval_ptr)) Z_ADDREF_P(retval_ptr);
+				} else {
+					if (UNEXPECTED(free_op1)) {zval_ptr_dtor_nogc(free_op1);};
 				}
 				break;
 			}
@@ -15774,11 +15766,11 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_RETURN_BY_REF_SPEC_VAR_HANDLER
 			ZVAL_MAKE_REF(retval_ptr);
 			Z_ADDREF_P(retval_ptr);
 			ZVAL_REF(EX(return_value), Z_REF_P(retval_ptr));
-			Z_VAR_FLAGS_P(EX(return_value)) = IS_VAR_RET_REF;
 		}
+
+		if (UNEXPECTED(free_op1)) {zval_ptr_dtor_nogc(free_op1);};
 	} while (0);
 
-	if (UNEXPECTED(free_op1)) {zval_ptr_dtor_nogc(free_op1);};
 	ZEND_VM_TAIL_CALL(zend_leave_helper_SPEC(ZEND_OPCODE_HANDLER_ARGS_PASSTHRU));
 }
 
@@ -15921,7 +15913,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_SEND_VAR_NO_REF_SPEC_VAR_HANDL
 	varptr = _get_zval_ptr_var(opline->op1.var, execute_data, &free_op1);
 
 	if ((!(opline->extended_value & ZEND_ARG_SEND_FUNCTION) ||
-	     (Z_VAR_FLAGS_P(varptr) & IS_VAR_RET_REF)) &&
+	     Z_ISREF_P(varptr)) &&
 	    (Z_ISREF_P(varptr) || Z_TYPE_P(varptr) == IS_OBJECT)) {
 
 		ZVAL_MAKE_REF(varptr);
@@ -19692,7 +19684,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_YIELD_SPEC_VAR_CONST_HANDLER(Z
 				if (IS_VAR == IS_VAR &&
 				    (value_ptr == &EG(uninitialized_zval) ||
 				     (opline->extended_value == ZEND_RETURNS_FUNCTION &&
-				      !(Z_VAR_FLAGS_P(value_ptr) & IS_VAR_RET_REF)))) {
+				      !Z_ISREF_P(value_ptr)))) {
 					zend_error(E_NOTICE, "Only variable references should be yielded by reference");
 				} else {
 					ZVAL_MAKE_REF(value_ptr);
@@ -19920,7 +19912,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_YIELD_SPEC_VAR_TMP_HANDLER(ZEN
 				if (IS_VAR == IS_VAR &&
 				    (value_ptr == &EG(uninitialized_zval) ||
 				     (opline->extended_value == ZEND_RETURNS_FUNCTION &&
-				      !(Z_VAR_FLAGS_P(value_ptr) & IS_VAR_RET_REF)))) {
+				      !Z_ISREF_P(value_ptr)))) {
 					zend_error(E_NOTICE, "Only variable references should be yielded by reference");
 				} else {
 					ZVAL_MAKE_REF(value_ptr);
@@ -20123,8 +20115,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_ASSIGN_REF_SPEC_VAR_VAR_HANDLE
 
 	} else if (IS_VAR == IS_VAR &&
 	           opline->extended_value == ZEND_RETURNS_FUNCTION &&
-	           UNEXPECTED(!(Z_VAR_FLAGS_P(value_ptr) & IS_VAR_RET_REF))) {
-
+			   UNEXPECTED(!Z_ISREF_P(value_ptr))) {
 		zend_error(E_NOTICE, "Only variables should be assigned by reference");
 		if (UNEXPECTED(EG(exception) != NULL)) {
 			if (UNEXPECTED(free_op2)) {zval_ptr_dtor_nogc(free_op2);};
@@ -20204,7 +20195,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_YIELD_SPEC_VAR_VAR_HANDLER(ZEN
 				if (IS_VAR == IS_VAR &&
 				    (value_ptr == &EG(uninitialized_zval) ||
 				     (opline->extended_value == ZEND_RETURNS_FUNCTION &&
-				      !(Z_VAR_FLAGS_P(value_ptr) & IS_VAR_RET_REF)))) {
+				      !Z_ISREF_P(value_ptr)))) {
 					zend_error(E_NOTICE, "Only variable references should be yielded by reference");
 				} else {
 					ZVAL_MAKE_REF(value_ptr);
@@ -21393,9 +21384,6 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_SEPARATE_SPEC_VAR_UNUSED_HANDL
 	if (UNEXPECTED(Z_ISREF_P(var_ptr))) {
 		if (UNEXPECTED(Z_REFCOUNT_P(var_ptr) == 1)) {
 			ZVAL_UNREF(var_ptr);
-		} else if (!(Z_VAR_FLAGS_P(var_ptr) & IS_VAR_RET_REF)) {
-			Z_DELREF_P(var_ptr);
-			ZVAL_COPY(var_ptr, Z_REFVAL_P(var_ptr));
 		}
 	}
 
@@ -21449,7 +21437,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_YIELD_SPEC_VAR_UNUSED_HANDLER(
 				if (IS_VAR == IS_VAR &&
 				    (value_ptr == &EG(uninitialized_zval) ||
 				     (opline->extended_value == ZEND_RETURNS_FUNCTION &&
-				      !(Z_VAR_FLAGS_P(value_ptr) & IS_VAR_RET_REF)))) {
+				      !Z_ISREF_P(value_ptr)))) {
 					zend_error(E_NOTICE, "Only variable references should be yielded by reference");
 				} else {
 					ZVAL_MAKE_REF(value_ptr);
@@ -23537,8 +23525,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_ASSIGN_REF_SPEC_VAR_CV_HANDLER
 
 	} else if (IS_CV == IS_VAR &&
 	           opline->extended_value == ZEND_RETURNS_FUNCTION &&
-	           UNEXPECTED(!(Z_VAR_FLAGS_P(value_ptr) & IS_VAR_RET_REF))) {
-
+			   UNEXPECTED(!Z_ISREF_P(value_ptr))) {
 		zend_error(E_NOTICE, "Only variables should be assigned by reference");
 		if (UNEXPECTED(EG(exception) != NULL)) {
 
@@ -24031,7 +24018,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_YIELD_SPEC_VAR_CV_HANDLER(ZEND
 				if (IS_VAR == IS_VAR &&
 				    (value_ptr == &EG(uninitialized_zval) ||
 				     (opline->extended_value == ZEND_RETURNS_FUNCTION &&
-				      !(Z_VAR_FLAGS_P(value_ptr) & IS_VAR_RET_REF)))) {
+				      !Z_ISREF_P(value_ptr)))) {
 					zend_error(E_NOTICE, "Only variable references should be yielded by reference");
 				} else {
 					ZVAL_MAKE_REF(value_ptr);
@@ -28880,7 +28867,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_YIELD_SPEC_UNUSED_CONST_HANDLE
 				if (IS_UNUSED == IS_VAR &&
 				    (value_ptr == &EG(uninitialized_zval) ||
 				     (opline->extended_value == ZEND_RETURNS_FUNCTION &&
-				      !(Z_VAR_FLAGS_P(value_ptr) & IS_VAR_RET_REF)))) {
+				      !Z_ISREF_P(value_ptr)))) {
 					zend_error(E_NOTICE, "Only variable references should be yielded by reference");
 				} else {
 					ZVAL_MAKE_REF(value_ptr);
@@ -29015,7 +29002,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_YIELD_SPEC_UNUSED_TMP_HANDLER(
 				if (IS_UNUSED == IS_VAR &&
 				    (value_ptr == &EG(uninitialized_zval) ||
 				     (opline->extended_value == ZEND_RETURNS_FUNCTION &&
-				      !(Z_VAR_FLAGS_P(value_ptr) & IS_VAR_RET_REF)))) {
+				      !Z_ISREF_P(value_ptr)))) {
 					zend_error(E_NOTICE, "Only variable references should be yielded by reference");
 				} else {
 					ZVAL_MAKE_REF(value_ptr);
@@ -29150,7 +29137,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_YIELD_SPEC_UNUSED_VAR_HANDLER(
 				if (IS_UNUSED == IS_VAR &&
 				    (value_ptr == &EG(uninitialized_zval) ||
 				     (opline->extended_value == ZEND_RETURNS_FUNCTION &&
-				      !(Z_VAR_FLAGS_P(value_ptr) & IS_VAR_RET_REF)))) {
+				      !Z_ISREF_P(value_ptr)))) {
 					zend_error(E_NOTICE, "Only variable references should be yielded by reference");
 				} else {
 					ZVAL_MAKE_REF(value_ptr);
@@ -29825,7 +29812,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_YIELD_SPEC_UNUSED_UNUSED_HANDL
 				if (IS_UNUSED == IS_VAR &&
 				    (value_ptr == &EG(uninitialized_zval) ||
 				     (opline->extended_value == ZEND_RETURNS_FUNCTION &&
-				      !(Z_VAR_FLAGS_P(value_ptr) & IS_VAR_RET_REF)))) {
+				      !Z_ISREF_P(value_ptr)))) {
 					zend_error(E_NOTICE, "Only variable references should be yielded by reference");
 				} else {
 					ZVAL_MAKE_REF(value_ptr);
@@ -32073,7 +32060,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_YIELD_SPEC_UNUSED_CV_HANDLER(Z
 				if (IS_UNUSED == IS_VAR &&
 				    (value_ptr == &EG(uninitialized_zval) ||
 				     (opline->extended_value == ZEND_RETURNS_FUNCTION &&
-				      !(Z_VAR_FLAGS_P(value_ptr) & IS_VAR_RET_REF)))) {
+				      !Z_ISREF_P(value_ptr)))) {
 					zend_error(E_NOTICE, "Only variable references should be yielded by reference");
 				} else {
 					ZVAL_MAKE_REF(value_ptr);
@@ -34839,14 +34826,16 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_RETURN_BY_REF_SPEC_CV_HANDLER(
 
 			retval_ptr = _get_zval_ptr_cv_BP_VAR_R(execute_data, opline->op1.var);
 			if (!EX(return_value)) {
-				if (IS_CV == IS_TMP_VAR) {
 
-				}
 			} else {
-				ZVAL_COPY_VALUE(EX(return_value), retval_ptr);
-				Z_VAR_FLAGS_P(EX(return_value)) = IS_VAR_RET_REF;
-				if (IS_CV != IS_TMP_VAR) {
-					zval_opt_copy_ctor_no_imm(EX(return_value));
+				if (IS_CV == IS_VAR && UNEXPECTED(Z_ISREF_P(retval_ptr))) {
+					ZVAL_COPY_VALUE(EX(return_value), retval_ptr);
+					break;
+				}
+
+				ZVAL_NEW_REF(EX(return_value), retval_ptr);
+				if (IS_CV == IS_CONST) {
+					if (Z_REFCOUNTED_P(retval_ptr)) Z_ADDREF_P(retval_ptr);
 				}
 			}
 			break;
@@ -34856,13 +34845,12 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_RETURN_BY_REF_SPEC_CV_HANDLER(
 
 		if (IS_CV == IS_VAR) {
 			if (retval_ptr == &EG(uninitialized_zval) ||
-			    (opline->extended_value == ZEND_RETURNS_FUNCTION &&
-			     !(Z_VAR_FLAGS_P(retval_ptr) & IS_VAR_RET_REF))) {
+			    (opline->extended_value == ZEND_RETURNS_FUNCTION && !Z_ISREF_P(retval_ptr))) {
 				zend_error(E_NOTICE, "Only variable references should be returned by reference");
 				if (EX(return_value)) {
 					ZVAL_NEW_REF(EX(return_value), retval_ptr);
-					Z_VAR_FLAGS_P(EX(return_value)) = IS_VAR_RET_REF;
-					if (Z_REFCOUNTED_P(retval_ptr)) Z_ADDREF_P(retval_ptr);
+				} else {
+
 				}
 				break;
 			}
@@ -34872,8 +34860,8 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_RETURN_BY_REF_SPEC_CV_HANDLER(
 			ZVAL_MAKE_REF(retval_ptr);
 			Z_ADDREF_P(retval_ptr);
 			ZVAL_REF(EX(return_value), Z_REF_P(retval_ptr));
-			Z_VAR_FLAGS_P(EX(return_value)) = IS_VAR_RET_REF;
 		}
+
 	} while (0);
 
 	ZEND_VM_TAIL_CALL(zend_leave_helper_SPEC(ZEND_OPCODE_HANDLER_ARGS_PASSTHRU));
@@ -39942,7 +39930,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_YIELD_SPEC_CV_CONST_HANDLER(ZE
 				if (IS_CV == IS_VAR &&
 				    (value_ptr == &EG(uninitialized_zval) ||
 				     (opline->extended_value == ZEND_RETURNS_FUNCTION &&
-				      !(Z_VAR_FLAGS_P(value_ptr) & IS_VAR_RET_REF)))) {
+				      !Z_ISREF_P(value_ptr)))) {
 					zend_error(E_NOTICE, "Only variable references should be yielded by reference");
 				} else {
 					ZVAL_MAKE_REF(value_ptr);
@@ -40311,7 +40299,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_YIELD_SPEC_CV_TMP_HANDLER(ZEND
 				if (IS_CV == IS_VAR &&
 				    (value_ptr == &EG(uninitialized_zval) ||
 				     (opline->extended_value == ZEND_RETURNS_FUNCTION &&
-				      !(Z_VAR_FLAGS_P(value_ptr) & IS_VAR_RET_REF)))) {
+				      !Z_ISREF_P(value_ptr)))) {
 					zend_error(E_NOTICE, "Only variable references should be yielded by reference");
 				} else {
 					ZVAL_MAKE_REF(value_ptr);
@@ -40652,8 +40640,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_ASSIGN_REF_SPEC_CV_VAR_HANDLER
 
 	} else if (IS_VAR == IS_VAR &&
 	           opline->extended_value == ZEND_RETURNS_FUNCTION &&
-	           UNEXPECTED(!(Z_VAR_FLAGS_P(value_ptr) & IS_VAR_RET_REF))) {
-
+			   UNEXPECTED(!Z_ISREF_P(value_ptr))) {
 		zend_error(E_NOTICE, "Only variables should be assigned by reference");
 		if (UNEXPECTED(EG(exception) != NULL)) {
 			if (UNEXPECTED(free_op2)) {zval_ptr_dtor_nogc(free_op2);};
@@ -40924,7 +40911,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_YIELD_SPEC_CV_VAR_HANDLER(ZEND
 				if (IS_CV == IS_VAR &&
 				    (value_ptr == &EG(uninitialized_zval) ||
 				     (opline->extended_value == ZEND_RETURNS_FUNCTION &&
-				      !(Z_VAR_FLAGS_P(value_ptr) & IS_VAR_RET_REF)))) {
+				      !Z_ISREF_P(value_ptr)))) {
 					zend_error(E_NOTICE, "Only variable references should be yielded by reference");
 				} else {
 					ZVAL_MAKE_REF(value_ptr);
@@ -42558,7 +42545,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_YIELD_SPEC_CV_UNUSED_HANDLER(Z
 				if (IS_CV == IS_VAR &&
 				    (value_ptr == &EG(uninitialized_zval) ||
 				     (opline->extended_value == ZEND_RETURNS_FUNCTION &&
-				      !(Z_VAR_FLAGS_P(value_ptr) & IS_VAR_RET_REF)))) {
+				      !Z_ISREF_P(value_ptr)))) {
 					zend_error(E_NOTICE, "Only variable references should be yielded by reference");
 				} else {
 					ZVAL_MAKE_REF(value_ptr);
@@ -45441,8 +45428,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_ASSIGN_REF_SPEC_CV_CV_HANDLER(
 
 	} else if (IS_CV == IS_VAR &&
 	           opline->extended_value == ZEND_RETURNS_FUNCTION &&
-	           UNEXPECTED(!(Z_VAR_FLAGS_P(value_ptr) & IS_VAR_RET_REF))) {
-
+			   UNEXPECTED(!Z_ISREF_P(value_ptr))) {
 		zend_error(E_NOTICE, "Only variables should be assigned by reference");
 		if (UNEXPECTED(EG(exception) != NULL)) {
 
@@ -46225,7 +46211,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_YIELD_SPEC_CV_CV_HANDLER(ZEND_
 				if (IS_CV == IS_VAR &&
 				    (value_ptr == &EG(uninitialized_zval) ||
 				     (opline->extended_value == ZEND_RETURNS_FUNCTION &&
-				      !(Z_VAR_FLAGS_P(value_ptr) & IS_VAR_RET_REF)))) {
+				      !Z_ISREF_P(value_ptr)))) {
 					zend_error(E_NOTICE, "Only variable references should be yielded by reference");
 				} else {
 					ZVAL_MAKE_REF(value_ptr);

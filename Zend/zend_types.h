@@ -416,9 +416,6 @@ static zend_always_inline zend_uchar zval_get_type(const zval* pz) {
 #define IS_CONSTANT_CLASS           0x080  /* __CLASS__ in trait */
 #define IS_CONSTANT_IN_NAMESPACE	0x100  /* used only in opline->extended_value */
 
-/* zval.u2.var_flags */
-#define IS_VAR_RET_REF				(1<<0) /* return by by reference */
-
 /* string flags (zval.value->gc.u.flags) */
 #define IS_STR_PERSISTENT			(1<<0) /* allocated using malloc   */
 #define IS_STR_INTERNED				(1<<1) /* interned string          */
