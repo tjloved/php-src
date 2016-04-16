@@ -48,16 +48,30 @@ zend_bool may_throw(
 		case ZEND_SUB:
 		case ZEND_MUL:
 		case ZEND_POW:
+			if (!MUST_BE(t1, MAY_BE_SIMPLE) || !MUST_BE(t2, MAY_BE_SIMPLE)) {
+				return 1;
+			}
+			return CAN_BE(t1, MAY_BE_STRING) || CAN_BE(t2, MAY_BE_STRING);
 		case ZEND_BW_OR:
 		case ZEND_BW_AND:
 		case ZEND_BW_XOR:
+			if (!MUST_BE(t1, MAY_BE_SIMPLE) || !MUST_BE(t2, MAY_BE_SIMPLE)) {
+				return 1;
+			}
+			if (MUST_BE(t1, MAY_BE_STRING) && MUST_BE(t2, MAY_BE_STRING)) {
+				return 0;
+			}
+			return CAN_BE(t1, MAY_BE_STRING) || CAN_BE(t2, MAY_BE_STRING);
 		case ZEND_CONCAT:
 		case ZEND_FAST_CONCAT:
-			/* For concat we are discounting the string size overflow error */
+			/* We are discounting the string size overflow error */
 			return !MUST_BE(t1, MAY_BE_SIMPLE) || !MUST_BE(t2, MAY_BE_SIMPLE);
 		case ZEND_DIV:
 		case ZEND_MOD:
 			if (!MUST_BE(t1, MAY_BE_SIMPLE) || !MUST_BE(t2, MAY_BE_SIMPLE)) {
+				return 1;
+			}
+			if (CAN_BE(t1, MAY_BE_STRING) || CAN_BE(t2, MAY_BE_STRING)) {
 				return 1;
 			}
 			if (OP2_HAS_RANGE()) {
@@ -86,6 +100,9 @@ zend_bool may_throw(
 		case ZEND_SL:
 		case ZEND_SR:
 			if (!MUST_BE(t1, MAY_BE_SIMPLE) || !MUST_BE(t2, MAY_BE_SIMPLE)) {
+				return 1;
+			}
+			if (CAN_BE(t1, MAY_BE_STRING) || CAN_BE(t2, MAY_BE_STRING)) {
 				return 1;
 			}
 			if (OP2_HAS_RANGE()) {

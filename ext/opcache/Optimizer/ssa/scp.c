@@ -229,6 +229,10 @@ static inline int ct_eval_binary(zval *result, zend_uchar opcode, zval *op1, zva
 	binary_op_type binary_op = get_binary_op(opcode);
 	int retval;
 
+	if (zend_binary_op_produces_numeric_string_error(opcode, op1, op2)) {
+		return FAILURE;
+	}
+
 	switch (opcode) {
 		case ZEND_SR:
 		case ZEND_SL:
