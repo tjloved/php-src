@@ -425,7 +425,7 @@ static uint32_t zend_vm_opcodes_flags[206] = {
 	0x40000b0b,
 	0x40000b0b,
 	0x40000b0b,
-	0x00000b09,
+	0x00000b05,
 	0x0000000b,
 	0x40000b0b,
 	0x00000000,
