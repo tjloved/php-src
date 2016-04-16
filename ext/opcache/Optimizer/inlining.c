@@ -143,6 +143,26 @@ static zend_bool can_inline_opcodes(
 				/* If inlining is in use, there can be no expectation of keeping consistent
 				 * backtraces. However, there's no need to be too blatant with it. */
 				return 0;
+			/* Various cases of indirect variable access */
+			case ZEND_INCLUDE_OR_EVAL:
+				return 0;
+			case ZEND_UNSET_VAR:
+			case ZEND_ISSET_ISEMPTY_VAR:
+				if ((opline->extended_value & ZEND_FETCH_TYPE_MASK) == ZEND_FETCH_LOCAL
+						&& !(opline->extended_value & ZEND_QUICK_SET)) {
+					return 0;
+				}
+				break;
+			case ZEND_FETCH_R:
+			case ZEND_FETCH_W:
+			case ZEND_FETCH_RW:
+			case ZEND_FETCH_FUNC_ARG:
+			case ZEND_FETCH_IS:
+			case ZEND_FETCH_UNSET:
+				if ((opline->extended_value & ZEND_FETCH_TYPE_MASK) == ZEND_FETCH_LOCAL) {
+					return 0;
+				}
+				break;
 		}
 	}
 	return 1;
