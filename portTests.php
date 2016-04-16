@@ -37,8 +37,10 @@ $forbidden = '/
     global|\$GLOBALS|debug_(print_)?backtrace|->getTrace|__LINE__|__halt_compiler
   | Reflection\w+::export|error_get_last
   | Parse\serror|on\sline\s\d|\#\d+\s\{main\}
+  | (?:%s|\.php)\(\d+\)
 /xi';
 
+$count = 0;
 foreach ($it as $file) {
     $name = $file->getPathName();
     if (!preg_match('/\.phpt$/', $name)) {
@@ -58,7 +60,7 @@ foreach ($it as $file) {
 
     $newCode = preg_replace_callback(
         '/(--FILE--\s+)(<\?php.*)(\s+--EXPECT)/s',
-        function($matches) use($parser, $pp, $name) {
+        function($matches) use($parser, $pp, $name, &$count) {
             $code = $matches[2];
             if (preg_match('/\?>(?!$)/', $code)) {
                 return $matches[0];
@@ -81,7 +83,11 @@ foreach ($it as $file) {
                     ) {
                         $decls[] = $stmt;
                         if (!empty($other)) {
-                            return $matches[0];
+                            if (!$stmt instanceof Stmt\Function_
+                                && !($stmt instanceof Stmt\ClassLike && isEarlyBound($stmt))
+                            ) {
+                                return $matches[0];
+                            }
                         }
                     } else {
                         $other[] = $stmt;
@@ -101,6 +107,7 @@ foreach ($it as $file) {
                 $stmts = array_merge($decls, [$fn, $call]);
                 $code = $pp->prettyPrintFile($stmts);
 
+                $count++;
                 return $matches[1] . $code . $matches[3];
             } catch (PhpParser\Error $e) {
                 return $matches[0];
@@ -112,4 +119,21 @@ foreach ($it as $file) {
     if ($newCode !== $code) {
         file_put_contents($name, $newCode);
     }
+}
+
+echo "Ported $count tests\n";
+
+function isEarlyBound(Stmt\ClassLike $node) {
+    if (!$node instanceof Stmt\Class_) {
+        return false;
+    }
+    if ($node->extends || $node->implements) {
+        return false;
+    }
+    foreach ($node->stmts as $stmt) {
+        if ($stmt instanceof Stmt\TraitUse) {
+            return false;
+        }
+    }
+    return true;
 }
