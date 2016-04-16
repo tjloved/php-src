@@ -9,26 +9,6 @@
 
 #define IS_SIMPLE(t) (!(t & MAY_BE_REFCOUNTED))
 
-static inline zend_bool is_compound_assign(zend_op *opline) {
-	switch (opline->opcode) {
-		case ZEND_ASSIGN_ADD:
-		case ZEND_ASSIGN_SUB:
-		case ZEND_ASSIGN_MUL:
-		case ZEND_ASSIGN_DIV:
-		case ZEND_ASSIGN_MOD:
-		case ZEND_ASSIGN_SL:
-		case ZEND_ASSIGN_SR:
-		case ZEND_ASSIGN_CONCAT:
-		case ZEND_ASSIGN_BW_OR:
-		case ZEND_ASSIGN_BW_AND:
-		case ZEND_ASSIGN_BW_XOR:
-		case ZEND_ASSIGN_POW:
-			return 1;
-		default:
-			return 0;
-	}
-}
-
 static inline zend_bool is_incdec(zend_op *opline) {
 	switch (opline->opcode) {
 		case ZEND_PRE_INC:
