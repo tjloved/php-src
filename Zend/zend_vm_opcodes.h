@@ -253,17 +253,17 @@ END_EXTERN_C()
 #define ZEND_FETCH_THIS                      184
 #define ZEND_ISSET_ISEMPTY_THIS              186
 #define ZEND_PHI_ASSIGN                      190
-#define ZEND_IS_SMALLER_DOUBLE               191
+#define ZEND_IS_SMALLER_FLOAT                191
 #define ZEND_IS_SMALLER_INT                  192
 #define ZEND_ADD_INT_NO_OVERFLOW             193
 #define ZEND_FETCH_DIM_INT                   194
 #define ZEND_MOV_UNCOUNTED                   195
-#define ZEND_DIV_DOUBLE                      196
+#define ZEND_DIV_FLOAT                       196
 #define ZEND_ADD_INT                         200
 #define ZEND_SUB_INT                         201
-#define ZEND_ADD_DOUBLE                      202
-#define ZEND_SUB_DOUBLE                      203
-#define ZEND_MUL_DOUBLE                      204
+#define ZEND_ADD_FLOAT                       202
+#define ZEND_SUB_FLOAT                       203
+#define ZEND_MUL_FLOAT                       204
 #define ZEND_FETCH_OBJ_R_FIXED               205
 
 #define ZEND_VM_LAST_OPCODE                  205
