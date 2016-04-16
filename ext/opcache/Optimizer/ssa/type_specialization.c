@@ -85,7 +85,7 @@ void ssa_optimize_type_specialization(ssa_opt_ctx *ctx) {
 					}
 					OPT_STAT(type_spec_arithm)++;
 				} else if (MUST_BE(t1, MAY_BE_DOUBLE) && MUST_BE(t2, MAY_BE_DOUBLE)) {
-					opline->opcode = ZEND_ADD_DOUBLE;
+					opline->opcode = ZEND_ADD_FLOAT;
 					OPT_STAT(type_spec_arithm)++;
 				}
 				break;
@@ -99,7 +99,7 @@ void ssa_optimize_type_specialization(ssa_opt_ctx *ctx) {
 					opline->opcode = ZEND_SUB_INT;
 					OPT_STAT(type_spec_arithm)++;
 				} else if (MUST_BE(t1, MAY_BE_DOUBLE) && MUST_BE(t2, MAY_BE_DOUBLE)) {
-					opline->opcode = ZEND_SUB_DOUBLE;
+					opline->opcode = ZEND_SUB_FLOAT;
 					OPT_STAT(type_spec_arithm)++;
 				}
 				break;
@@ -119,7 +119,7 @@ void ssa_optimize_type_specialization(ssa_opt_ctx *ctx) {
 				normalize_op1_type(op_array, opline, &t1, t2);
 				normalize_op2_type(op_array, opline, t1, &t2);
 				if (MUST_BE(t1, MAY_BE_DOUBLE) && MUST_BE(t2, MAY_BE_DOUBLE)) {
-					opline->opcode = ZEND_MUL_DOUBLE;
+					opline->opcode = ZEND_MUL_FLOAT;
 					OPT_STAT(type_spec_arithm)++;
 				}
 				break;
@@ -130,7 +130,7 @@ void ssa_optimize_type_specialization(ssa_opt_ctx *ctx) {
 				normalize_op1_type(op_array, opline, &t1, t2);
 				normalize_op2_type(op_array, opline, t1, &t2);
 				if (MUST_BE(t1, MAY_BE_DOUBLE) && MUST_BE(t2, MAY_BE_DOUBLE)) {
-					opline->opcode = ZEND_DIV_DOUBLE;
+					opline->opcode = ZEND_DIV_FLOAT;
 					OPT_STAT(type_spec_arithm)++;
 				}
 				break;
@@ -144,7 +144,7 @@ void ssa_optimize_type_specialization(ssa_opt_ctx *ctx) {
 					opline->opcode = ZEND_IS_SMALLER_INT;;
 					OPT_STAT(type_spec_arithm)++;
 				} else if (MUST_BE(t1, MAY_BE_DOUBLE) && MUST_BE(t2, MAY_BE_DOUBLE)) {
-					opline->opcode = ZEND_IS_SMALLER_DOUBLE;
+					opline->opcode = ZEND_IS_SMALLER_FLOAT;
 					OPT_STAT(type_spec_arithm)++;
 				}
 				break;
@@ -197,7 +197,7 @@ void ssa_optimize_type_specialization(ssa_opt_ctx *ctx) {
 					zval zv;
 					ZVAL_DOUBLE(&zv, 1.0);
 					opline->opcode = opline->opcode == ZEND_PRE_INC
-						? ZEND_ADD_DOUBLE : ZEND_SUB_DOUBLE;
+						? ZEND_ADD_FLOAT : ZEND_SUB_FLOAT;
 					opline->op2_type = IS_CONST;
 					opline->op2.constant = zend_optimizer_add_literal(op_array, &zv);
 				}
