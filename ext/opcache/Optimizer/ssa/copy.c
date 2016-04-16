@@ -364,9 +364,22 @@ void try_propagate_tmp_tmp_assignment(
 	}
 
 	FOREACH_USE(lhs_var, use) {
+		zend_op *use_opline = &op_array->opcodes[use];
+		zend_ssa_op *use_op = &ssa->ops[use];
+
 		/* Weird opcode, best not mess with it */
-		if (op_array->opcodes[use].opcode == ZEND_SEPARATE) {
+		if (use_opline->opcode == ZEND_SEPARATE) {
 			return;
+		}
+
+		/* If switching from VAR to TMP, ensure it's supported by uses. */
+		if (opline->result_type == IS_VAR && opline->op1_type == IS_TMP_VAR) {
+			if (use_op->op1_use == ssa_op->result_def && !can_tmpvar_op1(use_opline)) {
+				return;
+			}
+			if (use_op->op2_use == ssa_op->result_def && !can_tmpvar_op2(use_opline)) {
+				return;
+			}
 		}
 	} FOREACH_USE_END();
 
