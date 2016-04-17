@@ -16,16 +16,17 @@ static inline zend_bool is_minus_one(zval *op) {
 
 static inline zend_bool is_used_only_in(
 		const zend_ssa *ssa, const zend_ssa_var *var, const zend_ssa_op *ssa_op) {
+	int var_num = var - ssa->vars;
 	if (var->phi_use_chain || var->use_chain != ssa_op - ssa->ops) {
 		return 0;
 	}
-	if (ssa_op->result_use == var - ssa->vars) {
+	if (ssa_op->result_use == var_num) {
 		return ssa_op->res_use_chain < 0;
 	}
-	if (ssa_op->op1_use == var - ssa->vars) {
+	if (ssa_op->op1_use == var_num) {
 		return ssa_op->op1_use_chain < 0;
 	}
-	if (ssa_op->op2_use == var - ssa->vars) {
+	if (ssa_op->op2_use == var_num) {
 		return ssa_op->op2_use_chain < 0;
 	}
 	ZEND_ASSERT(0);
@@ -97,7 +98,7 @@ static void reverse_propagate_assign(
 	}
 
 	def_op = &ssa->ops[var->definition];
-	if (def_op->result_def != ssa_op->op1_use) {
+	if (def_op->result_def != ssa_op->op1_use || def_op->result_use > 0) {
 		return;
 	}
 
