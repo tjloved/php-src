@@ -611,6 +611,9 @@ static void merge_opcodes(
 					/* Insert jump to end of function */
 					new_opline++;
 					new_opline->opcode = ZEND_JMP;
+					SET_UNUSED(new_opline->op1);
+					SET_UNUSED(new_opline->op2);
+					SET_UNUSED(new_opline->result);
 					ZEND_SET_OP_JMP_ADDR(new_opline, new_opline->op1, new_end);
 					// TODO We can directly elide the last (trivial) JMP
 				}
@@ -624,6 +627,8 @@ static void merge_opcodes(
 			new_opline->opcode = ZEND_UNSET_VAR;
 			new_opline->op1_type = IS_CV;
 			new_opline->op1.var = (zend_uintptr_t) ZEND_CALL_VAR_NUM(NULL, cv_offset + i);
+			SET_UNUSED(new_opline->op2);
+			SET_UNUSED(new_opline->result);
 			new_opline->extended_value = ZEND_FETCH_LOCAL | ZEND_QUICK_SET;
 			new_opline++;
 		}
