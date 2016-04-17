@@ -61,6 +61,38 @@ static void collect_ssa_stats(zend_op_array *op_array, zend_ssa *ssa) {
 	}
 }
 
+static char *get_op_type_name(zend_uchar op_type) {
+	switch (op_type) {
+		case IS_CONST: return "CONST";
+		case IS_TMP_VAR: return "TMP";
+		case IS_VAR: return "VAR";
+		case IS_CV: return "CV";
+		case IS_UNUSED: return "UNUSED";
+		default: return "???";
+	}
+}
+
+#define TRACE_USE_INFO(name) \
+	(ssa_op->name##_use >= 0 ? ssa->var_info[ssa_op->name##_use].type \
+	 : opline->name##_type == IS_CONST \
+	   ? _const_op_type(CT_CONSTANT_EX(op_array, opline->name.constant)) : -1)
+#define TRACE_DEF_INFO(name) \
+	(ssa_op->name##_def >= 0 ? ssa->var_info[ssa_op->name##_def].type : -1)
+
+static void dump_instruction_trace(const zend_op_array *op_array, const zend_ssa *ssa) {
+	int i;
+	for (i = 0; i < op_array->last; i++) {
+		zend_op *opline = &op_array->opcodes[i];
+		zend_ssa_op *ssa_op = &ssa->ops[i];
+		fprintf(stderr, "%s %s %d %d %s %d %d %s %d %d\n",
+			zend_get_opcode_name(opline->opcode),
+			get_op_type_name(opline->op1_type), TRACE_USE_INFO(op1), TRACE_DEF_INFO(op1),
+			get_op_type_name(opline->op2_type), TRACE_USE_INFO(op2), TRACE_DEF_INFO(op2),
+			get_op_type_name(opline->result_type), TRACE_USE_INFO(result), TRACE_DEF_INFO(result)
+		);
+	}
+}
+
 /* The block map only contains entries for the start and end of a block.
  * Fill it up to cover all instructions. */
 static void complete_block_map(zend_cfg *cfg, uint32_t num_instr) {
@@ -330,8 +362,12 @@ static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) 
 		return;
 	}
 
-	if (ZCG(accel_directives).opt_statistics) {
+	if (OPT_STAT_ENABLED()) {
 		collect_ssa_stats(op_array, &info->ssa);
+	}
+
+	if (ZCG(accel_directives).opt_statistics > 1) {
+		dump_instruction_trace(op_array, &info->ssa);
 	}
 
 	complete_block_map(&info->ssa.cfg, op_array->last);

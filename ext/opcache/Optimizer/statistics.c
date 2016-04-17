@@ -12,7 +12,7 @@ zend_optimizer_statistics optimizer_statistics;
 
 void zend_optimizer_statistics_startup() {}
 void zend_optimizer_statistics_shutdown() {
-	if (!ZCG(accel_directives).opt_statistics) {
+	if (!OPT_STAT_ENABLED()) {
 		return;
 	}
 

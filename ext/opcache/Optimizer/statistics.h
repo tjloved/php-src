@@ -55,6 +55,7 @@ typedef struct _zend_optimizer_statistics {
 extern zend_optimizer_statistics optimizer_statistics;
 
 #define OPT_STAT(name) (optimizer_statistics.name)
+#define OPT_STAT_ENABLED() (ZCG(accel_directives).opt_statistics == 1)
 
 void zend_optimizer_statistics_startup(void);
 void zend_optimizer_statistics_shutdown(void);
