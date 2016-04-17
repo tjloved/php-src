@@ -221,12 +221,25 @@ static inline zend_bool should_dump(const zend_op_array *op_array, int debug_lev
 		const char *func = ZCG(accel_directives).ssa_debug_func;
 		size_t len = strlen(func);
 		if (len) {
-			if (!op_array->function_name) {
+			zend_string *function_name = op_array->function_name;
+			if (!function_name) {
 				return 0;
 			}
-			if (ZSTR_LEN(op_array->function_name) != len
-					|| memcmp(ZSTR_VAL(op_array->function_name), func, len)) {
-				return 0;
+			if (op_array->scope) {
+				zend_string *class_name = op_array->scope->name;
+				int total_len = ZSTR_LEN(class_name) + strlen("::") + ZSTR_LEN(function_name);
+				if (total_len != len
+						|| memcmp(func, ZSTR_VAL(class_name), ZSTR_LEN(class_name))
+						|| memcmp(func + ZSTR_LEN(class_name), "::", strlen("::"))
+						|| memcmp(func + ZSTR_LEN(class_name) + strlen("::"),
+								ZSTR_VAL(function_name), ZSTR_LEN(function_name))) {
+					return 0;
+				}
+			} else {
+				if (ZSTR_LEN(function_name) != len
+						|| memcmp(ZSTR_VAL(function_name), func, len)) {
+					return 0;
+				}
 			}
 		}
 		return 1;
