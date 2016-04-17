@@ -1641,7 +1641,7 @@ function gen_executor($f, $skl, $spec, $kind, $executor_name, $initializer_name)
 							out($f,"#define ZEND_VM_LOOP_INTERRUPT() zend_interrupt_helper".($spec?"_SPEC":"")."(ZEND_OPCODE_HANDLER_ARGS_PASSTHRU);\n");
 							out($f,"#define ZEND_VM_DISPATCH(opcode, opline) ZEND_VM_TAIL_CALL(((opcode_handler_t)zend_vm_get_opcode_handler(opcode, opline))(ZEND_OPCODE_HANDLER_ARGS_PASSTHRU));\n");
                             out($f,"#if ZEND_VM_BENCH\n");
-                            out($f,"uint32_t zend_vm_executed_ops[ZEND_VM_LAST_OPCODE+1];\n");
+                            out($f,"uint32_t zend_vm_executed_ops[256];\n");
                             out($f,"#endif\n");
 							out($f,"\n");
 							out($f,"static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL zend_interrupt_helper".($spec?"_SPEC":"")."(ZEND_OPCODE_HANDLER_ARGS);");
