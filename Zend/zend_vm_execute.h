@@ -399,7 +399,7 @@ typedef ZEND_OPCODE_HANDLER_RET (ZEND_FASTCALL *opcode_handler_t) (ZEND_OPCODE_H
 #endif
 #define ZEND_VM_DISPATCH(opcode, opline) ZEND_VM_TAIL_CALL(((opcode_handler_t)zend_vm_get_opcode_handler(opcode, opline))(ZEND_OPCODE_HANDLER_ARGS_PASSTHRU));
 #if ZEND_VM_BENCH
-uint32_t zend_vm_executed_ops[ZEND_VM_LAST_OPCODE+1];
+uint32_t zend_vm_executed_ops[256];
 #endif
 
 
