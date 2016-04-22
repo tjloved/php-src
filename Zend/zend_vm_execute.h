@@ -38497,6 +38497,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FETCH_DIM_INT_SPEC_CV_CONST_HA
 	zval *op1 = _get_zval_ptr_cv_undef(execute_data, opline->op1.var);
 	zval *op2 = EX_CONSTANT(opline->op2);
 	zval *retval = zend_hash_index_find(Z_ARRVAL_P(op1), Z_LVAL_P(op2));
+	SAVE_OPLINE();
 	if (EXPECTED(retval)) {
 		ZVAL_COPY(EX_VAR(opline->result.var), retval);
 	} else {
@@ -47989,6 +47990,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FETCH_DIM_INT_SPEC_CV_TMPVARCV
 	zval *op1 = _get_zval_ptr_cv_undef(execute_data, opline->op1.var);
 	zval *op2 = EX_VAR(opline->op2.var);
 	zval *retval = zend_hash_index_find(Z_ARRVAL_P(op1), Z_LVAL_P(op2));
+	SAVE_OPLINE();
 	if (EXPECTED(retval)) {
 		ZVAL_COPY(EX_VAR(opline->result.var), retval);
 	} else {
@@ -50039,6 +50041,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FETCH_DIM_INT_SPEC_TMPVAR_CONS
 	zval *op1 = _get_zval_ptr_var(opline->op1.var, execute_data, &free_op1);
 	zval *op2 = EX_CONSTANT(opline->op2);
 	zval *retval = zend_hash_index_find(Z_ARRVAL_P(op1), Z_LVAL_P(op2));
+	SAVE_OPLINE();
 	if (EXPECTED(retval)) {
 		ZVAL_COPY(EX_VAR(opline->result.var), retval);
 	} else {
@@ -53517,6 +53520,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FETCH_DIM_INT_SPEC_TMPVAR_TMPV
 	zval *op1 = _get_zval_ptr_var(opline->op1.var, execute_data, &free_op1);
 	zval *op2 = EX_VAR(opline->op2.var);
 	zval *retval = zend_hash_index_find(Z_ARRVAL_P(op1), Z_LVAL_P(op2));
+	SAVE_OPLINE();
 	if (EXPECTED(retval)) {
 		ZVAL_COPY(EX_VAR(opline->result.var), retval);
 	} else {

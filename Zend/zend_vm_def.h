@@ -8144,6 +8144,7 @@ ZEND_VM_HANDLER(194, ZEND_FETCH_DIM_INT, TMPVAR|CV, CONST|TMPVARCV)
 	zval *op1 = GET_OP1_ZVAL_PTR_UNDEF(BP_VAR_R);
 	zval *op2 = GET_OP2_ZVAL_PTR_UNDEF(BP_VAR_R);
 	zval *retval = zend_hash_index_find(Z_ARRVAL_P(op1), Z_LVAL_P(op2));
+	SAVE_OPLINE();
 	if (EXPECTED(retval)) {
 		ZVAL_COPY(EX_VAR(opline->result.var), retval);
 	} else {
