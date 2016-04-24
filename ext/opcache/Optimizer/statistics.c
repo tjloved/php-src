@@ -19,6 +19,7 @@ void zend_optimizer_statistics_shutdown() {
 	PRINT_STAT(instrs);
 	PRINT_STAT(cfg_blocks);
 	PRINT_STAT(phis);
+	PRINT_STAT(pis);
 
 	PRINT_STAT(ssa_vars);
 	PRINT_NORM_STAT(ssa_may_be_ref, ssa_vars);
