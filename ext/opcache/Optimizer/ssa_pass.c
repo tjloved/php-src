@@ -57,6 +57,9 @@ static void collect_ssa_stats(zend_op_array *op_array, zend_ssa *ssa) {
 		}
 		if (var->definition_phi) {
 			OPT_STAT(phis)++;
+			if (var->definition_phi->pi >= 0) {
+				OPT_STAT(pis)++;
+			}
 		}
 	}
 }
