@@ -109,7 +109,11 @@ static int try_propagate_cv_assignment(ssa_opt_ctx *ctx, zend_op *opline, zend_s
 	} else {
 		lhs_var_num = ssa_op->result_def;
 		rhs_var_num = ssa_op->op1_use;
-		old_lhs_var_num = ssa->vars[lhs_var_num].var;
+		if (opline->result_type == IS_CV) {
+			old_lhs_var_num = ssa->vars[lhs_var_num].var;
+		} else {
+			old_lhs_var_num = -1;
+		}
 	}
 	lhs_var = &ssa->vars[lhs_var_num];
 	rhs_var = &ssa->vars[rhs_var_num];
@@ -158,7 +162,9 @@ static int try_propagate_cv_assignment(ssa_opt_ctx *ctx, zend_op *opline, zend_s
 
 	/* All remaining uses must be in noval phis, change them to the previous LHS num */
 	ZEND_ASSERT(lhs_var->use_chain < 0);
-	rename_var_uses(ssa, lhs_var_num, old_lhs_var_num);
+	if (old_lhs_var_num >= 0) {
+		rename_var_uses(ssa, lhs_var_num, old_lhs_var_num);
+	}
 
 	/* Remove assignment instruction */
 	if (opline->opcode == ZEND_ASSIGN) {
