@@ -316,20 +316,9 @@ static inline_info *find_inlinable_calls(zend_op_array *op_array, zend_optimizer
 		if (opline->opcode == ZEND_INIT_FCALL) {
 			zend_string *name = Z_STR(ZEND_OP2_LITERAL(opline));
 			fbc = zend_hash_find_ptr(&ctx->script->function_table, name);
-		} else if (opline->opcode == ZEND_INIT_STATIC_METHOD_CALL
-				&& opline->op2_type == IS_CONST && Z_TYPE(ZEND_OP2_LITERAL(opline)) == IS_STRING) {
-			zend_class_entry *ce = NULL;
-			if (opline->op1_type == IS_CONST && Z_TYPE(ZEND_OP1_LITERAL(opline)) == IS_STRING) {
-				zend_string *class_name = Z_STR_P(&ZEND_OP1_LITERAL(opline) + 1);
-				ce = zend_hash_find_ptr(&ctx->script->class_table, class_name);
-			} else if (opline->op1_type == IS_UNUSED && op_array->scope
-					&& (opline->op1.num & ZEND_FETCH_CLASS_MASK) == ZEND_FETCH_CLASS_SELF) {
-				ce = op_array->scope;
-			}
-			if (ce) {
-				zend_string *func_name = Z_STR_P(&ZEND_OP2_LITERAL(opline) + 1);
-				fbc = zend_hash_find_ptr(&ce->function_table, func_name);
-			}
+		} else if (opline->opcode == ZEND_INIT_STATIC_METHOD_CALL) {
+			fbc = (zend_op_array *) zend_optimizer_get_called_func(
+					ctx->script, op_array, opline, 0);
 		}
 
 		if (fbc) {
