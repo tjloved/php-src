@@ -33,11 +33,9 @@ static void zend_bitset_dump(zend_bitset bitset, uint32_t len, uint32_t count) {
 	int i, j;
 	for (i = 0; i < count; i++) {
 		fprintf(stderr, "%d: ", i);
-		j = 0;
-		while ((j = zend_bitset_next(bitset + len * i, len, j)) >= 0) {
+		ZEND_BITSET_FOREACH_END(bitset + len * i, len, j) {
 			fprintf(stderr, "%d ", j);
-			j++;
-		}
+		} ZEND_BITSET_FOREACH_END();
 		fprintf(stderr, "\n");
 	}
 }
@@ -81,10 +79,10 @@ static void compute_targets(
 	for (i = 0; i < cfg->blocks_count; i++) {
 		int n = info->preorder[i];
 		if (zend_bitset_in(info->backedge_targets, n)) {
-			int source = 0;
+			int source;
 			zend_bitset_copy(tmp, REDUCED_REACHABLE(n), liveness->block_set_len);
 			zend_bitset_intersection(tmp, info->backedge_sources, liveness->block_set_len);
-			while ((source = zend_bitset_next(tmp, liveness->block_set_len, source)) >= 0) {
+			ZEND_BITSET_FOREACH(tmp, liveness->block_set_len, source) {
 				int s;
 				for (s = 0; s < 2; s++) {
 					if (zend_bitset_in(info->backedges, 2 * source + s)) {
@@ -95,20 +93,17 @@ static void compute_targets(
 						}
 					}
 				}
-				source++;
-			}
+			} ZEND_BITSET_FOREACH_END();
 			zend_bitset_incl(TARGETS(n), n);
 		}
 	}
 
 	/* For each backedge source compute union of backedge targets */
-	i = 0;
-	while ((i = zend_bitset_next(info->backedges, liveness->block_set_len, i)) >= 0) {
+	ZEND_BITSET_FOREACH(info->backedges, liveness->block_set_len, i) {
 		int source = i >> 1;
 		int target = cfg->blocks[source].successors[i & 1];
 		zend_bitset_union(TARGETS(source), TARGETS(target), liveness->block_set_len);
-		i++;
-	}
+	} ZEND_BITSET_FOREACH_END();
 
 	/* Propagate info upwards through reduced graph using postorder iteration */
 	for (i = 0; i < cfg->blocks_count; i++) {
@@ -212,12 +207,12 @@ zend_bool ssa_is_live_in_at_block(const ssa_liveness *liveness, int var_num, int
 	zend_ssa *ssa = liveness->ssa;
 	zend_ssa_var *var = &ssa->vars[var_num];
 	int def_block = get_def_block(ssa, var);
-	int i = 0;
+	int i;
 	DEBUG_PRINT("Live-in query for var %d (def block %d) at block %d\n", var_num, def_block, block);
 	if (is_immediately_consumed_pi(ssa, var)) {
 		return 0;
 	}
-	while ((i = zend_bitset_next(TARGETS(block), liveness->block_set_len, i)) >= 0) {
+	ZEND_BITSET_FOREACH(TARGETS(block), liveness->block_set_len, i) {
 		if (block_strictly_dominates(liveness->info, def_block, i)) {
 			int use;
 			zend_ssa_phi *phi;
@@ -236,8 +231,7 @@ zend_bool ssa_is_live_in_at_block(const ssa_liveness *liveness, int var_num, int
 				}
 			} FOREACH_PHI_USE_END();
 		}
-		i++;
-	}
+	} ZEND_BITSET_FOREACH_END();
 	return 0;
 }
 static inline zend_bool ssa_is_live_at_op(
@@ -292,8 +286,8 @@ static inline zend_bool ssa_is_live_at_op(
 		} FOREACH_PHI_USE_END();
 		return 0;
 	} else {
-		int i = 0;
-		while ((i = zend_bitset_next(TARGETS(block), liveness->block_set_len, i)) >= 0) {
+		int i;
+		ZEND_BITSET_FOREACH(TARGETS(block), liveness->block_set_len, i) {
 			if (block_strictly_dominates(liveness->info, def_block, i)) {
 				int use;
 				zend_ssa_phi *phi;
@@ -320,8 +314,7 @@ static inline zend_bool ssa_is_live_at_op(
 					}
 				} FOREACH_PHI_USE_END();
 			}
-			i++;
-		}
+		} ZEND_BITSET_FOREACH_END();
 		return 0;
 	}
 }
