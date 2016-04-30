@@ -1,5 +1,7 @@
 --TEST--
 Bug - crash in debug_backtrace when trace starts in eval
+--INI--
+opcache.optimization_level=0
 --FILE--
 <?php
 function foo() {
