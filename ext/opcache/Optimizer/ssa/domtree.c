@@ -9,6 +9,8 @@
  *  * If SEND_VAL_EX is used for an argument of a ZEND_INIT_FCALL_BY_NAME function, we can
  *    assume that this is a by-value argument in dominated paths and replace
  *    SEND_VAL_EX/SEND_VAR_EX opcodes with SEND_VAL/SEND_VAR opcodes.
+ *  * If ENSURE_HAVE_THIS dominates another ENSURE_HAVE_THIS, the latter may be dropped. We only
+ *    need to ensure this once.
  */
 
 typedef struct _arginfo {
@@ -16,16 +18,17 @@ typedef struct _arginfo {
 	uint32_t arg_offset;
 } arginfo;
 
-typedef struct _arginfo_context {
+typedef struct _context {
 	zend_cfg *cfg;
 	arginfo *info;
-	uint32_t pos;
-} arginfo_context;
+	uint32_t arginfo_pos;
+	zend_bool have_this_check;
+} context;
 
 static inline zend_bool have_arginfo(
-		arginfo_context *ctx, zend_string *lcname, uint32_t arg_offset) {
+		const context *ctx, zend_string *lcname, uint32_t arg_offset) {
 	uint32_t i;
-	for (i = 0; i < ctx->pos; i++) {
+	for (i = 0; i < ctx->arginfo_pos; i++) {
 		if (zend_string_equals(ctx->info[i].lcname, lcname)
 				&& ctx->info[i].arg_offset == arg_offset) {
 			return 1;
@@ -34,14 +37,11 @@ static inline zend_bool have_arginfo(
 	return 0;
 }
 
-static void propagate_recursive(arginfo_context *ctx, zend_op_array *op_array, int block_num) {
-	zend_cfg *cfg = ctx->cfg;
-	zend_basic_block *block = &cfg->blocks[block_num];
-	uint32_t orig_pos = ctx->pos;
+static void process_block(context *ctx, zend_op_array *op_array, zend_basic_block *block) {
 	zend_op *opline = &op_array->opcodes[block->start], *end = &op_array->opcodes[block->end];
-	int i;
 	for (; opline <= end; opline++) {
 		if (opline->opcode == ZEND_INIT_FCALL_BY_NAME) {
+			// TODO: We're effectively skipping the opcodes of the argument list here
 			zend_string *lcname = Z_STR_P(&ZEND_OP2_LITERAL(opline) + 1);
 			int level = 0;
 			while (++opline <= end) {
@@ -59,9 +59,9 @@ static void propagate_recursive(arginfo_context *ctx, zend_op_array *op_array, i
 							opline->opcode = ZEND_SEND_VAL;
 							OPT_STAT(simplified_sends)++;
 						} else {
-							ctx->info[ctx->pos].lcname = lcname;
-							ctx->info[ctx->pos].arg_offset = opline->op2.num;
-							ctx->pos++;
+							ctx->info[ctx->arginfo_pos].lcname = lcname;
+							ctx->info[ctx->arginfo_pos].arg_offset = opline->op2.num;
+							ctx->arginfo_pos++;
 						}
 					} else if (opline->opcode == ZEND_SEND_VAR_EX) {
 						if (have_arginfo(ctx, lcname, opline->op2.num)) {
@@ -71,18 +71,36 @@ static void propagate_recursive(arginfo_context *ctx, zend_op_array *op_array, i
 					}
 				}
 			}
+		} else if (opline->opcode == ZEND_ENSURE_HAVE_THIS) {
+			if (ctx->have_this_check) {
+				MAKE_NOP(opline);
+			}
+			ctx->have_this_check = 1;
 		}
 	}
+}
+
+static void propagate_recursive(context *ctx, zend_op_array *op_array, int block_num) {
+	zend_cfg *cfg = ctx->cfg;
+	zend_basic_block *block = &cfg->blocks[block_num];
+	uint32_t orig_arginfo_pos = ctx->arginfo_pos;
+	zend_bool orig_have_this_check = ctx->have_this_check;
+	int i;
+
+	process_block(ctx, op_array, block);
+
 	for (i = cfg->blocks[block_num].children; i >= 0; i = cfg->blocks[i].next_child) {
 		propagate_recursive(ctx, op_array, i);
 	}
-	ctx->pos = orig_pos;
+
+	/* Reset state when going back up the domtree */
+	ctx->arginfo_pos = orig_arginfo_pos;
+	ctx->have_this_check = orig_have_this_check;
 }
 
 void ssa_propagate_along_domtree(zend_op_array *op_array, zend_cfg *cfg) {
 	arginfo *info = safe_emalloc(sizeof(arginfo), op_array->last, 0);
-	arginfo_context ctx = {cfg, info, 0};
+	context ctx = {cfg, info, 0, 0};
 	propagate_recursive(&ctx, op_array, 0);
-
 	efree(info);
 }
