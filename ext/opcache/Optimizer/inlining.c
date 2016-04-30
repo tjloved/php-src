@@ -82,8 +82,9 @@ typedef struct _inline_info {
 	int32_t opnum_diff;
 	uint32_t num_inlined_opcodes;
 	uint32_t num_args_passed;
-	uint8_t result_var_type;
 	uint32_t result_var_num;
+	uint8_t result_var_type;
+	zend_bool is_this_call;
 	merge_info merge;
 } inline_info;
 
@@ -200,6 +201,10 @@ static zend_bool can_inline_from(
 	if (op_array->early_binding != (uint32_t) -1) {
 		return 0;
 	}
+	if (op_array->this_var != (uint32_t) -1) {
+		// TODO
+		return 0;
+	}
 	// TODO Support merging static variables
 	if (op_array->static_variables) {
 		return 0;
@@ -246,8 +251,14 @@ static uint32_t num_returns(zend_op_array *op_array) {
 	return num;
 }
 
-static int32_t opnum_diff(zend_op_array *op_array, uint32_t num_inlined_opcodes) {
+static int32_t opnum_diff(
+		const zend_op_array *op_array, uint32_t num_inlined_opcodes, zend_bool is_this_call) {
 	int32_t diff = num_inlined_opcodes;
+
+	/* We add a $this != NULL check */
+	if (is_this_call) {
+		diff += 1;
+	}
 
 	/* We drop the INIT_FCALL and DO_FCALL opcodes */
 	diff -= 2;
@@ -316,7 +327,8 @@ static inline_info *find_inlinable_calls(zend_op_array *op_array, zend_optimizer
 		if (opline->opcode == ZEND_INIT_FCALL) {
 			zend_string *name = Z_STR(ZEND_OP2_LITERAL(opline));
 			fbc = zend_hash_find_ptr(&ctx->script->function_table, name);
-		} else if (opline->opcode == ZEND_INIT_STATIC_METHOD_CALL) {
+		} else if (opline->opcode == ZEND_INIT_STATIC_METHOD_CALL
+				|| opline->opcode == ZEND_INIT_METHOD_CALL) {
 			fbc = (zend_op_array *) zend_optimizer_get_called_func(
 					ctx->script, op_array, opline, 0);
 		}
@@ -337,10 +349,11 @@ static inline_info *find_inlinable_calls(zend_op_array *op_array, zend_optimizer
 				info->init_opline = opline;
 				info->call_opline = call_opline;
 				info->num_args_passed = num_args_passed;
+				info->is_this_call = opline->opcode == ZEND_INIT_METHOD_CALL;
 
 				/* We add one extra JMP for every RETURN and we drop RECVs for passed arguments */
 				info->num_inlined_opcodes = fbc->last + num_returns(fbc) - num_args_passed;
-				info->opnum_diff = opnum_diff(fbc, info->num_inlined_opcodes);
+				info->opnum_diff = opnum_diff(fbc, info->num_inlined_opcodes, info->is_this_call);
 
 				if (call_opline->result_type == IS_UNUSED) {
 					info->result_var_num = (uint32_t) -1;
@@ -448,6 +461,11 @@ int32_t *create_shiftlists(zend_optimizer_ctx *ctx, zend_op_array *op_array, inl
 		NEXT();
 		shift--;
 
+		if (info->is_this_call) {
+			/* An ENSURE_HAVE_THIS will be inserted */
+			shift++;
+		}
+
 		while (opline != info->call_opline) {
 			NEXT();
 		}
@@ -512,6 +530,16 @@ static void merge_opcodes(
 		/* Skip INIT_FCALL */
 		opline++;
 
+		if (info->is_this_call) {
+			/* Insert an assertion that $this is defined */
+			new_opline->opcode = ZEND_ENSURE_HAVE_THIS;
+			SET_UNUSED(new_opline->op1);
+			SET_UNUSED(new_opline->op2);
+			SET_UNUSED(new_opline->result);
+			new_opline->lineno = (opline - 1)->lineno;
+			new_opline++;
+		}
+
 		while (opline != info->call_opline) {
 			if (is_init_opline(opline)) {
 				level++;
@@ -529,7 +557,7 @@ static void merge_opcodes(
 				COPY_NODE(new_opline->op2, new_opline->op1);
 				new_opline->op1_type = IS_CV;
 				new_opline->op1.var = (zend_uintptr_t) ZEND_CALL_VAR_NUM(NULL, var_num);
-				new_opline->result_type = IS_UNUSED;
+				SET_UNUSED(new_opline->result);
 				OPT_STAT(inlining_arg_assigns)++;
 			}
 

@@ -219,7 +219,7 @@ static const char *zend_vm_opcodes_names[206] = {
 	"ZEND_FETCH_DIM_INT",
 	"ZEND_MOV_UNCOUNTED",
 	"ZEND_DIV_FLOAT",
-	NULL,
+	"ZEND_ENSURE_HAVE_THIS",
 	NULL,
 	NULL,
 	"ZEND_ADD_INT",
