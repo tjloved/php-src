@@ -15,6 +15,7 @@ typedef struct _ssa_opt_ctx {
 	unsigned assume_no_undef : 1;
 } ssa_opt_ctx;
 
+void ssa_propagate_along_domtree(zend_op_array *op_array, zend_cfg *cfg);
 void ssa_optimize_scp(ssa_opt_ctx *ctx);
 void ssa_optimize_dce(ssa_opt_ctx *ctx);
 void ssa_optimize_simplify_cfg(ssa_opt_ctx *ssa_ctx);
