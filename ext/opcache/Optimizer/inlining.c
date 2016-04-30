@@ -201,10 +201,6 @@ static zend_bool can_inline_from(
 	if (op_array->early_binding != (uint32_t) -1) {
 		return 0;
 	}
-	if (op_array->this_var != (uint32_t) -1) {
-		// TODO
-		return 0;
-	}
 	// TODO Support merging static variables
 	if (op_array->static_variables) {
 		return 0;
@@ -510,9 +506,18 @@ int32_t *create_shiftlists(zend_optimizer_ctx *ctx, zend_op_array *op_array, inl
 #undef NEXT
 }
 
+static inline uint32_t translate_cv(
+		uint32_t num, uint32_t cv_offset, uint32_t old_this_var, uint32_t new_this_var) {
+	if (num == old_this_var) {
+		return new_this_var;
+	}
+
+	return num + cv_offset * sizeof(zval);
+}
+
 static void merge_opcodes(
 		zend_op_array *op_array, inline_info *info,
-		zend_op *new_opcodes, const merge_info *merge) {
+		zend_op *new_opcodes, const merge_info *merge, uint32_t new_this_var) {
 	zend_op *opline = op_array->opcodes;
 	zend_op *end = opline + op_array->last;
 	zend_op *new_opline = new_opcodes;
@@ -578,7 +583,8 @@ static void merge_opcodes(
 
 				/* Adjust CV and CONST offsets */
 				if (new_opline->op1_type == IS_CV) {
-					new_opline->op1.var += cv_offset * sizeof(zval);
+					new_opline->op1.var = translate_cv(
+						new_opline->op1.var, cv_offset, info->fbc->this_var, new_this_var);
 				} else if (new_opline->op1_type == IS_CONST) {
 					if (info->fbc != op_array) {
 						ZEND_PASS_TWO_UNDO_CONSTANT(info->fbc, new_opline->op1);
@@ -586,7 +592,8 @@ static void merge_opcodes(
 					new_opline->op1.constant += literal_offset;
 				}
 				if (new_opline->op2_type == IS_CV) {
-					new_opline->op2.var += cv_offset * sizeof(zval);
+					new_opline->op2.var = translate_cv(
+						new_opline->op2.var, cv_offset, info->fbc->this_var, new_this_var);
 				} else if (new_opline->op2_type == IS_CONST) {
 					if (info->fbc != op_array) {
 						ZEND_PASS_TWO_UNDO_CONSTANT(info->fbc, new_opline->op2);
@@ -594,7 +601,8 @@ static void merge_opcodes(
 					new_opline->op2.constant += literal_offset;
 				}
 				if (new_opline->result_type == IS_CV) {
-					new_opline->result.var += cv_offset * sizeof(zval);
+					new_opline->result.var = translate_cv(
+						new_opline->result.var, cv_offset, info->fbc->this_var, new_this_var);
 				}
 
 				if (new_opline->opcode == ZEND_RECV_INIT) {
@@ -786,11 +794,17 @@ static void inline_calls(zend_optimizer_ctx *ctx, zend_op_array *op_array, inlin
 	uint32_t new_num_cache_slots = op_array->cache_size;
 	uint32_t new_num_live_ranges = op_array->last_live_range;
 	uint32_t new_num_try_catch = op_array->last_try_catch;
+	uint32_t new_this_var = op_array->this_var;
 	uint32_t tmp_offset;
 
 	/* Compute new sizes for op_array structures */
 	inline_info *cur;
 	for (cur = info; cur; cur = cur->next) {
+		if (new_this_var == (uint32_t) -1 && cur->fbc->this_var != (uint32_t) -1) {
+			// TODO We'll be leaving behind dead $this variables
+			new_this_var = new_num_cvs + cur->fbc->this_var;
+		}
+
 		new_num_opcodes += cur->opnum_diff;
 		new_num_literals += cur->fbc->last_literal;
 		new_num_cvs += cur->fbc->last_var;
@@ -830,7 +844,7 @@ static void inline_calls(zend_optimizer_ctx *ctx, zend_op_array *op_array, inlin
 			op_array->last_live_range = new_num_live_ranges;
 		}
 
-		merge_opcodes(op_array, info, new_opcodes, &merge);
+		merge_opcodes(op_array, info, new_opcodes, &merge, new_this_var);
 		merge_cvs(op_array, info, new_vars);
 		merge_literals(op_array, info, new_literals);
 
@@ -857,6 +871,7 @@ static void inline_calls(zend_optimizer_ctx *ctx, zend_op_array *op_array, inlin
 
 		op_array->T = new_num_tmps;
 		op_array->cache_size = new_num_cache_slots;
+		op_array->this_var = new_this_var;
 	}
 	// TODO add/extend live range for return temporary
 }
