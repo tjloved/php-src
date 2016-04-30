@@ -142,16 +142,6 @@ static void remove_trivial_phis(zend_ssa *ssa) {
 	} FOREACH_PHI_END();
 }
 
-static zend_bool is_php_errormsg_used(zend_op_array *op_array) {
-	uint32_t i;
-	for (i = 0; i < op_array->last_var; ++i) {
-		if (zend_string_equals_literal(op_array->vars[i], "php_errormsg")) {
-			return 1;
-		}
-	}
-	return 0;
-}
-
 typedef struct _call_info {
 	int16_t start;
 	int16_t next;
@@ -248,11 +238,6 @@ static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) 
 	}
 
 	if (info->flags & ZEND_FUNC_INDIRECT_VAR_ACCESS) {
-		return;
-	}
-
-	if (is_php_errormsg_used(op_array)) {
-		// TODO Move this into construction phases?
 		return;
 	}
 
