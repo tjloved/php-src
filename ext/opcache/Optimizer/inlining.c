@@ -93,6 +93,26 @@ static zend_bool can_inline_opcodes(
 		zend_op_array *op_array, zend_bool rt_constants, zend_bool from) {
 	zend_op *opline = op_array->opcodes, *end = opline + op_array->last;
 	for (; opline != end; opline++) {
+		if (from) {
+			uint32_t flags = zend_get_opcode_flags(opline->opcode);
+
+			/* Check if LSB is used. It would be nice to just replace the correct class name in the
+			 * future, however right now adding the extra literals / cache slots on the fly would be
+			 * way too much hassle. */
+			if ((ZEND_VM_OP1_FLAGS(flags) & ZEND_VM_OP_CLASS_FETCH) && opline->op1_type == IS_UNUSED
+					&& (opline->op1.num & ZEND_FETCH_CLASS_MASK) == ZEND_FETCH_CLASS_STATIC) {
+				return 0;
+			}
+			if ((ZEND_VM_OP2_FLAGS(flags) & ZEND_VM_OP_CLASS_FETCH) && opline->op2_type == IS_UNUSED
+					&& (opline->op2.num & ZEND_FETCH_CLASS_MASK) == ZEND_FETCH_CLASS_STATIC) {
+				return 0;
+			}
+			if ((flags & ZEND_VM_EXT_CLASS_FETCH) &&
+					(opline->extended_value & ZEND_FETCH_CLASS_MASK) == ZEND_FETCH_CLASS_STATIC) {
+				return 0;
+			}
+		}
+
 		switch (opline->opcode) {
 			case ZEND_RECV_INIT:
 				if (from) {
@@ -134,6 +154,13 @@ static zend_bool can_inline_opcodes(
 							) {
 								/* Could theoretically be supported, but not worth patching
 								 * them up */
+								return 0;
+							}
+							if (zend_string_equals_literal(Z_STR_P(zv), "get_called_class") ||
+								zend_string_equals_literal(Z_STR_P(zv), "forward_static_call") ||
+								zend_string_equals_literal(Z_STR_P(zv), "forward_static_call_array")
+							) {
+								/* Functions observing LSB scope */
 								return 0;
 							}
 						}
