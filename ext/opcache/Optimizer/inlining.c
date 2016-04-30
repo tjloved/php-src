@@ -68,6 +68,7 @@
 
 typedef struct _merge_info {
 	uint32_t tmp_offset;
+	uint32_t this_var;
 	/* Shiftlist for instructions */
 	int32_t *shiftlist;
 	/* Map from old live_range offsets to new ones */
@@ -517,7 +518,7 @@ static inline uint32_t translate_cv(
 
 static void merge_opcodes(
 		zend_op_array *op_array, inline_info *info,
-		zend_op *new_opcodes, const merge_info *merge, uint32_t new_this_var) {
+		zend_op *new_opcodes, const merge_info *merge) {
 	zend_op *opline = op_array->opcodes;
 	zend_op *end = opline + op_array->last;
 	zend_op *new_opline = new_opcodes;
@@ -584,7 +585,8 @@ static void merge_opcodes(
 				/* Adjust CV and CONST offsets */
 				if (new_opline->op1_type == IS_CV) {
 					new_opline->op1.var = translate_cv(
-						new_opline->op1.var, cv_offset, info->fbc->this_var, new_this_var);
+						new_opline->op1.var, cv_offset,
+						info->fbc->this_var, info->merge.this_var);
 				} else if (new_opline->op1_type == IS_CONST) {
 					if (info->fbc != op_array) {
 						ZEND_PASS_TWO_UNDO_CONSTANT(info->fbc, new_opline->op1);
@@ -593,7 +595,8 @@ static void merge_opcodes(
 				}
 				if (new_opline->op2_type == IS_CV) {
 					new_opline->op2.var = translate_cv(
-						new_opline->op2.var, cv_offset, info->fbc->this_var, new_this_var);
+						new_opline->op2.var, cv_offset,
+						info->fbc->this_var, info->merge.this_var);
 				} else if (new_opline->op2_type == IS_CONST) {
 					if (info->fbc != op_array) {
 						ZEND_PASS_TWO_UNDO_CONSTANT(info->fbc, new_opline->op2);
@@ -602,7 +605,8 @@ static void merge_opcodes(
 				}
 				if (new_opline->result_type == IS_CV) {
 					new_opline->result.var = translate_cv(
-						new_opline->result.var, cv_offset, info->fbc->this_var, new_this_var);
+						new_opline->result.var, cv_offset,
+						info->fbc->this_var, info->merge.this_var);
 				}
 
 				if (new_opline->opcode == ZEND_RECV_INIT) {
@@ -785,6 +789,11 @@ static void merge_try_catch(
 #undef TO_NEW
 }
 
+static inline zend_bool has_proper_this_var(zend_op_array *op_array) {
+	return op_array->this_var != (uint32_t) -1
+		&& op_array->scope && !(op_array->fn_flags & ZEND_ACC_STATIC);
+}
+
 static void inline_calls(zend_optimizer_ctx *ctx, zend_op_array *op_array, inline_info *info) {
 	merge_info merge;
 	uint32_t new_num_opcodes = op_array->last;
@@ -795,12 +804,12 @@ static void inline_calls(zend_optimizer_ctx *ctx, zend_op_array *op_array, inlin
 	uint32_t new_num_live_ranges = op_array->last_live_range;
 	uint32_t new_num_try_catch = op_array->last_try_catch;
 	uint32_t new_this_var = op_array->this_var;
-	uint32_t tmp_offset;
+	uint32_t tmp_offset = op_array->this_var;
 
 	/* Compute new sizes for op_array structures */
 	inline_info *cur;
 	for (cur = info; cur; cur = cur->next) {
-		if (new_this_var == (uint32_t) -1 && cur->fbc->this_var != (uint32_t) -1) {
+		if (new_this_var == (uint32_t) -1 && has_proper_this_var(info->fbc)) {
 			// TODO We'll be leaving behind dead $this variables
 			new_this_var = new_num_cvs + cur->fbc->this_var;
 		}
@@ -817,12 +826,19 @@ static void inline_calls(zend_optimizer_ctx *ctx, zend_op_array *op_array, inlin
 		OPT_STAT(inlining_instrs) += cur->fbc->last;
 	}
 
-	/* Compute TMP base offsets */
+	/* Compute TMP base offsets and this_vars */
 	merge.tmp_offset = new_num_cvs - op_array->last_var;
+	merge.this_var = new_this_var;
 	tmp_offset = new_num_cvs + op_array->T;
 	for (cur = info; cur; cur = cur->next) {
 		cur->merge.tmp_offset = tmp_offset - cur->fbc->last_var;
 		tmp_offset += cur->fbc->T;
+
+		if (has_proper_this_var(cur->fbc)) {
+			cur->merge.this_var = new_this_var;
+		} else {
+			cur->merge.this_var = cur->fbc->this_var;
+		}
 	}
 
 	{
@@ -844,7 +860,7 @@ static void inline_calls(zend_optimizer_ctx *ctx, zend_op_array *op_array, inlin
 			op_array->last_live_range = new_num_live_ranges;
 		}
 
-		merge_opcodes(op_array, info, new_opcodes, &merge, new_this_var);
+		merge_opcodes(op_array, info, new_opcodes, &merge);
 		merge_cvs(op_array, info, new_vars);
 		merge_literals(op_array, info, new_literals);
 
