@@ -95,19 +95,22 @@ static zend_bool can_inline_opcodes(
 	for (; opline != end; opline++) {
 		if (from) {
 			uint32_t flags = zend_get_opcode_flags(opline->opcode);
+			uint32_t op1_flags = ZEND_VM_OP1_FLAGS(flags) & ZEND_VM_OP_MASK;
+			uint32_t op2_flags = ZEND_VM_OP2_FLAGS(flags) & ZEND_VM_OP_MASK;
+			uint32_t ext_flags = flags & ZEND_VM_EXT_MASK;
 
 			/* Check if LSB is used. It would be nice to just replace the correct class name in the
 			 * future, however right now adding the extra literals / cache slots on the fly would be
 			 * way too much hassle. */
-			if ((ZEND_VM_OP1_FLAGS(flags) & ZEND_VM_OP_CLASS_FETCH) && opline->op1_type == IS_UNUSED
+			if (op1_flags == ZEND_VM_OP_CLASS_FETCH && opline->op1_type == IS_UNUSED
 					&& (opline->op1.num & ZEND_FETCH_CLASS_MASK) == ZEND_FETCH_CLASS_STATIC) {
 				return 0;
 			}
-			if ((ZEND_VM_OP2_FLAGS(flags) & ZEND_VM_OP_CLASS_FETCH) && opline->op2_type == IS_UNUSED
+			if (op2_flags == ZEND_VM_OP_CLASS_FETCH && opline->op2_type == IS_UNUSED
 					&& (opline->op2.num & ZEND_FETCH_CLASS_MASK) == ZEND_FETCH_CLASS_STATIC) {
 				return 0;
 			}
-			if ((flags & ZEND_VM_EXT_CLASS_FETCH) &&
+			if (ext_flags == ZEND_VM_EXT_CLASS_FETCH &&
 					(opline->extended_value & ZEND_FETCH_CLASS_MASK) == ZEND_FETCH_CLASS_STATIC) {
 				return 0;
 			}
