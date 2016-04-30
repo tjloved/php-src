@@ -1,5 +1,7 @@
 --TEST--
 Bug #29896 (Backtrace argument list out of sync)
+--INI--
+opcache.optimization_level=0
 --FILE--
 <?php
 function userErrorHandler($num, $msg, $file, $line, $vars)

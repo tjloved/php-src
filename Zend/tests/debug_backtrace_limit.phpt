@@ -1,5 +1,7 @@
 --TEST--
 debug_backtrace limit
+--INI--
+opcache.optimization_level=0
 --FILE--
 <?php
 function a() {
