@@ -717,7 +717,6 @@ static inline void copy_instr(
 		case ZEND_JMPNZ_EX:
 		case ZEND_FE_RESET_R:
 		case ZEND_FE_RESET_RW:
-		case ZEND_NEW:
 		case ZEND_JMP_SET:
 		case ZEND_COALESCE:
 		case ZEND_ASSERT_CHECK:

@@ -319,9 +319,6 @@ static void simplify_jumps(zend_ssa *ssa, zend_op_array *op_array) {
 					remove_result_def(ssa, ssa_op);
 				}
 				break;
-			case ZEND_COALESCE:
-				// TODO
-				break;
 		}
 
 		if (opline->op1_type != IS_CONST) {
@@ -347,6 +344,22 @@ static void simplify_jumps(zend_ssa *ssa, zend_op_array *op_array) {
 					opline->op1_type = IS_UNUSED;
 					opline->op1.num = opline->op2.num;
 					opline->opcode = ZEND_JMP;
+				} else {
+					MAKE_NOP(opline);
+				}
+				break;
+			case ZEND_COALESCE:
+				if (var_used(&ssa->vars[ssa_op->result_def])) {
+					break;
+				}
+
+				remove_result_def(ssa, ssa_op);
+				if (Z_TYPE_P(op1) != IS_NULL) {
+					literal_dtor(op1);
+					opline->op1_type = IS_UNUSED;
+					opline->op1.num = opline->op2.num;
+					opline->opcode = ZEND_JMP;
+					opline->result_type = IS_UNUSED;
 				} else {
 					MAKE_NOP(opline);
 				}
