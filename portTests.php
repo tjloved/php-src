@@ -36,7 +36,7 @@ $blacklist = [
 $forbidden = '/
     global|\$GLOBALS|debug_(print_)?backtrace|->getTrace|__LINE__|__halt_compiler
   | Reflection\w+::export|error_get_last
-  | Parse\serror|on\sline\s\d|\#\d+\s\{main\}
+  | Parse\serror|\#\d+\s\{main\}
   | (?:%s|\.php)\(\d+\)
 /xi';
 
@@ -56,6 +56,12 @@ foreach ($it as $file) {
     $code = file_get_contents($name);
     if (preg_match($forbidden, $code)) {
         continue;
+    }
+
+    $numReplacements = 0;
+    $code = preg_replace('/on line \d+/', 'on line %d', $code, -1, $numReplacements);
+    if ($numReplacements > 0) {
+        $code = str_replace('--EXPECT--', '--EXPECTF--', $code);
     }
 
     $newCode = preg_replace_callback(
