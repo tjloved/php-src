@@ -43,6 +43,9 @@ typedef struct {
 	group *groups;
 	zend_stack stack;
 	block_info *blocks;
+	/* Shiftlist for block starts (used for JMPs) */
+	int *block_shiftlist;
+	/* Shiftlist for instructions (used for everything else) */
 	int *shiftlist;
 	int *loc;
 	int *pred;
@@ -274,7 +277,10 @@ static void coalesce_vars(context *ctx) {
 	FOREACH_PHI(phi) {
 		int source;
 		FOREACH_PHI_SOURCE(phi, source) {
-			try_merge(ctx, phi->ssa_var, source);
+			// TODO This check is here only for experimenting
+			if ((ssa->var_info[source].type & MAY_BE_REF)) {
+				try_merge(ctx, phi->ssa_var, source);
+			}
 		} FOREACH_PHI_SOURCE_END();
 	} FOREACH_PHI_END();
 
@@ -330,9 +336,7 @@ static inline pcopy_elem *pcopy_reserve_elem(pcopy *cpy) {
 			efree(cpy->elems);
 		}
 		cpy->elems = new_elems;
-		//OPT_STAT(tmp)++;
 	}
-	//OPT_STAT(tmp2)++;
 
 	return &cpy->elems[cpy->num_elems++];
 }
@@ -620,18 +624,19 @@ static void compute_shiftlist(context *ctx) {
 	const zend_cfg *cfg = &ctx->ssa->cfg;
 	int i, j = 0, shift = 0;
 	int *shiftlist = ctx->shiftlist;
+	int *block_shiftlist = ctx->block_shiftlist;
 
 	for (i = 0; i < cfg->blocks_count; i++) {
 		const zend_basic_block *block = &cfg->blocks[i];
 		zend_bool has_jump;
 
+		*block_shiftlist++ = shift;
+
 		if (!(block->flags & ZEND_BB_REACHABLE)) {
 			continue;
 		}
 
-		/* This assumes that a live range can never start at the first instruction in a basic
-		 * block. Right now this should hold. */
-		while (j <= block->start) {
+		while (j < block->start) {
 			shiftlist[j++] = shift;
 		}
 
@@ -654,6 +659,13 @@ static void compute_shiftlist(context *ctx) {
 		shiftlist[j++] = shift;
 	}
 
+#if DEBUG
+	fprintf(stderr, "Shiftlist:\n");
+	for (j = 0; j < op_array->last; j++) {
+		fprintf(stderr, "%d: %d\n", j, shiftlist[j]);
+	}
+#endif
+
 	ctx->new_num_opcodes = op_array->last + shift;
 }
 
@@ -670,9 +682,11 @@ static inline int get_cv_for_op(const zend_ssa *ssa, int use, int def) {
 static inline void copy_instr(
 		zend_op *new_opline, const zend_op *old_opline,
 		const zend_op_array *op_array, const zend_op *new_opcodes,
-		const int *shiftlist, const zend_ssa *ssa) {
-#define TO_NEW(opline) \
-		(opline - op_array->opcodes + new_opcodes) + shiftlist[opline - op_array->opcodes]
+		const int *block_shiftlist, const zend_ssa *ssa) {
+#define TO_NEW(block_num) \
+		(new_opcodes + cfg->blocks[block_num].start + block_shiftlist[block_num])
+	const zend_cfg *cfg = &ssa->cfg;
+	zend_basic_block *block = &cfg->blocks[cfg->map[old_opline - op_array->opcodes]];
 	const zend_ssa_op *ssa_op = &ssa->ops[old_opline - op_array->opcodes];
 	*new_opline = *old_opline;
 
@@ -691,12 +705,11 @@ static inline void copy_instr(
 	switch (new_opline->opcode) {
 		case ZEND_JMP:
 		case ZEND_FAST_CALL:
-			ZEND_SET_OP_JMP_ADDR(new_opline, new_opline->op1,
-					TO_NEW(ZEND_OP1_JMP_ADDR(old_opline)));
+			ZEND_SET_OP_JMP_ADDR(new_opline, new_opline->op1, TO_NEW(block->successors[0]));
 			break;
 		case ZEND_JMPZNZ:
-			new_opline->extended_value = ZEND_OPLINE_TO_OFFSET(new_opline,
-				TO_NEW(ZEND_OFFSET_TO_OPLINE(old_opline, old_opline->extended_value)));
+			new_opline->extended_value = ZEND_OPLINE_TO_OFFSET(
+				new_opline, TO_NEW(block->successors[1]));
 			/* break missing intentionally */
 		case ZEND_JMPZ:
 		case ZEND_JMPNZ:
@@ -708,21 +721,20 @@ static inline void copy_instr(
 		case ZEND_JMP_SET:
 		case ZEND_COALESCE:
 		case ZEND_ASSERT_CHECK:
-			ZEND_SET_OP_JMP_ADDR(new_opline, new_opline->op2,
-				TO_NEW(ZEND_OP2_JMP_ADDR(old_opline)));
+			ZEND_SET_OP_JMP_ADDR(new_opline, new_opline->op2, TO_NEW(block->successors[0]));
 			break;
 		case ZEND_CATCH:
 			if (!new_opline->result.num) {
-				new_opline->extended_value = ZEND_OPLINE_TO_OFFSET(new_opline,
-					TO_NEW(ZEND_OFFSET_TO_OPLINE(old_opline, old_opline->extended_value)));
+				new_opline->extended_value = ZEND_OPLINE_TO_OFFSET(
+					new_opline, TO_NEW(block->successors[0]));
 			}
 			break;
 		case ZEND_DECLARE_ANON_CLASS:
 		case ZEND_DECLARE_ANON_INHERITED_CLASS:
 		case ZEND_FE_FETCH_R:
 		case ZEND_FE_FETCH_RW:
-			new_opline->extended_value = ZEND_OPLINE_TO_OFFSET(new_opline,
-				TO_NEW(ZEND_OFFSET_TO_OPLINE(old_opline, old_opline->extended_value)));
+			new_opline->extended_value = ZEND_OPLINE_TO_OFFSET(
+				new_opline, TO_NEW(block->successors[0]));
 			break;
 	} 
 #undef TO_NEW
@@ -733,7 +745,7 @@ static void insert_copies(context *ctx) {
 	const zend_ssa *ssa = ctx->ssa;
 	const zend_cfg *cfg = &ssa->cfg;
 	const zend_op *old = op_array->opcodes;
-	const int *shiftlist = ctx->shiftlist;
+	const int *block_shiftlist = ctx->block_shiftlist;
 	zend_op *new_opcodes = ecalloc(sizeof(zend_op), ctx->new_num_opcodes);
 	zend_op *new = new_opcodes;
 	int i;
@@ -745,7 +757,7 @@ static void insert_copies(context *ctx) {
 		}
 
 		while (old < &op_array->opcodes[block->start]) {
-			copy_instr(new++, old++, op_array, new_opcodes, shiftlist, ssa);
+			copy_instr(new++, old++, op_array, new_opcodes, block_shiftlist, ssa);
 		}
 
 		pcopy_sequentialize(ctx, new, &ctx->blocks[i].early,
@@ -753,7 +765,7 @@ static void insert_copies(context *ctx) {
 		new += pcopy_estimated_num_copies(&ctx->blocks[i].early);
 
 		while (old < &op_array->opcodes[block->end]) {
-			copy_instr(new++, old++, op_array, new_opcodes, shiftlist, ssa);
+			copy_instr(new++, old++, op_array, new_opcodes, block_shiftlist, ssa);
 		}
 
 		// TODO This is pretty ugly
@@ -762,9 +774,9 @@ static void insert_copies(context *ctx) {
 			pcopy_sequentialize(ctx, new, &ctx->blocks[i].late,
 				op_array->opcodes[block->end].lineno);
 			new += pcopy_estimated_num_copies(&ctx->blocks[i].late);
-			copy_instr(new++, old++, op_array, new_opcodes, shiftlist, ssa);
+			copy_instr(new++, old++, op_array, new_opcodes, block_shiftlist, ssa);
 		} else {
-			copy_instr(new++, old++, op_array, new_opcodes, shiftlist, ssa);
+			copy_instr(new++, old++, op_array, new_opcodes, block_shiftlist, ssa);
 			pcopy_sequentialize(ctx, new, &ctx->blocks[i].late,
 				op_array->opcodes[block->end].lineno);
 			new += pcopy_estimated_num_copies(&ctx->blocks[i].late);
@@ -772,7 +784,7 @@ static void insert_copies(context *ctx) {
 	}
 
 	while (old < &op_array->opcodes[op_array->last]) {
-		copy_instr(new++, old++, op_array, new_opcodes, shiftlist, ssa);
+		copy_instr(new++, old++, op_array, new_opcodes, block_shiftlist, ssa);
 	}
 
 	efree(op_array->opcodes);
@@ -885,6 +897,7 @@ static void insert_pcopies(context *ctx) {
 #endif
 
 	ctx->shiftlist = zend_arena_alloc(&ctx->arena, sizeof(int) * op_array->last);
+	ctx->block_shiftlist = zend_arena_alloc(&ctx->arena, sizeof(int) * ssa->cfg.blocks_count);
 	compute_shiftlist(ctx);
 
 	ctx->loc = zend_arena_alloc(&ctx->arena,
