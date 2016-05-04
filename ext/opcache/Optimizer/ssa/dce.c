@@ -305,6 +305,7 @@ static void simplify_jumps(zend_ssa *ssa, zend_op_array *op_array) {
 		/* Convert jump-and-set into jump if result is not used  */
 		switch (opline->opcode) {
 			case ZEND_JMPZ_EX:
+				ZEND_ASSERT(ssa_op->result_def >= 0);
 				if (!var_used(&ssa->vars[ssa_op->result_def])) {
 					opline->opcode = ZEND_JMPZ;
 					opline->result_type = IS_UNUSED;
@@ -313,6 +314,7 @@ static void simplify_jumps(zend_ssa *ssa, zend_op_array *op_array) {
 				break;
 			case ZEND_JMPNZ_EX:
 			case ZEND_JMP_SET:
+				ZEND_ASSERT(ssa_op->result_def >= 0);
 				if (!var_used(&ssa->vars[ssa_op->result_def])) {
 					opline->opcode = ZEND_JMPNZ;
 					opline->result_type = IS_UNUSED;
@@ -349,6 +351,7 @@ static void simplify_jumps(zend_ssa *ssa, zend_op_array *op_array) {
 				}
 				break;
 			case ZEND_COALESCE:
+				ZEND_ASSERT(ssa_op->result_def >= 0);
 				if (var_used(&ssa->vars[ssa_op->result_def])) {
 					break;
 				}
