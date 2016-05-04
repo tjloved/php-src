@@ -152,7 +152,6 @@ static inline void remove_op2_def(zend_ssa *ssa, zend_ssa_op *ssa_op) {
 }
 
 static inline zend_bool var_used(zend_ssa_var *var) {
-	// TODO Do we care about sym_use_chain at this point?
 	return var->use_chain >= 0 || var->phi_use_chain != NULL;
 }
 
