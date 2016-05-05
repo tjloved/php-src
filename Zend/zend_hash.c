@@ -24,7 +24,7 @@
 #include "zend_globals.h"
 #include "zend_variables.h"
 
-#define HT_DEBUG 0
+#define HT_DEBUG 1
 #if HT_DEBUG
 # define HT_ASSERT(c) ZEND_ASSERT(c)
 #else
