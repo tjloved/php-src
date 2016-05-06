@@ -3167,10 +3167,30 @@ static void zend_update_type_info(const zend_op_array *op_array,
 			}
 			UPDATE_SSA_TYPE(tmp, ssa_ops[i].result_def);
 			break;
-		case ZEND_TYPE_CHECK:
 		case ZEND_DEFINED:
 			UPDATE_SSA_TYPE(MAY_BE_FALSE|MAY_BE_TRUE, ssa_ops[i].result_def);
 			break;
+		case ZEND_TYPE_CHECK:
+		{
+			/* Try to statically determine if the check is always true/false */
+			uint32_t expected_type = opline->extended_value == _IS_BOOL
+				? (MAY_BE_TRUE|MAY_BE_FALSE) : (1 << opline->extended_value);
+			tmp = MAY_BE_RC1;
+			if (t1 & MAY_BE_UNDEF) {
+				t1 |= MAY_BE_NULL;
+			}
+			if (!(t1 & expected_type)) {
+				tmp |= MAY_BE_FALSE;
+			} else if ((t1 & MAY_BE_ANY) == expected_type
+					&& opline->extended_value != IS_OBJECT
+					&& opline->extended_value != IS_RESOURCE) {
+				tmp |= MAY_BE_TRUE;
+			} else {
+				tmp |= MAY_BE_FALSE|MAY_BE_TRUE;
+			}
+			UPDATE_SSA_TYPE(tmp, ssa_ops[i].result_def);
+			break;
+		}
 		case ZEND_VERIFY_RETURN_TYPE:
 			if (t1 & MAY_BE_REF) {
 				tmp = t1;
