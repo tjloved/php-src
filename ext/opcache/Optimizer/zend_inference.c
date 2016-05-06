@@ -2888,13 +2888,15 @@ static void zend_update_type_info(void *void_ctx, zend_op *opline, zend_ssa_op *
 			}
 			break;
 		case ZEND_UNSET_VAR:
-			ZEND_ASSERT(opline->extended_value & ZEND_QUICK_SET);
-			tmp = MAY_BE_UNDEF;
-			if (!op_array->function_name) {
-				/* In global scope, we know nothing */
-				tmp |= MAY_BE_REF;
+			if (ssa_ops[i].op1_def >= 0) {
+				ZEND_ASSERT(opline->extended_value & ZEND_QUICK_SET);
+				tmp = MAY_BE_UNDEF;
+				if (!op_array->function_name) {
+					/* In global scope, we know nothing */
+					tmp |= MAY_BE_REF;
+				}
+				UPDATE_SSA_TYPE(tmp, ssa_ops[i].op1_def);
 			}
-			UPDATE_SSA_TYPE(tmp, ssa_ops[i].op1_def);
 			break;
 		case ZEND_UNSET_DIM:
 		case ZEND_UNSET_OBJ:
