@@ -3812,8 +3812,68 @@ void zend_func_return_info(const zend_op_array   *op_array,
 static zend_bool get_feasible_successors(
 		void *void_ctx, zend_basic_block *block,
 		zend_op *opline, zend_ssa_op *ssa_op, zend_bool *suc) {
-	suc[0] = 1;
-	suc[1] = 1;
+	ti_context *ctx = (ti_context *) void_ctx;
+	const zend_op_array *op_array = ctx->scdf.op_array;
+	zend_ssa *ssa = ctx->scdf.ssa;
+	uint32_t t1 = OP1_INFO();
+	zend_bool is_true;
+
+	/* We can't determine the branch target at compile-time for these */
+	switch (opline->opcode) {
+		case ZEND_ASSERT_CHECK:
+		case ZEND_CATCH:
+		case ZEND_DECLARE_ANON_CLASS:
+		case ZEND_DECLARE_ANON_INHERITED_CLASS:
+		case ZEND_FE_FETCH_R:
+		case ZEND_FE_FETCH_RW:
+		case ZEND_NEW:
+		// TODO on these three:
+		case ZEND_COALESCE:
+		case ZEND_FE_RESET_R:
+		case ZEND_FE_RESET_RW:
+			suc[0] = 1;
+			suc[1] = 1;
+			return 1;
+	}
+
+	if (t1 & MAY_BE_UNDEF) {
+		t1 |= MAY_BE_NULL;
+	}
+	t1 = t1 & MAY_BE_ANY;
+
+	/* Type not yet known */
+	if (!t1) {
+		return 0;
+	}
+
+	/* We can only make static descisions about null/false/true */
+	if (t1 & ~(MAY_BE_NULL|MAY_BE_FALSE|MAY_BE_TRUE)) {
+		suc[0] = 1;
+		suc[1] = 1;
+		return 1;
+	}
+
+	/* Branch can be both true and false */
+	if ((t1 & MAY_BE_TRUE) && (t1 & (MAY_BE_NULL|MAY_BE_FALSE))) {
+		suc[0] = 1;
+		suc[1] = 1;
+		return 1;
+	}
+
+	is_true = (t1 & MAY_BE_TRUE) != 0;
+	switch (opline->opcode) {
+		case ZEND_JMPZ:
+		case ZEND_JMPZNZ:
+		case ZEND_JMPZ_EX:
+			suc[is_true] = 1;
+			break;
+		case ZEND_JMPNZ:
+		case ZEND_JMPNZ_EX:
+		case ZEND_JMP_SET:
+			suc[!is_true] = 1;
+			break;
+		EMPTY_SWITCH_DEFAULT_CASE()
+	}
 	return 1;
 }
 
