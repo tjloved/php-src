@@ -2,7 +2,7 @@
 #define _SSA_SCDF_H
 
 typedef struct _scdf_ctx {
-	zend_op_array *op_array;
+	const zend_op_array *op_array;
 	zend_ssa *ssa;
 	zend_bitset var_worklist;
 	zend_bitset block_worklist;
@@ -21,7 +21,7 @@ typedef struct _scdf_ctx {
 } scdf_ctx;
 
 void scdf_solve(scdf_ctx *ctx, const char *name);
-void scdf_init(scdf_ctx *ctx, zend_op_array *op_array, zend_ssa *ssa);
+void scdf_init(scdf_ctx *ctx, const zend_op_array *op_array, zend_ssa *ssa);
 void scdf_free(scdf_ctx *ctx);
 
 static inline void scdf_add_to_worklist(scdf_ctx *ctx, int var) {

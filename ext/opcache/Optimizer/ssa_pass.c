@@ -271,6 +271,8 @@ static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) 
 		return;
 	}
 
+	complete_block_map(&info->ssa.cfg, op_array->last);
+
 	if (zend_ssa_inference(&ctx->arena, op_array, ctx->script, &info->ssa) != SUCCESS) {
 		return;
 	}
@@ -282,8 +284,6 @@ static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) 
 	if (ZCG(accel_directives).opt_statistics > 1) {
 		dump_instruction_trace(op_array, &info->ssa);
 	}
-
-	complete_block_map(&info->ssa.cfg, op_array->last);
 
 #if SSA_VERIFY_INTEGRITY > 1
 	ssa_verify_integrity(&info->ssa, "before SSA pass");

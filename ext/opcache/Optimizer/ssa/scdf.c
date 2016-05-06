@@ -95,7 +95,7 @@ static void handle_instr(scdf_ctx *ctx, int block_num, zend_op *opline, zend_ssa
 	}
 }
 
-void scdf_init(scdf_ctx *ctx, zend_op_array *op_array, zend_ssa *ssa) {
+void scdf_init(scdf_ctx *ctx, const zend_op_array *op_array, zend_ssa *ssa) {
 	zend_ulong *bitsets;
 
 	ctx->op_array = op_array;

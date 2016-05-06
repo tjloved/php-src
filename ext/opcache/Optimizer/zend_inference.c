@@ -23,6 +23,7 @@
 #include "zend_func_info.h"
 #include "zend_call_graph.h"
 #include "zend_worklist.h"
+#include "ssa/scdf.h"
 
 /* The used range inference algorithm is described in:
  *     V. Campos, R. Rodrigues, I. de Assis Costa and F. Pereira.
@@ -1753,10 +1754,10 @@ static int zend_infer_ranges(const zend_op_array *op_array, zend_ssa *ssa) /* {{
 				}                                                       \
 			}															\
 			if (ssa_var_info[__var].type != __type) { 					\
-				check_type_narrowing(op_array, ssa, worklist,			\
-					__var, ssa_var_info[__var].type, __type);			\
+				/*check_type_narrowing(op_array, ssa, worklist,*/			\
+					/*__var, ssa_var_info[__var].type, __type);*/			\
 				ssa_var_info[__var].type = __type;						\
-				add_usages(op_array, ssa, worklist, __var);				\
+				scdf_add_to_worklist(&ctx->scdf, __var);                \
 			}															\
 			/*zend_bitset_excl(worklist, var);*/						\
 		}																\
@@ -1769,7 +1770,7 @@ static int zend_infer_ranges(const zend_op_array *op_array, zend_ssa *ssa) /* {{
 			    ssa_var_info[var].is_instanceof != (_is_instanceof)) {  \
 				ssa_var_info[var].ce = (_ce);						    \
 				ssa_var_info[var].is_instanceof = (_is_instanceof);     \
-				add_usages(op_array, ssa, worklist, var);				\
+				scdf_add_to_worklist(&ctx->scdf, var);					\
 			}															\
 			/*zend_bitset_excl(worklist, var);*/						\
 		}																\
@@ -1826,6 +1827,7 @@ static void add_usages(const zend_op_array *op_array, zend_ssa *ssa, zend_bitset
 	}
 }
 
+#if 0
 static void reset_dependent_vars(const zend_op_array *op_array, zend_ssa *ssa, zend_bitset worklist, int var)
 {
 	zend_ssa_op *ssa_ops = ssa->ops;
@@ -1903,6 +1905,7 @@ static void check_type_narrowing(const zend_op_array *op_array, zend_ssa *ssa, z
 		reset_dependent_vars(op_array, ssa, worklist, var);
 	}
 }
+#endif
 
 uint32_t zend_array_element_type(uint32_t t1, int write, int insert)
 {
@@ -2127,19 +2130,24 @@ static uint32_t zend_fetch_arg_info(const zend_script *script, zend_arg_info *ar
 	return tmp;
 }
 
-static void zend_update_type_info(const zend_op_array *op_array,
-                                  zend_ssa            *ssa,
-                                  const zend_script   *script,
-                                  zend_bitset          worklist,
-                                  int                  i)
+typedef struct _ti_context {
+	scdf_ctx scdf;
+	const zend_script *script;
+} ti_context;
+
+static void zend_update_type_info(void *void_ctx, zend_op *opline, zend_ssa_op *ssa_op)
 {
+	ti_context *ctx = (ti_context *) void_ctx;
+	zend_ssa *ssa = ctx->scdf.ssa;
+	const zend_op_array *op_array = ctx->scdf.op_array;
+	const zend_script *script = ctx->script;
 	uint32_t t1, t2;
 	uint32_t tmp, orig;
-	zend_op *opline = op_array->opcodes + i;
 	zend_ssa_op *ssa_ops = ssa->ops;
 	zend_ssa_var *ssa_vars = ssa->vars;
 	zend_ssa_var_info *ssa_var_info = ssa->var_info;
 	zend_class_entry *ce;
+	int i = ssa_op - ssa_ops;
 	int j;
 
 	if (opline->opcode == ZEND_OP_DATA) {
@@ -3287,76 +3295,65 @@ static zend_class_entry *join_class_entries(
 	return ce1;
 }
 
-int zend_infer_types_ex(const zend_op_array *op_array, const zend_script *script, zend_ssa *ssa, zend_bitset worklist)
-{
-	zend_basic_block *blocks = ssa->cfg.blocks;
+static void zend_update_phi_type_info(void *void_ctx, zend_ssa_phi *p) {
+	ti_context *ctx = (ti_context *) void_ctx;
+	zend_ssa *ssa = ctx->scdf.ssa;
+	const zend_op_array *op_array = ctx->scdf.op_array;
 	zend_ssa_var *ssa_vars = ssa->vars;
 	zend_ssa_var_info *ssa_var_info = ssa->var_info;
-	int ssa_vars_count = ssa->vars_count;
-	int i, j;
-	uint32_t tmp;
 
-	WHILE_WORKLIST(worklist, zend_bitset_len(ssa_vars_count), j) {
-		if (ssa_vars[j].definition_phi) {
-			zend_ssa_phi *p = ssa_vars[j].definition_phi;
-			if (p->pi >= 0 && p->sources[0] >= 0) {
-				zend_class_entry *ce = ssa_var_info[p->sources[0]].ce;
-				int is_instanceof = ssa_var_info[p->sources[0]].is_instanceof;
-				tmp = get_ssa_var_info(ssa, p->sources[0]);
+	if (p->pi >= 0) {
+		if (p->sources[0] >= 0 && scdf_is_edge_feasible(&ctx->scdf, p->pi, p->block)) {
+			zend_class_entry *ce = ssa_var_info[p->sources[0]].ce;
+			int is_instanceof = ssa_var_info[p->sources[0]].is_instanceof;
+			uint32_t tmp = get_ssa_var_info(ssa, p->sources[0]);
 
-				if (!p->has_range_constraint) {
-					zend_ssa_type_constraint *constraint = &p->constraint.type;
-					tmp &= constraint->type_mask;
-					if ((tmp & MAY_BE_OBJECT) && constraint->ce && ce != constraint->ce) {
-						if (!ce) {
-							ce = constraint->ce;
-							is_instanceof = 1;
-						} else if (is_instanceof && instanceof_function(constraint->ce, ce)) {
-							ce = constraint->ce;
-						} else {
-							/* Ignore the constraint (either ce instanceof constraint->ce or
-							 * they are unrelated, as far as we can statically determine) */
-						}
+			if (!p->has_range_constraint) {
+				zend_ssa_type_constraint *constraint = &p->constraint.type;
+				tmp &= constraint->type_mask;
+				if ((tmp & MAY_BE_OBJECT) && constraint->ce && ce != constraint->ce) {
+					if (!ce) {
+						ce = constraint->ce;
+						is_instanceof = 1;
+					} else if (is_instanceof && instanceof_function(constraint->ce, ce)) {
+						ce = constraint->ce;
+					} else {
+						/* Ignore the constraint (either ce instanceof constraint->ce or
+						 * they are unrelated, as far as we can statically determine) */
 					}
 				}
-
-				UPDATE_SSA_TYPE(tmp, j);
-				UPDATE_SSA_OBJ_TYPE(ce, is_instanceof, j);
-			} else {
-				int first = 1;
-				int is_instanceof = 0;
-				zend_class_entry *ce = NULL;
-
-				tmp = 0;
-				for (i = 0; i < blocks[p->block].predecessors_count; i++) {
-					if (p->sources[i] >= 0) {
-						tmp |= get_ssa_var_info(ssa, p->sources[i]);
-					}
-				}
-				UPDATE_SSA_TYPE(tmp, j);
-				for (i = 0; i < blocks[p->block].predecessors_count; i++) {
-					if (p->sources[i] >= 0) {
-						zend_ssa_var_info *info = &ssa_var_info[p->sources[i]];
-						if (info->type & MAY_BE_OBJECT) {
-							if (first) {
-								ce = info->ce;
-								is_instanceof = info->is_instanceof;
-								first = 0;
-							} else {
-								is_instanceof |= info->is_instanceof;
-								ce = join_class_entries(ce, info->ce, &is_instanceof);
-							}
-						}
-					}
-				}
-				UPDATE_SSA_OBJ_TYPE(ce, ce ? is_instanceof : 0, j);
 			}
-		} else if (ssa_vars[j].definition >= 0) {
-			i = ssa_vars[j].definition;
-			zend_update_type_info(op_array, ssa, script, worklist, i);
+
+			UPDATE_SSA_TYPE(tmp, p->ssa_var);
+			UPDATE_SSA_OBJ_TYPE(ce, is_instanceof, p->ssa_var);
 		}
-	} WHILE_WORKLIST_END();
-	return SUCCESS;
+	} else {
+		zend_basic_block *block = &ssa->cfg.blocks[p->block];
+		int *predecessors = &ssa->cfg.predecessors[block->predecessor_offset];
+		uint32_t tmp = 0;
+		int i, first = 1, is_instanceof = 0;
+		zend_class_entry *ce = NULL;
+
+		for (i = 0; i < block->predecessors_count; i++) {
+			if (p->sources[i] >= 0
+					&& scdf_is_edge_feasible(&ctx->scdf, predecessors[i], p->block)) {
+				zend_ssa_var_info *info = &ssa_var_info[p->sources[i]];
+				tmp |= info->type;
+				if (info->type & MAY_BE_OBJECT) {
+					if (first) {
+						ce = info->ce;
+						is_instanceof = info->is_instanceof;
+						first = 0;
+					} else {
+						is_instanceof |= info->is_instanceof;
+						ce = join_class_entries(ce, info->ce, &is_instanceof);
+					}
+				}
+			}
+		}
+		UPDATE_SSA_TYPE(tmp, p->ssa_var);
+		UPDATE_SSA_OBJ_TYPE(ce, ce ? is_instanceof : 0, p->ssa_var);
+	}
 }
 
 static zend_bool is_narrowable_instr(zend_op *opline)  {
@@ -3523,7 +3520,7 @@ static zend_bool can_convert_to_double(
 	return 1;
 }
 
-static int zend_type_narrowing(const zend_op_array *op_array, const zend_script *script, zend_ssa *ssa)
+static int zend_type_narrowing(const zend_op_array *op_array, const zend_script *script, zend_ssa *ssa, ti_context *ctx)
 {
 	uint32_t bitset_len = zend_bitset_len(ssa->vars_count);
 	zend_bitset visited, worklist;
@@ -3557,7 +3554,7 @@ static int zend_type_narrowing(const zend_op_array *op_array, const zend_script 
 				ZEND_BITSET_FOREACH(visited, bitset_len, i) {
 					ssa->var_info[i].type &= ~MAY_BE_ANY;
 				} ZEND_BITSET_FOREACH_END();
-				zend_bitset_union(worklist, visited, bitset_len);
+				scdf_add_to_worklist(&ctx->scdf, i);
 			}
 		}
 	}
@@ -3567,10 +3564,7 @@ static int zend_type_narrowing(const zend_op_array *op_array, const zend_script 
 		return SUCCESS;
 	}
 
-	if (zend_infer_types_ex(op_array, script, ssa, worklist) != SUCCESS) {
-		free_alloca(visited, use_heap);
-		return FAILURE;
-	}
+	scdf_solve(&ctx->scdf, "Type inference (after narrowing)");
 
 	free_alloca(visited, use_heap);
 	return SUCCESS;
@@ -3815,30 +3809,38 @@ void zend_func_return_info(const zend_op_array   *op_array,
 	ret->has_range = tmp_has_range;
 }
 
+static zend_bool get_feasible_successors(
+		void *void_ctx, zend_basic_block *block,
+		zend_op *opline, zend_ssa_op *ssa_op, zend_bool *suc) {
+	suc[0] = 1;
+	suc[1] = 1;
+	return 1;
+}
+
 static int zend_infer_types(const zend_op_array *op_array, const zend_script *script, zend_ssa *ssa)
 {
 	zend_ssa_var_info *ssa_var_info = ssa->var_info;
 	int ssa_vars_count = ssa->vars_count;
 	int j;
-	zend_bitset worklist;
-	ALLOCA_FLAG(use_heap);
+	ti_context ctx;
+	ctx.script = script;
 
-	worklist = do_alloca(sizeof(zend_ulong) * zend_bitset_len(ssa_vars_count), use_heap);
-	memset(worklist, 0, sizeof(zend_ulong) * zend_bitset_len(ssa_vars_count));
+	ctx.scdf.handlers.visit_instr = zend_update_type_info;
+	ctx.scdf.handlers.visit_phi = zend_update_phi_type_info;
+	ctx.scdf.handlers.get_feasible_successors = get_feasible_successors;
 
 	/* Type Inference */
 	for (j = op_array->last_var; j < ssa_vars_count; j++) {
-		zend_bitset_incl(worklist, j);
 		ssa_var_info[j].type = 0;
 	}
 
-	if (zend_infer_types_ex(op_array, script, ssa, worklist) != SUCCESS) {
-		free_alloca(worklist,  use_heap);
-		return FAILURE;
-	}
+	scdf_init(&ctx.scdf, op_array, ssa);
+	scdf_solve(&ctx.scdf, "Type inference");
 
 	/* Narrowing integer initialization to doubles */
-	zend_type_narrowing(op_array, script, ssa);
+	zend_type_narrowing(op_array, script, ssa, &ctx);
+
+	scdf_free(&ctx.scdf);
 
 	for (j = 0; j < op_array->last_var; j++) {
 		/* $php_errormsg and $http_response_header may be updated indirectly */
@@ -3863,7 +3865,6 @@ static int zend_infer_types(const zend_op_array *op_array, const zend_script *sc
 		zend_func_return_info(op_array, script, 1, 0, &ZEND_FUNC_INFO(op_array)->return_info);
 	}
 
-	free_alloca(worklist,  use_heap);
 	return SUCCESS;
 }
 
