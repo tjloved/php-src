@@ -160,6 +160,32 @@
 		} \
 	} while (0)
 
+static inline uint32_t to_bool_type(uint32_t t) {
+	if (t & MAY_BE_UNDEF) {
+		t |= MAY_BE_NULL;
+	}
+	if ((t & MAY_BE_ANY) & ~(MAY_BE_NULL|MAY_BE_FALSE|MAY_BE_TRUE)) {
+		return MAY_BE_TRUE|MAY_BE_FALSE;
+	} else if ((t & MAY_BE_ANY) == MAY_BE_TRUE) {
+		return MAY_BE_TRUE;
+	} else if (t & (MAY_BE_FALSE|MAY_BE_NULL)) {
+		return MAY_BE_FALSE;
+	} else {
+		return 0;
+	}
+}
+
+static inline uint32_t invert_bool_type(uint32_t t) {
+	uint32_t tmp = 0;
+	if (t & MAY_BE_TRUE) {
+		tmp |= MAY_BE_FALSE;
+	}
+	if (t & MAY_BE_FALSE) {
+		tmp |= MAY_BE_TRUE;
+	}
+	return tmp;
+}
+
 static void zend_ssa_check_scc_var(const zend_op_array *op_array, zend_ssa *ssa, int var, int *index, int *dfs, int *root, zend_worklist_stack *stack) /* {{{ */
 {
 #ifdef SYM_RANGE
@@ -2189,20 +2215,74 @@ static void zend_update_type_info(void *void_ctx, zend_op *opline, zend_ssa_op *
 		case ZEND_BEGIN_SILENCE:
 			UPDATE_SSA_TYPE(MAY_BE_LONG, ssa_ops[i].result_def);
 			break;
+		case ZEND_BOOL:
+		case ZEND_JMPZ_EX:
+		case ZEND_JMPNZ_EX:
+			tmp = MAY_BE_RC1 | to_bool_type(t1);
+			UPDATE_SSA_TYPE(tmp, ssa_ops[i].result_def);
+			break;
 		case ZEND_BOOL_NOT:
-		case ZEND_BOOL_XOR:
+			tmp = MAY_BE_RC1 | invert_bool_type(to_bool_type(t1));
+			UPDATE_SSA_TYPE(tmp, ssa_ops[i].result_def);
+			break;
 		case ZEND_IS_IDENTICAL:
+			if (t1 & MAY_BE_UNDEF) {
+				t1 |= MAY_BE_NULL;
+			}
+			if (t2 & MAY_BE_UNDEF) {
+				t2 |= MAY_BE_NULL;
+			}
+			tmp = MAY_BE_RC1;
+			if ((t1 & t2 & MAY_BE_ANY) == 0) {
+				tmp |= MAY_BE_FALSE;
+			} else if ((t1 & MAY_BE_ANY) != (t1 & MAY_BE_ANY)
+					&& !((t1 & t2 & MAY_BE_ANY) & ~(MAY_BE_TRUE|MAY_BE_FALSE|MAY_BE_NULL))) {
+				tmp |= MAY_BE_TRUE;
+			} else {
+				tmp |= MAY_BE_FALSE|MAY_BE_TRUE;
+			}
+			UPDATE_SSA_TYPE(tmp, ssa_ops[i].result_def);
+			break;
 		case ZEND_IS_NOT_IDENTICAL:
+			if (t1 & MAY_BE_UNDEF) {
+				t1 |= MAY_BE_NULL;
+			}
+			if (t2 & MAY_BE_UNDEF) {
+				t2 |= MAY_BE_NULL;
+			}
+			tmp = MAY_BE_RC1;
+			if ((t1 & t2 & MAY_BE_ANY) == 0) {
+				tmp |= MAY_BE_TRUE;
+			} else if ((t1 & MAY_BE_ANY) != (t1 & MAY_BE_ANY)
+					&& !((t1 & t2 & MAY_BE_ANY) & ~(MAY_BE_TRUE|MAY_BE_FALSE|MAY_BE_NULL))) {
+				tmp |= MAY_BE_FALSE;
+			} else {
+				tmp |= MAY_BE_FALSE|MAY_BE_TRUE;
+			}
+			UPDATE_SSA_TYPE(tmp, ssa_ops[i].result_def);
+			break;
+		case ZEND_ISSET_ISEMPTY_VAR:
+			tmp = MAY_BE_RC1;
+			if (opline->extended_value & ZEND_ISSET) {
+				if (!(t1 & (MAY_BE_UNDEF|MAY_BE_NULL))) {
+					tmp |= MAY_BE_TRUE;
+				} else if (!(t1 & ~(MAY_BE_UNDEF|MAY_BE_NULL))) {
+					tmp |= MAY_BE_FALSE;
+				} else {
+					tmp |= MAY_BE_FALSE|MAY_BE_TRUE;
+				}
+			} else {
+				tmp |= invert_bool_type(to_bool_type(t1));
+			}
+			UPDATE_SSA_TYPE(tmp, ssa_ops[i].result_def);
+			break;
+		case ZEND_BOOL_XOR:
 		case ZEND_IS_EQUAL:
 		case ZEND_IS_NOT_EQUAL:
 		case ZEND_IS_SMALLER:
 		case ZEND_IS_SMALLER_OR_EQUAL:
 		case ZEND_INSTANCEOF:
-		case ZEND_JMPZ_EX:
-		case ZEND_JMPNZ_EX:
 		case ZEND_CASE:
-		case ZEND_BOOL:
-		case ZEND_ISSET_ISEMPTY_VAR:
 		case ZEND_ISSET_ISEMPTY_DIM_OBJ:
 		case ZEND_ISSET_ISEMPTY_PROP_OBJ:
 		case ZEND_ISSET_ISEMPTY_STATIC_PROP:
@@ -2227,7 +2307,7 @@ static void zend_update_type_info(void *void_ctx, zend_op *opline, zend_ssa_op *
 			}
 			tmp = 0;
 			if (opline->extended_value == _IS_BOOL) {
-				tmp |= MAY_BE_TRUE|MAY_BE_FALSE;
+				tmp |= to_bool_type(t1);
 			} else {
 				tmp |= 1 << opline->extended_value;
 				if (tmp & (MAY_BE_STRING|MAY_BE_ARRAY|MAY_BE_OBJECT|MAY_BE_RESOURCE)) {
