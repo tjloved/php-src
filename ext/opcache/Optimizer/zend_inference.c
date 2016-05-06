@@ -24,6 +24,7 @@
 #include "zend_call_graph.h"
 #include "zend_worklist.h"
 #include "ssa/scdf.h"
+#include "statistics.h"
 
 /* The used range inference algorithm is described in:
  *     V. Campos, R. Rodrigues, I. de Assis Costa and F. Pereira.
@@ -3896,6 +3897,12 @@ static int zend_infer_types(const zend_op_array *op_array, const zend_script *sc
 
 	scdf_init(&ctx.scdf, op_array, ssa);
 	scdf_solve(&ctx.scdf, "Type inference");
+
+	for (j = 0; j < ssa->cfg.blocks_count; j++) {
+		if (!zend_bitset_in(ctx.scdf.executable_blocks, j)) {
+			OPT_STAT(tmp)++;
+		}
+	}
 
 	/* Narrowing integer initialization to doubles */
 	zend_type_narrowing(op_array, script, ssa, &ctx);
