@@ -1142,7 +1142,8 @@ static void eliminate_dead_blocks(scp_ctx *ctx) {
 	zend_ssa *ssa = ctx->ssa;
 	int i;
 	for (i = 0; i < ssa->cfg.blocks_count; i++) {
-		if (!zend_bitset_in(ctx->scdf.executable_blocks, i)) {
+		if (!zend_bitset_in(ctx->scdf.executable_blocks, i)
+				&& (ssa->cfg.blocks[i].flags & ZEND_BB_REACHABLE)) {
 			OPT_STAT(scp_dead_blocks)++;
 			remove_block(ssa, i,
 				&OPT_STAT(scp_dead_blocks_instrs), &OPT_STAT(scp_dead_blocks_phis));
