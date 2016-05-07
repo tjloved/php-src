@@ -21,10 +21,14 @@ void zend_optimizer_statistics_shutdown() {
 	PRINT_STAT(phis);
 	PRINT_STAT(pis);
 
+	fprintf(stderr, "%-27s: %f\n", "type_quality",
+		OPT_STAT(type_quality) / (OPT_STAT(ssa_vars) - OPT_STAT(ssa_may_be_nothing)));
+
 	PRINT_STAT(ssa_vars);
 	PRINT_NORM_STAT(ssa_may_be_ref, ssa_vars);
 	PRINT_NORM_STAT(ssa_may_be_any, ssa_vars);
 	PRINT_NORM_STAT(ssa_may_be_refcounted, ssa_vars);
+	PRINT_NORM_STAT(ssa_may_be_nothing, ssa_vars);
 
 	PRINT_STAT(cv_ssa_vars);
 	PRINT_NORM_STAT(cv_ssa_may_be_ref, cv_ssa_vars);

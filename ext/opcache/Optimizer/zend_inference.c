@@ -2203,7 +2203,7 @@ static void zend_update_type_info(
 	}
 #endif
 
-#if 0&&COMBINE_SCP
+#if 1&&COMBINE_SCP
 	if (opline->op1_type == IS_CONST) {
 		t1 = _const_op_type(CRT_CONSTANT_EX(op_array, opline->op1, ssa->rt_constants));
 	} else if (ssa_ops[i].op1_use >= 0 && scp_value_known(&ctx->scp.values[ssa_ops[i].op1_use])) {

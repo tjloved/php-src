@@ -55,6 +55,13 @@ static void collect_ssa_stats(zend_op_array *op_array, zend_ssa *ssa) {
 				OPT_STAT(cv_ssa_may_be_refcounted)++;
 			}
 		}
+
+		if (info->type & MAY_BE_ANY) {
+			OPT_STAT(type_quality) += log2(__builtin_popcount(info->type & MAY_BE_ANY));
+		} else {
+			OPT_STAT(ssa_may_be_nothing)++;
+		}
+
 		if (var->definition_phi) {
 			OPT_STAT(phis)++;
 			if (var->definition_phi->pi >= 0) {

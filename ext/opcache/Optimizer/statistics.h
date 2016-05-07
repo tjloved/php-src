@@ -51,6 +51,8 @@ typedef struct _zend_optimizer_statistics {
 	uint32_t tmp2;
 	uint32_t tmp3;
 	uint32_t pis;
+	uint32_t ssa_may_be_nothing;
+	double type_quality;
 } zend_optimizer_statistics;
 
 extern zend_optimizer_statistics optimizer_statistics;
