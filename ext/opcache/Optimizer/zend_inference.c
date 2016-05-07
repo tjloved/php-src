@@ -2159,10 +2159,18 @@ static uint32_t zend_fetch_arg_info(const zend_script *script, zend_arg_info *ar
 	return tmp;
 }
 
+#define COMBINE_SCP 1
+
 typedef struct _ti_context {
 	const zend_script *script;
 	scp_ctx scp;
 } ti_context;
+
+#if COMBINE_SCP
+static zend_bool scp_value_known(zval *value) {
+	return Z_TYPE_P(value) != (zend_uchar) -1 && Z_TYPE_P(value) != (zend_uchar) -2;
+}
+#endif
 
 static void zend_update_type_info(
 		scdf_ctx *scdf, void *void_ctx, zend_op *opline, zend_ssa_op *ssa_op) {
@@ -2184,8 +2192,37 @@ static void zend_update_type_info(
 		i--;
 	}
 
+#if 1&&COMBINE_SCP
+	if (ssa_ops[i].result_def >= 0 && ssa_ops[i].op1_def < 0 && ssa_ops[i].op2_def < 0) {
+		zval *value = &ctx->scp.values[ssa_ops[i].result_def];
+		if (scp_value_known(value)) {
+			uint32_t t = _const_op_type(value);
+			UPDATE_SSA_TYPE(t, ssa_ops[i].result_def);
+			return;
+		}
+	}
+#endif
+
+#if 0&&COMBINE_SCP
+	if (opline->op1_type == IS_CONST) {
+		t1 = _const_op_type(CRT_CONSTANT_EX(op_array, opline->op1, ssa->rt_constants));
+	} else if (ssa_ops[i].op1_use >= 0 && scp_value_known(&ctx->scp.values[ssa_ops[i].op1_use])) {
+		t1 = _const_op_type(&ctx->scp.values[ssa_ops[i].op1_use]);
+	} else {
+		t1 = get_ssa_var_info(ssa, ssa_ops[i].op1_use);
+	}
+
+	if (opline->op2_type == IS_CONST) {
+		t2 = _const_op_type(CRT_CONSTANT_EX(op_array, opline->op2, ssa->rt_constants));
+	} else if (ssa_ops[i].op2_use >= 0 && scp_value_known(&ctx->scp.values[ssa_ops[i].op2_use])) {
+		t2 = _const_op_type(&ctx->scp.values[ssa_ops[i].op2_use]);
+	} else {
+		t2 = get_ssa_var_info(ssa, ssa_ops[i].op2_use);
+	}
+#else
 	t1 = OP1_INFO();
 	t2 = OP2_INFO();
+#endif
 
 	switch (opline->opcode) {
 		case ZEND_ADD:
@@ -3960,19 +3997,18 @@ static zend_bool get_feasible_successors(
 	return 1;
 }
 
-#define COMBINE_SCP 1
 #if COMBINE_SCP
 void combined_visit_instr(scdf_ctx *scdf, void *void_ctx, zend_op *opline, zend_ssa_op *ssa_op)
 {
 	ti_context *ctx = (ti_context *) void_ctx;
-	zend_update_type_info(scdf, ctx, opline, ssa_op);
 	scp_visit_instr(scdf, &ctx->scp, opline, ssa_op);
+	zend_update_type_info(scdf, ctx, opline, ssa_op);
 }
 void combined_visit_phi(scdf_ctx *scdf, void *void_ctx, zend_ssa_phi *phi)
 {
 	ti_context *ctx = (ti_context *) void_ctx;
-	zend_update_phi_type_info(scdf, ctx, phi);
 	scp_visit_phi(scdf, &ctx->scp, phi);
+	zend_update_phi_type_info(scdf, ctx, phi);
 }
 zend_bool combined_get_feasible_successors(
 		scdf_ctx *scdf, void *void_ctx, zend_basic_block *block,
@@ -4040,7 +4076,7 @@ static int zend_infer_types(
 	zend_type_narrowing(op_array, script, ssa, &scdf);
 
 	scdf_free(&scdf);
-#if COMBINED_SCP
+#if COMBINE_SCP
 	scp_context_free(&ctx.scp);
 #endif
 
