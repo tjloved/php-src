@@ -23,8 +23,9 @@
 #include "zend_func_info.h"
 #include "zend_call_graph.h"
 #include "zend_worklist.h"
-#include "ssa/scdf.h"
 #include "ssa/helpers.h"
+#include "ssa/scdf.h"
+#include "ssa/scp.h"
 #include "statistics.h"
 
 /* The used range inference algorithm is described in:
@@ -2160,6 +2161,7 @@ static uint32_t zend_fetch_arg_info(const zend_script *script, zend_arg_info *ar
 
 typedef struct _ti_context {
 	const zend_script *script;
+	scp_ctx scp;
 } ti_context;
 
 static void zend_update_type_info(
@@ -3958,6 +3960,44 @@ static zend_bool get_feasible_successors(
 	return 1;
 }
 
+#define COMBINE_SCP 1
+#if COMBINE_SCP
+void combined_visit_instr(scdf_ctx *scdf, void *void_ctx, zend_op *opline, zend_ssa_op *ssa_op)
+{
+	ti_context *ctx = (ti_context *) void_ctx;
+	zend_update_type_info(scdf, ctx, opline, ssa_op);
+	scp_visit_instr(scdf, &ctx->scp, opline, ssa_op);
+}
+void combined_visit_phi(scdf_ctx *scdf, void *void_ctx, zend_ssa_phi *phi)
+{
+	ti_context *ctx = (ti_context *) void_ctx;
+	zend_update_phi_type_info(scdf, ctx, phi);
+	scp_visit_phi(scdf, &ctx->scp, phi);
+}
+zend_bool combined_get_feasible_successors(
+		scdf_ctx *scdf, void *void_ctx, zend_basic_block *block,
+		zend_op *opline, zend_ssa_op *ssa_op, zend_bool *suc)
+{
+	ti_context *ctx = (ti_context *) void_ctx;
+	zend_bool suc2[2] = {0};
+
+	/* Successors are the intersection of both successor functions */
+	zend_bool has_successors = get_feasible_successors(scdf, ctx, block, opline, ssa_op, suc);
+	if (!has_successors) {
+		return 0;
+	}
+
+	has_successors = scp_get_feasible_successors(scdf, &ctx->scp, block, opline, ssa_op, suc2);
+	if (!has_successors) {
+		return 0;
+	}
+
+	suc[0] = suc[0] && suc2[0];
+	suc[1] = suc[1] && suc2[1];
+	return 1;
+}
+#endif
+
 static int zend_infer_types(const zend_op_array *op_array, const zend_script *script, zend_ssa *ssa)
 {
 	zend_ssa_var_info *ssa_var_info = ssa->var_info;
@@ -3967,9 +4007,17 @@ static int zend_infer_types(const zend_op_array *op_array, const zend_script *sc
 	ti_context ctx;
 	ctx.script = script;
 
+#if COMBINE_SCP
+	scp_context_init(&ctx.scp, ssa, (zend_op_array *) op_array, NULL);
+
+	scdf.handlers.visit_instr = combined_visit_instr;
+	scdf.handlers.visit_phi = combined_visit_phi;
+	scdf.handlers.get_feasible_successors = combined_get_feasible_successors;
+#else
 	scdf.handlers.visit_instr = zend_update_type_info;
 	scdf.handlers.visit_phi = zend_update_phi_type_info;
 	scdf.handlers.get_feasible_successors = get_feasible_successors;
+#endif
 
 	/* Type Inference */
 	for (j = op_array->last_var; j < ssa_vars_count; j++) {
@@ -3990,6 +4038,9 @@ static int zend_infer_types(const zend_op_array *op_array, const zend_script *sc
 	zend_type_narrowing(op_array, script, ssa, &scdf);
 
 	scdf_free(&scdf);
+#if COMBINED_SCP
+	scp_context_free(&ctx.scp);
+#endif
 
 	for (j = 0; j < op_array->last_var; j++) {
 		/* $php_errormsg and $http_response_header may be updated indirectly */

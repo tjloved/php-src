@@ -220,6 +220,7 @@ static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) 
 	cfg_info cfg_info;
 	ssa_liveness liveness;
 	ssa_opt_ctx ssa_ctx;
+	zend_call_info **call_map;
 
 	/* We can't currently perform data-flow analysis for code using try/catch */
 	if (op_array->last_try_catch) {
@@ -272,6 +273,7 @@ static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) 
 	}
 
 	complete_block_map(&info->ssa.cfg, op_array->last);
+	call_map = compute_call_map(ctx, info, op_array);
 
 	if (zend_ssa_inference(&ctx->arena, op_array, ctx->script, &info->ssa) != SUCCESS) {
 		return;
@@ -299,7 +301,7 @@ static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) 
 	ssa_ctx.func_info = info;
 	ssa_ctx.cfg_info = &cfg_info;
 	ssa_ctx.liveness = &liveness;
-	ssa_ctx.call_map = compute_call_map(ctx, info, op_array);
+	ssa_ctx.call_map = call_map;
 	ssa_ctx.reorder_dtor_effects =
 		(ctx->optimization_level & ZEND_OPTIMIZER_REORDER_DTOR_EFFECTS) != 0;
 	ssa_ctx.assume_no_undef = (ctx->optimization_level & ZEND_OPTIMIZER_ASSUME_NO_UNDEF) != 0;
