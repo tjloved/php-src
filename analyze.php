@@ -15,7 +15,10 @@ if (!file_exists($file)) {
 $lines = readLines($file);
 $instrs = parseTrace($lines);
 if (isset($opts['opcode'])) {
-    $instrs = filterOpcode($instrs, $opts['opcode']);
+    $instrs = filterInstrs($instrs, createOpcodeFilter($opts['opcode']));
+}
+if (isset($opts['next'])) {
+    $instrs = filterInstrsNext($instrs, createOpcodeFilter($opts['next']));
 }
 if (isset($opts['op1'])) {
     $instrs = filterOperand($instrs, 'op1', 'use_info', $opts['op1']);
@@ -42,7 +45,8 @@ printCounts(stringifyInstrs($instrs, $showTypes));
 function parseCliArgs() : array {
     $opts = getopt('f:o:1:2:r:n', [
         'file:', 'opcode:', 'op1:', 'op2:', 'result:',
-        'op1-def:', 'op2-def:', 'result-use', 'no-types'
+        'op1-def:', 'op2-def:', 'result-use', 'no-types',
+        'next:',
     ]);
     $shortToLong = [
         'f' => 'file', 'o' => 'opcode',
@@ -83,7 +87,7 @@ REGEX;
     }
 }
 
-function filterOpcode($instrs, string $opcodeSpec) : Traversable {
+function createOpcodeFilter(string $opcodeSpec) : Closure {
     $negated = false;
     if ($opcodeSpec[0] === '!') {
         $negated = true;
@@ -91,10 +95,27 @@ function filterOpcode($instrs, string $opcodeSpec) : Traversable {
     }
 
     $opcodes = array_flip(explode('|', $opcodeSpec));
+    return function($instr) use($opcodes, $negated) {
+        return isset($opcodes[$instr->opcode]) xor $negated;
+    };
+}
+
+function filterInstrs($instrs, callable $filter) : Traversable {
     foreach ($instrs as $instr) {
-        if (isset($opcodes[$instr->opcode]) xor $negated) {
+        if ($filter($instr)) {
             yield $instr;
         }
+    }
+}
+
+/* Filter instructions by checking *next* instruction */
+function filterInstrsNext($instrs, callable $filter) : Traversable {
+    $prev = null;
+    foreach ($instrs as $instr) {
+        if ($filter($instr) && $prev !== null) {
+            yield $prev;
+        }
+        $prev = $instr;
     }
 }
 
