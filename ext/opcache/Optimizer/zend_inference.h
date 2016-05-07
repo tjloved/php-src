@@ -22,6 +22,7 @@
 #include "zend_optimizer.h"
 #include "zend_ssa.h"
 #include "zend_bitset.h"
+#include "zend_call_graph.h"
 
 /* Bitmask for type inference (zend_ssa_var_info.type) */
 #include "zend_type_info.h"
@@ -242,7 +243,7 @@ BEGIN_EXTERN_C()
 
 int zend_ssa_find_false_dependencies(const zend_op_array *op_array, zend_ssa *ssa);
 int zend_ssa_find_sccs(const zend_op_array *op_array, zend_ssa *ssa);
-int zend_ssa_inference(zend_arena **raena, const zend_op_array *op_array, const zend_script *script, zend_ssa *ssa);
+int zend_ssa_inference(zend_arena **raena, const zend_op_array *op_array, const zend_script *script, zend_ssa *ssa, zend_call_info **call_map);
 
 uint32_t zend_array_element_type(uint32_t t1, int write, int insert);
 

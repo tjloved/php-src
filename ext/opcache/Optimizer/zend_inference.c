@@ -3998,7 +3998,9 @@ zend_bool combined_get_feasible_successors(
 }
 #endif
 
-static int zend_infer_types(const zend_op_array *op_array, const zend_script *script, zend_ssa *ssa)
+static int zend_infer_types(
+		const zend_op_array *op_array, const zend_script *script,
+		zend_ssa *ssa, zend_call_info **call_map)
 {
 	zend_ssa_var_info *ssa_var_info = ssa->var_info;
 	int ssa_vars_count = ssa->vars_count;
@@ -4008,7 +4010,7 @@ static int zend_infer_types(const zend_op_array *op_array, const zend_script *sc
 	ctx.script = script;
 
 #if COMBINE_SCP
-	scp_context_init(&ctx.scp, ssa, (zend_op_array *) op_array, NULL);
+	scp_context_init(&ctx.scp, ssa, (zend_op_array *) op_array, call_map);
 
 	scdf.handlers.visit_instr = combined_visit_instr;
 	scdf.handlers.visit_phi = combined_visit_phi;
@@ -4068,7 +4070,7 @@ static int zend_infer_types(const zend_op_array *op_array, const zend_script *sc
 	return SUCCESS;
 }
 
-int zend_ssa_inference(zend_arena **arena, const zend_op_array *op_array, const zend_script *script, zend_ssa *ssa) /* {{{ */
+int zend_ssa_inference(zend_arena **arena, const zend_op_array *op_array, const zend_script *script, zend_ssa *ssa, zend_call_info **call_map) /* {{{ */
 {
 	zend_ssa_var_info *ssa_var_info;
 	int i;
@@ -4098,7 +4100,7 @@ int zend_ssa_inference(zend_arena **arena, const zend_op_array *op_array, const 
 		return FAILURE;
 	}
 
-	if (zend_infer_types(op_array, script, ssa) != SUCCESS) {
+	if (zend_infer_types(op_array, script, ssa, call_map) != SUCCESS) {
 		return FAILURE;
 	}
 

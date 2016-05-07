@@ -275,7 +275,7 @@ static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) 
 	complete_block_map(&info->ssa.cfg, op_array->last);
 	call_map = compute_call_map(ctx, info, op_array);
 
-	if (zend_ssa_inference(&ctx->arena, op_array, ctx->script, &info->ssa) != SUCCESS) {
+	if (zend_ssa_inference(&ctx->arena, op_array, ctx->script, &info->ssa, call_map) != SUCCESS) {
 		return;
 	}
 
