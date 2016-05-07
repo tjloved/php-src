@@ -661,7 +661,12 @@ void scp_visit_instr(scdf_ctx *scdf, void *void_ctx, zend_op *opline, zend_ssa_o
 		{
 			/* If the value of a SEND for an ICALL changes, we need to reconsider the
 			 * ICALL result value. Otherwise we can ignore the opcode. */
-			zend_call_info *call = ctx->call_map[opline - ctx->op_array->opcodes];
+			zend_call_info *call;
+			if (!ctx->call_map) {
+				return;
+			}
+
+			call = ctx->call_map[opline - ctx->op_array->opcodes];
 			if (IS_TOP(op1) || !call || call->caller_call_opline->opcode != ZEND_DO_ICALL) {
 				return;
 			}
@@ -947,10 +952,17 @@ void scp_visit_instr(scdf_ctx *scdf, void *void_ctx, zend_op *opline, zend_ssa_o
 		}
 		case ZEND_DO_ICALL:
 		{
-			zend_call_info *call = ctx->call_map[opline - ctx->op_array->opcodes];
-			zval *name = CT_CONSTANT_EX(ctx->op_array, call->caller_init_opline->op2.constant);
-			zval *args[2] = {NULL};
+			zend_call_info *call;
+			zval *name, *args[2] = {NULL};
 			int i;
+
+			if (!ctx->call_map) {
+				SET_RESULT_BOT(result);
+				break;
+			}
+
+			call = ctx->call_map[opline - ctx->op_array->opcodes];
+			name = CT_CONSTANT_EX(ctx->op_array, call->caller_init_opline->op2.constant);
 
 			/* We already know it can't be evaluated, don't bother checking again */
 			if (ssa_op->result_def < 0 || IS_BOT(&ctx->values[ssa_op->result_def])) {
