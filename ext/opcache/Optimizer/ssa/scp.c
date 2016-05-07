@@ -55,7 +55,6 @@
 #endif
 
 typedef struct _scp_ctx {
-	scdf_ctx scdf;
 	zend_op_array *op_array;
 	zend_ssa *ssa;
 	zend_call_info **call_map;
@@ -78,7 +77,7 @@ static inline zend_bool value_known(zval *zv) {
 
 /* Sets new value for variable and ensures that it is lower or equal
  * the previous one in the constant propagation lattice. */
-static void set_value(scp_ctx *ctx, int var, zval *new) {
+static void set_value(scdf_ctx *scdf, scp_ctx *ctx, int var, zval *new) {
 	zval *value = &ctx->values[var];
 	if (IS_BOT(value) || IS_TOP(new)) {
 		return;
@@ -93,7 +92,7 @@ static void set_value(scp_ctx *ctx, int var, zval *new) {
 	if (IS_TOP(value) || IS_BOT(new)) {
 		zval_ptr_dtor_nogc(value);
 		ZVAL_COPY(value, new);
-		scdf_add_to_worklist(&ctx->scdf, var);
+		scdf_add_to_worklist(scdf, var);
 		return;
 	}
 
@@ -605,7 +604,7 @@ static inline int ct_eval_func_call(
 
 #define SET_RESULT(op, zv) do { \
 	if (ssa_op->op##_def >= 0) { \
-		set_value(ctx, ssa_op->op##_def, zv); \
+		set_value(scdf, ctx, ssa_op->op##_def, zv); \
 	} \
 } while (0)
 #define SET_RESULT_BOT(op) SET_RESULT(op, &ctx->bot)
@@ -613,7 +612,7 @@ static inline int ct_eval_func_call(
 
 #define SKIP_IF_TOP(op) if (IS_TOP(op)) break;
 
-static void visit_instr(void *void_ctx, zend_op *opline, zend_ssa_op *ssa_op) {
+static void visit_instr(scdf_ctx *scdf, void *void_ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 	scp_ctx *ctx = (scp_ctx *) void_ctx;
 	zval *op1, *op2, zv; /* zv is a temporary to hold result values */
 
@@ -1026,7 +1025,7 @@ static void visit_instr(void *void_ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 
 /* Returns whether there is a successor */
 static zend_bool get_feasible_successors(
-		void *void_ctx, zend_basic_block *block,
+		scdf_ctx *scdf, void *void_ctx, zend_basic_block *block,
 		zend_op *opline, zend_ssa_op *ssa_op, zend_bool *suc) {
 	scp_ctx *ctx = (scp_ctx *) void_ctx;
 	zval *op1;
@@ -1102,7 +1101,7 @@ static void join_phi_values(zval *a, zval *b) {
 	}
 }
 
-static void visit_phi(void *void_ctx, zend_ssa_phi *phi) {
+static void visit_phi(scdf_ctx *scdf, void *void_ctx, zend_ssa_phi *phi) {
 	scp_ctx *ctx = (scp_ctx *) void_ctx;
 	zend_ssa *ssa = ctx->ssa;
 	ZEND_ASSERT(phi->ssa_var >= 0);
@@ -1115,13 +1114,13 @@ static void visit_phi(void *void_ctx, zend_ssa_phi *phi) {
 		MAKE_TOP(&result);
 		SCP_DEBUG("Handling PHI(");
 		if (phi->pi >= 0) {
-			if (phi->sources[0] >= 0 && scdf_is_edge_feasible(&ctx->scdf, phi->pi, phi->block)) {
+			if (phi->sources[0] >= 0 && scdf_is_edge_feasible(scdf, phi->pi, phi->block)) {
 				join_phi_values(&result, &ctx->values[phi->sources[0]]);
 			}
 		} else {
 			for (i = 0; i < block->predecessors_count; i++) {
 				if (phi->sources[i] >= 0
-						&& scdf_is_edge_feasible(&ctx->scdf, predecessors[i], phi->block)) {
+						&& scdf_is_edge_feasible(scdf, predecessors[i], phi->block)) {
 					SCP_DEBUG("val, ");
 					join_phi_values(&result, &ctx->values[phi->sources[i]]);
 				} else {
@@ -1131,18 +1130,18 @@ static void visit_phi(void *void_ctx, zend_ssa_phi *phi) {
 		}
 		SCP_DEBUG(")\n");
 
-		set_value(ctx, phi->ssa_var, &result);
+		set_value(scdf, ctx, phi->ssa_var, &result);
 		zval_ptr_dtor_nogc(&result);
 	}
 }
 
 /* Removes dead blocks. This will remove both the instructions (and phis) in the blocks, as well
  * as remove them from the successor / predecessor lists and mark them unreachable. */
-static void eliminate_dead_blocks(scp_ctx *ctx) {
-	zend_ssa *ssa = ctx->ssa;
+static void eliminate_dead_blocks(scdf_ctx *scdf) {
+	zend_ssa *ssa = scdf->ssa;
 	int i;
 	for (i = 0; i < ssa->cfg.blocks_count; i++) {
-		if (!zend_bitset_in(ctx->scdf.executable_blocks, i)
+		if (!zend_bitset_in(scdf->executable_blocks, i)
 				&& (ssa->cfg.blocks[i].flags & ZEND_BB_REACHABLE)) {
 			OPT_STAT(scp_dead_blocks)++;
 			remove_block(ssa, i,
@@ -1277,6 +1276,7 @@ void ssa_optimize_scp(ssa_opt_ctx *ssa_ctx) {
 	zend_ssa *ssa = ssa_ctx->ssa;
 	int i;
 	
+	scdf_ctx scdf;
 	scp_ctx ctx;
 
 	ctx.op_array = op_array;
@@ -1297,16 +1297,16 @@ void ssa_optimize_scp(ssa_opt_ctx *ssa_ctx) {
 		MAKE_TOP(&ctx.values[i]);
 	}
 
-	ctx.scdf.handlers.visit_instr = visit_instr;
-	ctx.scdf.handlers.visit_phi = visit_phi;
-	ctx.scdf.handlers.get_feasible_successors = get_feasible_successors;
+	scdf.handlers.visit_instr = visit_instr;
+	scdf.handlers.visit_phi = visit_phi;
+	scdf.handlers.get_feasible_successors = get_feasible_successors;
 
-	scdf_init(&ctx.scdf, op_array, ssa);
-	scdf_solve(&ctx.scdf, "SCCP");
-	eliminate_dead_blocks(&ctx);
+	scdf_init(&scdf, op_array, ssa, &ctx);
+	scdf_solve(&scdf, "SCCP");
+	eliminate_dead_blocks(&scdf);
 	replace_constant_operands(&ctx);
 	eliminate_dead_instructions(&ctx);
-	scdf_free(&ctx.scdf);
+	scdf_free(&scdf);
 
 	for (i = 0; i < ssa->vars_count; ++i) {
 		zval_ptr_dtor_nogc(&ctx.values[i]);

@@ -1785,7 +1785,7 @@ static int zend_infer_ranges(const zend_op_array *op_array, zend_ssa *ssa) /* {{
 				/*check_type_narrowing(op_array, ssa, worklist,*/			\
 					/*__var, ssa_var_info[__var].type, __type);*/			\
 				ssa_var_info[__var].type = __type;						\
-				scdf_add_to_worklist(&ctx->scdf, __var);                \
+				scdf_add_to_worklist(scdf, __var);                \
 			}															\
 			/*zend_bitset_excl(worklist, var);*/						\
 		}																\
@@ -1798,7 +1798,7 @@ static int zend_infer_ranges(const zend_op_array *op_array, zend_ssa *ssa) /* {{
 			    ssa_var_info[var].is_instanceof != (_is_instanceof)) {  \
 				ssa_var_info[var].ce = (_ce);						    \
 				ssa_var_info[var].is_instanceof = (_is_instanceof);     \
-				scdf_add_to_worklist(&ctx->scdf, var);					\
+				scdf_add_to_worklist(scdf, var);						\
 			}															\
 			/*zend_bitset_excl(worklist, var);*/						\
 		}																\
@@ -2159,15 +2159,14 @@ static uint32_t zend_fetch_arg_info(const zend_script *script, zend_arg_info *ar
 }
 
 typedef struct _ti_context {
-	scdf_ctx scdf;
 	const zend_script *script;
 } ti_context;
 
-static void zend_update_type_info(void *void_ctx, zend_op *opline, zend_ssa_op *ssa_op)
-{
+static void zend_update_type_info(
+		scdf_ctx *scdf, void *void_ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 	ti_context *ctx = (ti_context *) void_ctx;
-	zend_ssa *ssa = ctx->scdf.ssa;
-	const zend_op_array *op_array = ctx->scdf.op_array;
+	zend_ssa *ssa = scdf->ssa;
+	const zend_op_array *op_array = scdf->op_array;
 	const zend_script *script = ctx->script;
 	uint32_t t1, t2;
 	uint32_t tmp, orig;
@@ -3379,15 +3378,14 @@ static zend_class_entry *join_class_entries(
 	return ce1;
 }
 
-static void zend_update_phi_type_info(void *void_ctx, zend_ssa_phi *p) {
-	ti_context *ctx = (ti_context *) void_ctx;
-	zend_ssa *ssa = ctx->scdf.ssa;
-	const zend_op_array *op_array = ctx->scdf.op_array;
+static void zend_update_phi_type_info(scdf_ctx *scdf, void *void_ctx, zend_ssa_phi *p) {
+	zend_ssa *ssa = scdf->ssa;
+	const zend_op_array *op_array = scdf->op_array;
 	zend_ssa_var *ssa_vars = ssa->vars;
 	zend_ssa_var_info *ssa_var_info = ssa->var_info;
 
 	if (p->pi >= 0) {
-		if (p->sources[0] >= 0 && scdf_is_edge_feasible(&ctx->scdf, p->pi, p->block)) {
+		if (p->sources[0] >= 0 && scdf_is_edge_feasible(scdf, p->pi, p->block)) {
 			zend_class_entry *ce = ssa_var_info[p->sources[0]].ce;
 			int is_instanceof = ssa_var_info[p->sources[0]].is_instanceof;
 			uint32_t tmp = get_ssa_var_info(ssa, p->sources[0]);
@@ -3420,7 +3418,7 @@ static void zend_update_phi_type_info(void *void_ctx, zend_ssa_phi *p) {
 
 		for (i = 0; i < block->predecessors_count; i++) {
 			if (p->sources[i] >= 0
-					&& scdf_is_edge_feasible(&ctx->scdf, predecessors[i], p->block)) {
+					&& scdf_is_edge_feasible(scdf, predecessors[i], p->block)) {
 				zend_ssa_var_info *info = &ssa_var_info[p->sources[i]];
 				tmp |= info->type;
 				if (info->type & MAY_BE_OBJECT) {
@@ -3604,7 +3602,7 @@ static zend_bool can_convert_to_double(
 	return 1;
 }
 
-static int zend_type_narrowing(const zend_op_array *op_array, const zend_script *script, zend_ssa *ssa, ti_context *ctx)
+static int zend_type_narrowing(const zend_op_array *op_array, const zend_script *script, zend_ssa *ssa, scdf_ctx *scdf)
 {
 	uint32_t bitset_len = zend_bitset_len(ssa->vars_count);
 	zend_bitset visited, worklist;
@@ -3638,7 +3636,7 @@ static int zend_type_narrowing(const zend_op_array *op_array, const zend_script 
 				ZEND_BITSET_FOREACH(visited, bitset_len, i) {
 					ssa->var_info[i].type &= ~MAY_BE_ANY;
 				} ZEND_BITSET_FOREACH_END();
-				scdf_add_to_worklist(&ctx->scdf, i);
+				scdf_add_to_worklist(scdf, i);
 			}
 		}
 	}
@@ -3648,7 +3646,7 @@ static int zend_type_narrowing(const zend_op_array *op_array, const zend_script 
 		return SUCCESS;
 	}
 
-	scdf_solve(&ctx->scdf, "Type inference (after narrowing)");
+	scdf_solve(scdf, "Type inference (after narrowing)");
 
 	free_alloca(visited, use_heap);
 	return SUCCESS;
@@ -3894,11 +3892,10 @@ void zend_func_return_info(const zend_op_array   *op_array,
 }
 
 static zend_bool get_feasible_successors(
-		void *void_ctx, zend_basic_block *block,
+		scdf_ctx *scdf, void *void_ctx, zend_basic_block *block,
 		zend_op *opline, zend_ssa_op *ssa_op, zend_bool *suc) {
-	ti_context *ctx = (ti_context *) void_ctx;
-	const zend_op_array *op_array = ctx->scdf.op_array;
-	zend_ssa *ssa = ctx->scdf.ssa;
+	const zend_op_array *op_array = scdf->op_array;
+	zend_ssa *ssa = scdf->ssa;
 	uint32_t t1 = OP1_INFO();
 	zend_bool is_true;
 
@@ -3966,32 +3963,33 @@ static int zend_infer_types(const zend_op_array *op_array, const zend_script *sc
 	zend_ssa_var_info *ssa_var_info = ssa->var_info;
 	int ssa_vars_count = ssa->vars_count;
 	int j;
+	scdf_ctx scdf;
 	ti_context ctx;
 	ctx.script = script;
 
-	ctx.scdf.handlers.visit_instr = zend_update_type_info;
-	ctx.scdf.handlers.visit_phi = zend_update_phi_type_info;
-	ctx.scdf.handlers.get_feasible_successors = get_feasible_successors;
+	scdf.handlers.visit_instr = zend_update_type_info;
+	scdf.handlers.visit_phi = zend_update_phi_type_info;
+	scdf.handlers.get_feasible_successors = get_feasible_successors;
 
 	/* Type Inference */
 	for (j = op_array->last_var; j < ssa_vars_count; j++) {
 		ssa_var_info[j].type = 0;
 	}
 
-	scdf_init(&ctx.scdf, op_array, ssa);
-	scdf_solve(&ctx.scdf, "Type inference");
+	scdf_init(&scdf, op_array, ssa, &ctx);
+	scdf_solve(&scdf, "Type inference");
 
 	for (j = 0; j < ssa->cfg.blocks_count; j++) {
-		if (!zend_bitset_in(ctx.scdf.executable_blocks, j)) {
+		if (!zend_bitset_in(scdf.executable_blocks, j)) {
 			OPT_STAT(tmp)++;
 			remove_block(ssa, j, &OPT_STAT(tmp2), &OPT_STAT(tmp3));
 		}
 	}
 
 	/* Narrowing integer initialization to doubles */
-	zend_type_narrowing(op_array, script, ssa, &ctx);
+	zend_type_narrowing(op_array, script, ssa, &scdf);
 
-	scdf_free(&ctx.scdf);
+	scdf_free(&scdf);
 
 	for (j = 0; j < op_array->last_var; j++) {
 		/* $php_errormsg and $http_response_header may be updated indirectly */
