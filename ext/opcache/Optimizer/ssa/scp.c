@@ -4,6 +4,7 @@
 #include "Optimizer/ssa_pass.h"
 #include "Optimizer/ssa/instructions.h"
 #include "Optimizer/ssa/scdf.h"
+#include "Optimizer/ssa/scp.h"
 #include "Optimizer/statistics.h"
 #include "ext/standard/php_string.h"
 
@@ -53,15 +54,6 @@
 #else
 #define SCP_DEBUG(...)
 #endif
-
-typedef struct _scp_ctx {
-	zend_op_array *op_array;
-	zend_ssa *ssa;
-	zend_call_info **call_map;
-	zval *values;
-	zval top;
-	zval bot;
-} scp_ctx;
 
 #define TOP ((zend_uchar)-1) 
 #define BOT ((zend_uchar)-2)
@@ -120,7 +112,8 @@ static zval *get_op2_value(scp_ctx *ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 	}
 }
 
-static zend_bool can_replace_op1(zend_op_array *op_array, zend_op *opline, zend_ssa_op *ssa_op) {
+static zend_bool can_replace_op1(
+		const zend_op_array *op_array, zend_op *opline, zend_ssa_op *ssa_op) {
 	switch (opline->opcode) {
 		case ZEND_PRE_INC:
 		case ZEND_PRE_DEC:
@@ -191,7 +184,8 @@ static zend_bool can_replace_op1(zend_op_array *op_array, zend_op *opline, zend_
 	return 1;
 }
 
-static zend_bool can_replace_op2(zend_op_array *op_array, zend_op *opline, zend_ssa_op *ssa_op) {
+static zend_bool can_replace_op2(
+		const zend_op_array *op_array, zend_op *opline, zend_ssa_op *ssa_op) {
 	switch (opline->opcode) {
 		/* Do not accept CONST */
 		case ZEND_DECLARE_INHERITED_CLASS:
@@ -612,7 +606,7 @@ static inline int ct_eval_func_call(
 
 #define SKIP_IF_TOP(op) if (IS_TOP(op)) break;
 
-static void visit_instr(scdf_ctx *scdf, void *void_ctx, zend_op *opline, zend_ssa_op *ssa_op) {
+void scp_visit_instr(scdf_ctx *scdf, void *void_ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 	scp_ctx *ctx = (scp_ctx *) void_ctx;
 	zval *op1, *op2, zv; /* zv is a temporary to hold result values */
 
@@ -1024,7 +1018,7 @@ static void visit_instr(scdf_ctx *scdf, void *void_ctx, zend_op *opline, zend_ss
 }
 
 /* Returns whether there is a successor */
-static zend_bool get_feasible_successors(
+zend_bool scp_get_feasible_successors(
 		scdf_ctx *scdf, void *void_ctx, zend_basic_block *block,
 		zend_op *opline, zend_ssa_op *ssa_op, zend_bool *suc) {
 	scp_ctx *ctx = (scp_ctx *) void_ctx;
@@ -1101,7 +1095,7 @@ static void join_phi_values(zval *a, zval *b) {
 	}
 }
 
-static void visit_phi(scdf_ctx *scdf, void *void_ctx, zend_ssa_phi *phi) {
+void scp_visit_phi(scdf_ctx *scdf, void *void_ctx, zend_ssa_phi *phi) {
 	scp_ctx *ctx = (scp_ctx *) void_ctx;
 	zend_ssa *ssa = ctx->ssa;
 	ZEND_ASSERT(phi->ssa_var >= 0);
@@ -1271,44 +1265,53 @@ static void eliminate_dead_instructions(scp_ctx *ctx) {
 	}
 }
 
-void ssa_optimize_scp(ssa_opt_ctx *ssa_ctx) {
-	zend_op_array *op_array = ssa_ctx->op_array;
-	zend_ssa *ssa = ssa_ctx->ssa;
+void scp_context_init(scp_ctx *ctx,
+		zend_ssa *ssa, zend_op_array *op_array, zend_call_info **call_map) {
 	int i;
-	
-	scdf_ctx scdf;
-	scp_ctx ctx;
+	ctx->op_array = op_array;
+	ctx->ssa = ssa;
+	ctx->call_map = call_map;
+	ctx->values = emalloc(sizeof(zval) * ssa->vars_count);
 
-	ctx.op_array = op_array;
-	ctx.ssa = ssa;
-	ctx.call_map = ssa_ctx->call_map;
-	ctx.values = alloca(sizeof(zval) * ssa->vars_count);
-
-	MAKE_TOP(&ctx.top);
-	MAKE_BOT(&ctx.bot);
+	MAKE_TOP(&ctx->top);
+	MAKE_BOT(&ctx->bot);
 
 	i = 0;
 	for (; i < op_array->last_var; ++i) {
 		/* These are all undefined variables, which we have to mark BOT.
 		 * Otherwise the undefined variable warning might not be preserved. */
-		MAKE_BOT(&ctx.values[i]);
+		MAKE_BOT(&ctx->values[i]);
 	}
 	for (; i < ssa->vars_count; ++i) {
-		MAKE_TOP(&ctx.values[i]);
+		MAKE_TOP(&ctx->values[i]);
 	}
+}
 
-	scdf.handlers.visit_instr = visit_instr;
-	scdf.handlers.visit_phi = visit_phi;
-	scdf.handlers.get_feasible_successors = get_feasible_successors;
+void scp_context_free(scp_ctx *ctx) {
+	int i;
+	for (i = 0; i < ctx->ssa->vars_count; ++i) {
+		zval_ptr_dtor_nogc(&ctx->values[i]);
+	}
+	efree(ctx->values);
+}
 
-	scdf_init(&scdf, op_array, ssa, &ctx);
+void ssa_optimize_scp(ssa_opt_ctx *ssa_ctx) {
+	scdf_ctx scdf;
+	scp_ctx ctx;
+
+	scp_context_init(&ctx, ssa_ctx->ssa, ssa_ctx->op_array, ssa_ctx->call_map);
+
+	scdf.handlers.visit_instr = scp_visit_instr;
+	scdf.handlers.visit_phi = scp_visit_phi;
+	scdf.handlers.get_feasible_successors = scp_get_feasible_successors;
+
+	scdf_init(&scdf, ssa_ctx->op_array, ssa_ctx->ssa, &ctx);
 	scdf_solve(&scdf, "SCCP");
+
 	eliminate_dead_blocks(&scdf);
 	replace_constant_operands(&ctx);
 	eliminate_dead_instructions(&ctx);
-	scdf_free(&scdf);
 
-	for (i = 0; i < ssa->vars_count; ++i) {
-		zval_ptr_dtor_nogc(&ctx.values[i]);
-	}
+	scdf_free(&scdf);
+	scp_context_free(&ctx);
 }
