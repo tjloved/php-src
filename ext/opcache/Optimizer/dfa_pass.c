@@ -103,7 +103,7 @@ int zend_dfa_analyze_op_array(zend_op_array *op_array, zend_optimizer_ctx *ctx, 
 		return FAILURE;
 	}
 
-	if (zend_ssa_inference(&ctx->arena, op_array, ctx->script, ssa) != SUCCESS) {
+	if (zend_ssa_inference(&ctx->arena, op_array, ctx->script, ssa, NULL) != SUCCESS) {
 		return FAILURE;
 	}
 
