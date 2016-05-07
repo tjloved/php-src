@@ -55,7 +55,7 @@ static void mark_edge_feasible(scdf_ctx *ctx, int from, int to, int suc_num) {
 		zend_ssa_block *ssa_block = &ctx->ssa->blocks[to];
 		zend_ssa_phi *phi;
 		for (phi = ssa_block->phis; phi; phi = phi->next) {
-			ctx->handlers.visit_phi(ctx, phi);
+			ctx->handlers.visit_phi(ctx, ctx->ctx, phi);
 		}
 	}
 }
@@ -75,12 +75,12 @@ static inline zend_bool get_feasible_successors(
 		return 1;
 	}
 
-	return ctx->handlers.get_feasible_successors(ctx, block, opline, ssa_op, suc);
+	return ctx->handlers.get_feasible_successors(ctx, ctx->ctx, block, opline, ssa_op, suc);
 }
 
 static void handle_instr(scdf_ctx *ctx, int block_num, zend_op *opline, zend_ssa_op *ssa_op) {
 	zend_basic_block *block = &ctx->ssa->cfg.blocks[block_num];
-	ctx->handlers.visit_instr(ctx, opline, ssa_op);
+	ctx->handlers.visit_instr(ctx, ctx->ctx, opline, ssa_op);
 
 	if (block->end == opline - ctx->op_array->opcodes) {
 		zend_bool suc[2] = {0};
@@ -95,11 +95,12 @@ static void handle_instr(scdf_ctx *ctx, int block_num, zend_op *opline, zend_ssa
 	}
 }
 
-void scdf_init(scdf_ctx *ctx, const zend_op_array *op_array, zend_ssa *ssa) {
+void scdf_init(scdf_ctx *ctx, const zend_op_array *op_array, zend_ssa *ssa, void *extra_ctx) {
 	zend_ulong *bitsets;
 
 	ctx->op_array = op_array;
 	ctx->ssa = ssa;
+	ctx->ctx = extra_ctx;
 
 	ctx->var_worklist_len = zend_bitset_len(ssa->vars_count);
 	ctx->block_worklist_len = zend_bitset_len(ssa->cfg.blocks_count);
@@ -149,7 +150,7 @@ void scdf_solve(scdf_ctx *ctx, const char *name) {
 				zend_ssa_phi *phi;
 				FOREACH_PHI_USE(var, phi) {
 					if (zend_bitset_in(ctx->executable_blocks, phi->block)) {
-						ctx->handlers.visit_phi(ctx, phi);
+						ctx->handlers.visit_phi(ctx, ctx->ctx, phi);
 					}
 				} FOREACH_PHI_USE_END();
 			}
@@ -165,7 +166,7 @@ void scdf_solve(scdf_ctx *ctx, const char *name) {
 			{
 				zend_ssa_phi *phi;
 				for (phi = ssa_block->phis; phi; phi = phi->next) {
-					ctx->handlers.visit_phi(ctx, phi);
+					ctx->handlers.visit_phi(ctx, ctx->ctx, phi);
 				}
 			}
 

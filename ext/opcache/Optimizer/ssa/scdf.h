@@ -2,6 +2,7 @@
 #define _SSA_SCDF_H
 
 typedef struct _scdf_ctx {
+	void *ctx;
 	const zend_op_array *op_array;
 	zend_ssa *ssa;
 	zend_bitset var_worklist;
@@ -12,24 +13,26 @@ typedef struct _scdf_ctx {
 	uint32_t block_worklist_len;
 
 	struct {
-		void (*visit_instr)(void *ctx, zend_op *opline, zend_ssa_op *ssa_op);
-		void (*visit_phi)(void *ctx, zend_ssa_phi *phi);
+		void (*visit_instr)(
+			struct _scdf_ctx *scdf, void *ctx, zend_op *opline, zend_ssa_op *ssa_op);
+		void (*visit_phi)(
+			struct _scdf_ctx *scdf, void *ctx, zend_ssa_phi *phi);
 		zend_bool (*get_feasible_successors)(
-			void *ctx, zend_basic_block *block,
+			struct _scdf_ctx *scdf, void *ctx, zend_basic_block *block,
 			zend_op *opline, zend_ssa_op *ssa_op, zend_bool *suc);
 	} handlers;
 } scdf_ctx;
 
-void scdf_solve(scdf_ctx *ctx, const char *name);
-void scdf_init(scdf_ctx *ctx, const zend_op_array *op_array, zend_ssa *ssa);
-void scdf_free(scdf_ctx *ctx);
+void scdf_init(scdf_ctx *scdf, const zend_op_array *op_array, zend_ssa *ssa, void *ctx);
+void scdf_solve(scdf_ctx *scdf, const char *name);
+void scdf_free(scdf_ctx *scdf);
 
-static inline void scdf_add_to_worklist(scdf_ctx *ctx, int var) {
-	zend_bitset_incl(ctx->var_worklist, var);
+static inline void scdf_add_to_worklist(scdf_ctx *scdf, int var) {
+	zend_bitset_incl(scdf->var_worklist, var);
 }
 
-static inline zend_bool scdf_is_edge_feasible(scdf_ctx *ctx, int from, int to) {
-	zend_basic_block *block = &ctx->ssa->cfg.blocks[from];
+static inline zend_bool scdf_is_edge_feasible(scdf_ctx *scdf, int from, int to) {
+	zend_basic_block *block = &scdf->ssa->cfg.blocks[from];
 	int suc;
 	if (block->successors[0] == to) {
 		suc = 0;
@@ -38,7 +41,7 @@ static inline zend_bool scdf_is_edge_feasible(scdf_ctx *ctx, int from, int to) {
 	} else {
 		ZEND_ASSERT(0);
 	}
-	return zend_bitset_in(ctx->feasible_edges, 2 * from + suc);
+	return zend_bitset_in(scdf->feasible_edges, 2 * from + suc);
 }
 
 #endif

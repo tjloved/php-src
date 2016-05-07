@@ -420,54 +420,53 @@ void try_propagate_tmp_tmp_assignment(
  * unconditional propagation for nearly the same result. */
 
 typedef struct _context {
-	scdf_ctx scdf;
 	int *copy;
 } context;
 
 #define TOP (-1)
 #define BOT (-2)
 
-static inline void set_copy(context *ctx, int var, int copy) {
+static inline void set_copy(scdf_ctx *scdf, context *ctx, int var, int copy) {
 	/* The result var can be BOT here if it is a reference */
 	if (ctx->copy[var] != BOT && ctx->copy[var] != copy) {
 		ctx->copy[var] = copy;
-		scdf_add_to_worklist(&ctx->scdf, var);
+		scdf_add_to_worklist(scdf, var);
 	}
 }
 
-void visit_instr(void *void_ctx, zend_op *opline, zend_ssa_op *ssa_op) {
+void visit_instr(scdf_ctx *scdf, void *void_ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 	context *ctx = (context *) void_ctx;
 	if (opline->opcode == ZEND_ASSIGN && opline->op2_type == IS_CV && ssa_op->op1_def >= 0) {
 		if (ctx->copy[ssa_op->op2_use] == BOT) {
-			set_copy(ctx, ssa_op->op1_def, ssa_op->op1_def);
+			set_copy(scdf, ctx, ssa_op->op1_def, ssa_op->op1_def);
 		} else {
-			set_copy(ctx, ssa_op->op1_def, ctx->copy[ssa_op->op2_use]);
+			set_copy(scdf, ctx, ssa_op->op1_def, ctx->copy[ssa_op->op2_use]);
 		}
 		return;
 	}
 
 	if (ssa_op->result_def >= 0) {
-		set_copy(ctx, ssa_op->result_def, ssa_op->result_def);
+		set_copy(scdf, ctx, ssa_op->result_def, ssa_op->result_def);
 	}
 	if (ssa_op->op1_def >= 0) {
-		set_copy(ctx, ssa_op->op1_def, ssa_op->op1_def);
+		set_copy(scdf, ctx, ssa_op->op1_def, ssa_op->op1_def);
 	}
 	if (ssa_op->op2_def >= 0) {
-		set_copy(ctx, ssa_op->op2_def, ssa_op->op2_def);
+		set_copy(scdf, ctx, ssa_op->op2_def, ssa_op->op2_def);
 	}
 }
 
-void visit_phi(void *void_ctx, zend_ssa_phi *phi) {
+void visit_phi(scdf_ctx *scdf, void *void_ctx, zend_ssa_phi *phi) {
 	context *ctx = (context *) void_ctx;
-	zend_ssa *ssa = ctx->scdf.ssa;
+	zend_ssa *ssa = scdf->ssa;
 	if (ctx->copy[phi->ssa_var] == BOT) {
 		return;
 	}
 
 	if (phi->pi >= 0) {
-		if (phi->sources[0] >= 0 && scdf_is_edge_feasible(&ctx->scdf, phi->pi, phi->block)) {
+		if (phi->sources[0] >= 0 && scdf_is_edge_feasible(scdf, phi->pi, phi->block)) {
 			if (ctx->copy[phi->sources[0]] != BOT) {
-				set_copy(ctx, phi->ssa_var, ctx->copy[phi->sources[0]]);
+				set_copy(scdf, ctx, phi->ssa_var, ctx->copy[phi->sources[0]]);
 			}
 		}
 	} else {
@@ -477,7 +476,7 @@ void visit_phi(void *void_ctx, zend_ssa_phi *phi) {
 		int result = TOP;
 		for (i = 0; i < block->predecessors_count; i++) {
 			if (phi->sources[i] >= 0
-					&& scdf_is_edge_feasible(&ctx->scdf, predecessors[i], phi->block)) {
+					&& scdf_is_edge_feasible(scdf, predecessors[i], phi->block)) {
 				int copy = ctx->copy[phi->sources[i]];
 				if (result == TOP) {
 					result = copy;
@@ -486,13 +485,13 @@ void visit_phi(void *void_ctx, zend_ssa_phi *phi) {
 				}
 			}
 		}
-		set_copy(ctx, phi->ssa_var, result);
+		set_copy(scdf, ctx, phi->ssa_var, result);
 	}
 }
 
 // TODO $a == $a is not necessarily true if $a is NaN
-static int is_cond_true(context *ctx, int var_num) {
-	zend_ssa_var *var = &ctx->scdf.ssa->vars[var_num];
+static int is_cond_true(context *ctx, zend_ssa *ssa, const zend_op_array *op_array, int var_num) {
+	zend_ssa_var *var = &ssa->vars[var_num];
 	zend_op *opline;
 	zend_ssa_op *ssa_op;
 	int copy1, copy2;
@@ -501,7 +500,7 @@ static int is_cond_true(context *ctx, int var_num) {
 		return BOT;
 	}
 
-	opline = &ctx->scdf.op_array->opcodes[var->definition];
+	opline = &op_array->opcodes[var->definition];
 	switch (opline->opcode) {
 		case ZEND_IS_EQUAL:
 		case ZEND_IS_IDENTICAL:
@@ -515,7 +514,7 @@ static int is_cond_true(context *ctx, int var_num) {
 			return BOT;
 	}
 
-	ssa_op = &ctx->scdf.ssa->ops[var->definition];
+	ssa_op = &ssa->ops[var->definition];
 	if (ssa_op->op1_use < 0 || ssa_op->op2_use < 0) {
 		return BOT;
 	}
@@ -536,7 +535,7 @@ static int is_cond_true(context *ctx, int var_num) {
 }
 
 zend_bool get_feasible_successors(
-		void *void_ctx, zend_basic_block *block,
+		scdf_ctx *scdf, void *void_ctx, zend_basic_block *block,
 		zend_op *opline, zend_ssa_op *ssa_op, zend_bool *suc) {
 	context *ctx = (context *) void_ctx;
 	int is_true;
@@ -566,7 +565,7 @@ zend_bool get_feasible_successors(
 	}
 
 	/* We can't statically determine the condition */
-	is_true = is_cond_true(ctx, ssa_op->op1_use);
+	is_true = is_cond_true(ctx, scdf->ssa, scdf->op_array, ssa_op->op1_use);
 	if (is_true == BOT) {
 		suc[0] = 1;
 		suc[1] = 1;
@@ -596,11 +595,12 @@ void scdf_copy_propagation(ssa_opt_ctx *ssa_ctx) {
 	zend_ssa *ssa = ssa_ctx->ssa;
 	zend_op_array *op_array = ssa_ctx->op_array;
 	int i;
+	scdf_ctx scdf;
 	context ctx;
 
-	ctx.scdf.handlers.visit_instr = visit_instr;
-	ctx.scdf.handlers.visit_phi = visit_phi;
-	ctx.scdf.handlers.get_feasible_successors = get_feasible_successors;
+	scdf.handlers.visit_instr = visit_instr;
+	scdf.handlers.visit_phi = visit_phi;
+	scdf.handlers.get_feasible_successors = get_feasible_successors;
 
 	ctx.copy = alloca(sizeof(int) * ssa->vars_count);
 	for (i = 0; i < op_array->last_var; i++) {
@@ -614,8 +614,8 @@ void scdf_copy_propagation(ssa_opt_ctx *ssa_ctx) {
 		}
 	}
 
-	scdf_init(&ctx.scdf, op_array, ssa);
-	scdf_solve(&ctx.scdf, "copy propagation");
+	scdf_init(&scdf, op_array, ssa, &ctx);
+	scdf_solve(&scdf, "copy propagation");
 
 	for (i = 0; i < ssa->vars_count; i++) {
 		if (ctx.copy[i] != TOP && ctx.copy[i] != BOT && ctx.copy[i] != i) {
@@ -633,7 +633,7 @@ void scdf_copy_propagation(ssa_opt_ctx *ssa_ctx) {
 		if (!(ssa->cfg.blocks[i].flags & ZEND_BB_REACHABLE)) {
 			continue;
 		}
-		if (!zend_bitset_in(ctx.scdf.executable_blocks, i)) {
+		if (!zend_bitset_in(scdf.executable_blocks, i)) {
 #if 0
 			remove_block(ssa, i, &OPT_STAT(tmp), &OPT_STAT(tmp));
 			OPT_STAT(tmp)++;
@@ -641,7 +641,7 @@ void scdf_copy_propagation(ssa_opt_ctx *ssa_ctx) {
 		}
 	}
 
-	scdf_free(&ctx.scdf);
+	scdf_free(&scdf);
 }
 
 static inline zend_bool may_be_undef(ssa_opt_ctx *ctx, int var_num) {
