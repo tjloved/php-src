@@ -220,14 +220,14 @@ void ssa_optimize_type_specialization(ssa_opt_ctx *ctx) {
 				// it does not actually specialize anything (yet)
 				if (MUST_BE(t1, MAY_BE_ARRAY)) {
 					OPT_STAT(ts_must_be_array)++;
-					if ((t1 & MAY_BE_ARRAY_KEY_LONG) == MAY_BE_ARRAY_KEY_LONG) {
+					if ((t1 & MAY_BE_ARRAY_KEY_ANY) == MAY_BE_ARRAY_KEY_LONG) {
 						OPT_STAT(ts_must_be_int_key)++;
 						if (opline->op2_type == IS_UNUSED) {
 							OPT_STAT(ts_must_be_append_int_key)++;
 						} else if (MUST_BE(t2, MAY_BE_LONG)) {
 							OPT_STAT(ts_must_be_matching_int_key)++;
 						}
-					} else if ((t1 & MAY_BE_ARRAY_KEY_STRING) == MAY_BE_ARRAY_KEY_STRING) {
+					} else if ((t1 & MAY_BE_ARRAY_KEY_ANY) == MAY_BE_ARRAY_KEY_STRING) {
 						OPT_STAT(ts_must_be_string_key)++;
 					}
 					if (((t1 & MAY_BE_ARRAY_OF_ANY) & (MAY_BE_ARRAY_OF_STRING|MAY_BE_ARRAY_OF_ARRAY|MAY_BE_ARRAY_OF_RESOURCE|MAY_BE_ARRAY_OF_OBJECT)) == 0) {
