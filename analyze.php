@@ -169,8 +169,8 @@ class Operand {
 
     public function __construct(string $op_type, int $use_info, int $def_info) {
         $this->op_type = $op_type;
-        $this->use_info = $use_info;
-        $this->def_info = $def_info;
+        $this->use_info = Type::normalize($use_info);
+        $this->def_info = Type::normalize($def_info);
     }
 
     public function format(bool $showTypes) : string {
@@ -263,6 +263,9 @@ class Type {
     const ERROR = 1 << 23;
     const CLAZZ = 1 << 24;
 
+    const RC1 = 1 << 27;
+    const RCN = 1 << 28;
+
     const UNUSED = -1;
 
     private const TO_NAME = [
@@ -306,6 +309,13 @@ class Type {
             }
         }
         return $result;
+    }
+
+    public static function normalize(int $type) : int {
+        if ($type == self::UNUSED) {
+            return $type;
+        }
+        return $type & ~(self::RC1|self::RCN);
     }
 
     private static function setBits(int $num) : Traversable {
