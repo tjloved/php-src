@@ -46,8 +46,9 @@ static void mark_edge_feasible(scdf_ctx *ctx, int from, int to, int suc_num) {
 	zend_bitset_incl(ctx->feasible_edges, edge);
 
 	if (!zend_bitset_in(ctx->executable_blocks, to)) {
-		DEBUG_PRINT("Marking block %d executable\n", to);
-		zend_bitset_incl(ctx->executable_blocks, to);
+		if (!zend_bitset_in(ctx->block_worklist, to)) {
+			DEBUG_PRINT("Adding block %d to worklist\n", to);
+		}
 		zend_bitset_incl(ctx->block_worklist, to);
 	} else {
 		/* Block is already executable, only a new edge became feasible.
@@ -159,10 +160,12 @@ void scdf_solve(scdf_ctx *ctx, const char *name) {
 			zend_ssa_block *ssa_block = &ssa->blocks[i];
 
 			DEBUG_PRINT("Pop block %d from worklist\n", i);
+			zend_bitset_incl(ctx->executable_blocks, i);
 
 			{
 				zend_ssa_phi *phi;
 				for (phi = ssa_block->phis; phi; phi = phi->next) {
+					zend_bitset_excl(ctx->phi_var_worklist, phi->ssa_var);
 					ctx->handlers.visit_phi(ctx, ctx->ctx, phi);
 				}
 			}
@@ -170,6 +173,7 @@ void scdf_solve(scdf_ctx *ctx, const char *name) {
 			{
 				int j;
 				for (j = block->start; j <= block->end; j++) {
+					zend_bitset_excl(ctx->instr_worklist, j);
 					handle_instr(ctx, i, &ctx->op_array->opcodes[j], &ssa->ops[j]);
 				}
 			}
