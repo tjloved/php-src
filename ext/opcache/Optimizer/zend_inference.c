@@ -3645,15 +3645,14 @@ static int zend_type_narrowing(const zend_op_array *op_array, const zend_script 
 {
 	uint32_t bitset_len = zend_bitset_len(ssa->vars_count);
 	zend_bitset visited, worklist;
-	int i, v;
+	int i;
+	uint32_t v;
 	zend_op *opline;
 	zend_bool narrowed = 0;
 	ALLOCA_FLAG(use_heap)
 
 	visited = ZEND_BITSET_ALLOCA(2 * bitset_len, use_heap);
 	worklist = visited + bitset_len;
-
-	zend_bitset_clear(worklist, bitset_len);
 
 	for (v = op_array->last_var; v < ssa->vars_count; v++) {
 		if ((ssa->var_info[v].type & (MAY_BE_REF | MAY_BE_ANY | MAY_BE_UNDEF)) != MAY_BE_LONG) continue;
