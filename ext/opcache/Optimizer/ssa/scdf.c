@@ -102,18 +102,22 @@ void scdf_init(scdf_ctx *ctx, const zend_op_array *op_array, zend_ssa *ssa, void
 	ctx->ssa = ssa;
 	ctx->ctx = extra_ctx;
 
-	ctx->var_worklist_len = zend_bitset_len(ssa->vars_count);
+	ctx->instr_worklist_len = zend_bitset_len(op_array->last);
+	ctx->phi_var_worklist_len = zend_bitset_len(ssa->vars_count);
 	ctx->block_worklist_len = zend_bitset_len(ssa->cfg.blocks_count);
 
 	bitsets = safe_emalloc(
-		ctx->var_worklist_len + 4 * ctx->block_worklist_len, sizeof(zend_ulong), 0);
+		ctx->instr_worklist_len + ctx->phi_var_worklist_len + 4 * ctx->block_worklist_len,
+		sizeof(zend_ulong), 0);
 
-	ctx->var_worklist = bitsets;
-	ctx->block_worklist = ctx->var_worklist + ctx->var_worklist_len;
+	ctx->instr_worklist = bitsets;
+	ctx->phi_var_worklist = ctx->instr_worklist + ctx->instr_worklist_len;
+	ctx->block_worklist = ctx->phi_var_worklist + ctx->phi_var_worklist_len;
 	ctx->executable_blocks = ctx->block_worklist + ctx->block_worklist_len;
 	ctx->feasible_edges = ctx->executable_blocks + ctx->block_worklist_len;
 
-	zend_bitset_clear(ctx->var_worklist, ctx->var_worklist_len);
+	zend_bitset_clear(ctx->instr_worklist, ctx->instr_worklist_len);
+	zend_bitset_clear(ctx->phi_var_worklist, ctx->phi_var_worklist_len);
 	zend_bitset_clear(ctx->block_worklist, ctx->block_worklist_len);
 	zend_bitset_clear(ctx->executable_blocks, ctx->block_worklist_len);
 	zend_bitset_clear(ctx->feasible_edges, ctx->block_worklist_len * 2);
@@ -123,36 +127,29 @@ void scdf_init(scdf_ctx *ctx, const zend_op_array *op_array, zend_ssa *ssa, void
 }
 
 void scdf_free(scdf_ctx *ctx) {
-	efree(ctx->var_worklist);
+	efree(ctx->instr_worklist);
 }
 
 void scdf_solve(scdf_ctx *ctx, const char *name) {
 	zend_ssa *ssa = ctx->ssa;
 	DEBUG_PRINT("Start SCDF solve (%s)\n", name);
-	while (!zend_bitset_empty(ctx->var_worklist, ctx->var_worklist_len)
+	while (!zend_bitset_empty(ctx->instr_worklist, ctx->instr_worklist_len)
+		|| !zend_bitset_empty(ctx->phi_var_worklist, ctx->phi_var_worklist_len)
 		|| !zend_bitset_empty(ctx->block_worklist, ctx->block_worklist_len)
 	) {
 		int i;
-		while ((i = zend_bitset_pop_first(ctx->var_worklist, ctx->var_worklist_len)) >= 0) {
-			zend_ssa_var *var = &ssa->vars[i];
-
-			{
-				int use;
-				FOREACH_USE(var, use) {
-					int block_num = ssa->cfg.map[use];
-					if (zend_bitset_in(ctx->executable_blocks, block_num)) {
-						handle_instr(ctx, block_num, &ctx->op_array->opcodes[use], &ssa->ops[use]);
-					}
-				} FOREACH_USE_END();
+		while ((i = zend_bitset_pop_first(ctx->phi_var_worklist, ctx->phi_var_worklist_len)) >= 0) {
+			zend_ssa_phi *phi = ssa->vars[i].definition_phi;
+			ZEND_ASSERT(phi);
+			if (zend_bitset_in(ctx->executable_blocks, phi->block)) {
+				ctx->handlers.visit_phi(ctx, ctx->ctx, phi);
 			}
+		}
 
-			{
-				zend_ssa_phi *phi;
-				FOREACH_PHI_USE(var, phi) {
-					if (zend_bitset_in(ctx->executable_blocks, phi->block)) {
-						ctx->handlers.visit_phi(ctx, ctx->ctx, phi);
-					}
-				} FOREACH_PHI_USE_END();
+		while ((i = zend_bitset_pop_first(ctx->instr_worklist, ctx->instr_worklist_len)) >= 0) {
+			int block_num = ssa->cfg.map[i];
+			if (zend_bitset_in(ctx->executable_blocks, block_num)) {
+				handle_instr(ctx, block_num, &ctx->op_array->opcodes[i], &ssa->ops[i]);
 			}
 		}
 
