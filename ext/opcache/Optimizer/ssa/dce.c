@@ -297,7 +297,7 @@ static zend_bool dce_instr(context *ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 // TODO Move this somewhere else (CFG simplification?)
 static void simplify_jumps(zend_ssa *ssa, zend_op_array *op_array) {
 	int i;
-	for (i = 0; i < op_array->last; i++) {
+	FOREACH_INSTR_NUM(i) {
 		zend_op *opline = &op_array->opcodes[i];
 		zend_ssa_op *ssa_op = &ssa->ops[i];
 		zval *op1;
@@ -368,7 +368,7 @@ static void simplify_jumps(zend_ssa *ssa, zend_op_array *op_array) {
 				}
 				break;
 		}
-	}
+	} FOREACH_INSTR_NUM_END();
 }
 
 static inline int get_common_phi_source(zend_ssa *ssa, zend_ssa_phi *phi) {
@@ -437,12 +437,12 @@ void ssa_optimize_dce(ssa_opt_ctx *ssa_ctx) {
 	memset(ctx.phi_dead, 0xff, sizeof(zend_ulong) * ctx.phi_worklist_len);
 
 	/* Mark instruction with side effects as live */
-	for (i = 0; i < op_array->last; ++i) {
+	FOREACH_INSTR_NUM(i) {
 		if (may_have_side_effects(&ctx, &op_array->opcodes[i], &ssa->ops[i]) || has_varargs) {
 			zend_bitset_excl(ctx.instr_dead, i);
 			add_operands_to_worklists(&ctx, &op_array->opcodes[i], &ssa->ops[i]);
 		}
-	}
+	} FOREACH_INSTR_NUM_END();
 
 	/* Propagate liveness backwards to all definitions of used vars */
 	while (!zend_bitset_empty(ctx.instr_worklist, ctx.instr_worklist_len)
@@ -458,20 +458,20 @@ void ssa_optimize_dce(ssa_opt_ctx *ssa_ctx) {
 	}
 
 	/* Eliminate dead instructions */
-	for (i = 0; i < op_array->last; ++i) {
+	FOREACH_INSTR_NUM(i) {
 		if (zend_bitset_in(ctx.instr_dead, i)) {
 			dce_instr(&ctx, &op_array->opcodes[i], &ssa->ops[i]);
 		}
-	}
+	} FOREACH_INSTR_NUM_END();
 
 	/* Improper uses don't count as "uses" for the purpose of instruction elimination,
 	 * but we have to retain phis defining them. Push those phis to the worklist. */
-	for (i = 0; i < op_array->last; i++) {
+	FOREACH_INSTR_NUM(i) {
 		if (has_improper_op1_use(&op_array->opcodes[i])) {
 			ZEND_ASSERT(ssa->ops[i].op1_use >= 0);
 			add_to_phi_worklist_only(&ctx, ssa->ops[i].op1_use);
 		}
-	}
+	} FOREACH_INSTR_NUM_END();
 
 	/* Propagate this information backwards, marking any phi with an improperly used
 	 * target as non-dead. */

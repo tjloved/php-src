@@ -57,6 +57,27 @@
 	} \
 } while (0)
 
+#define FOREACH_BLOCK(block) do { \
+	int _i; \
+	for (_i = 0; _i < ssa->cfg.blocks_count; _i++) { \
+		(block) = &ssa->cfg.blocks[_i]; \
+		if (!((block)->flags & ZEND_BB_REACHABLE)) { \
+			continue; \
+		}
+#define FOREACH_BLOCK_END() \
+	} \
+} while (0)
+
+/* Does not support "break" */
+#define FOREACH_INSTR_NUM(i) do { \
+	zend_basic_block *_block; \
+	FOREACH_BLOCK(_block) { \
+		for ((i) = _block->start; (i) <= _block->end; (i)++) {
+#define FOREACH_INSTR_NUM_END() \
+		} \
+	} FOREACH_BLOCK_END(); \
+} while (0)
+
 void rename_var_uses_ex(zend_ssa *ssa, int old, int new, zend_bool update_types);
 void remove_result_use(zend_ssa *ssa, zend_ssa_op *ssa_op);
 void remove_op1_use(zend_ssa *ssa, zend_ssa_op *ssa_op);
