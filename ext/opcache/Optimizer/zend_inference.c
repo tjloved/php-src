@@ -4064,12 +4064,7 @@ static int zend_infer_types(
 	scdf_init(&scdf, op_array, ssa, &ctx);
 	scdf_solve(&scdf, "Type inference");
 
-	for (j = 0; j < ssa->cfg.blocks_count; j++) {
-		if (!zend_bitset_in(scdf.executable_blocks, j)) {
-			OPT_STAT(tmp)++;
-			remove_block(ssa, j, &OPT_STAT(tmp2), &OPT_STAT(tmp3));
-		}
-	}
+	scdf_remove_unreachable_blocks(&scdf, &OPT_STAT(tmp), &OPT_STAT(tmp2), &OPT_STAT(tmp3));
 
 	/* Narrowing integer initialization to doubles */
 	zend_type_narrowing(op_array, script, ssa, &scdf);

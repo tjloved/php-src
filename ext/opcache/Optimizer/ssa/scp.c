@@ -1141,21 +1141,6 @@ void scp_visit_phi(scdf_ctx *scdf, void *void_ctx, zend_ssa_phi *phi) {
 	}
 }
 
-/* Removes dead blocks. This will remove both the instructions (and phis) in the blocks, as well
- * as remove them from the successor / predecessor lists and mark them unreachable. */
-static void eliminate_dead_blocks(scdf_ctx *scdf) {
-	zend_ssa *ssa = scdf->ssa;
-	int i;
-	for (i = 0; i < ssa->cfg.blocks_count; i++) {
-		if (!zend_bitset_in(scdf->executable_blocks, i)
-				&& (ssa->cfg.blocks[i].flags & ZEND_BB_REACHABLE)) {
-			OPT_STAT(scp_dead_blocks)++;
-			remove_block(ssa, i,
-				&OPT_STAT(scp_dead_blocks_instrs), &OPT_STAT(scp_dead_blocks_phis));
-		}
-	}
-}
-
 /* This will try to replace uses of SSA variables we have determined to be constant. Not all uses
  * can be replaced, because some instructions don't accept constant operands or only accept them
  * if they have a certain type. */
@@ -1320,7 +1305,9 @@ void ssa_optimize_scp(ssa_opt_ctx *ssa_ctx) {
 	scdf_init(&scdf, ssa_ctx->op_array, ssa_ctx->ssa, &ctx);
 	scdf_solve(&scdf, "SCCP");
 
-	eliminate_dead_blocks(&scdf);
+	scdf_remove_unreachable_blocks(&scdf,
+		&OPT_STAT(scp_dead_blocks), &OPT_STAT(scp_dead_blocks_instrs),
+		&OPT_STAT(scp_dead_blocks_phis));
 	replace_constant_operands(&ctx);
 	eliminate_dead_instructions(&ctx);
 
