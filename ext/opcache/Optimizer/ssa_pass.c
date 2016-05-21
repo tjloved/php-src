@@ -103,20 +103,6 @@ static void dump_instruction_trace(const zend_op_array *op_array, const zend_ssa
 	}
 }
 
-/* The block map only contains entries for the start and end of a block.
- * Fill it up to cover all instructions. */
-static void complete_block_map(zend_cfg *cfg, uint32_t num_instr) {
-	uint32_t *map = cfg->map, *end = map + num_instr;
-	uint32_t block = (uint32_t) -1;
-	for (; map < end; map++) {
-		if (*map != (uint32_t) -1) {
-			block = *map;
-		} else {
-			*map = block;
-		}
-	}
-}
-
 static int get_common_phi_source(zend_ssa *ssa, zend_ssa_phi *phi) {
 	int common_source = -1;
 	int source;
@@ -279,7 +265,6 @@ static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) 
 		return;
 	}
 
-	complete_block_map(&info->ssa.cfg, op_array->last);
 	call_map = compute_call_map(ctx, info, op_array);
 
 	if (zend_ssa_inference(&ctx->arena, op_array, ctx->script, &info->ssa, call_map) != SUCCESS) {
