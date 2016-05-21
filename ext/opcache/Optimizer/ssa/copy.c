@@ -664,7 +664,7 @@ void ssa_optimize_copy(ssa_opt_ctx *ctx) {
 
 	scdf_copy_propagation(ctx);
 
-	for (i = 0; i < op_array->last; i++) {
+	FOREACH_INSTR_NUM(i) {
 		zend_op *opline = &op_array->opcodes[i];
 		zend_ssa_op *ssa_op = &ssa->ops[i];
 
@@ -696,5 +696,5 @@ void ssa_optimize_copy(ssa_opt_ctx *ctx) {
 				try_propagate_tmp_tmp_assignment(ctx, opline, ssa_op, i);
 			}
 		}
-	}
+	} FOREACH_INSTR_NUM_END();
 }

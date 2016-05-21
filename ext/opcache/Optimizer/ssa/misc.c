@@ -112,7 +112,7 @@ void ssa_optimize_misc(ssa_opt_ctx *ctx) {
 	zend_ssa_phi *phi;
 	int i;
 
-	for (i = 0; i < op_array->last; i++) {
+	FOREACH_INSTR_NUM(i) {
 		zend_op *opline = &op_array->opcodes[i];
 		zend_ssa_op *ssa_op = &ssa->ops[i];
 
@@ -130,7 +130,7 @@ void ssa_optimize_misc(ssa_opt_ctx *ctx) {
 				reverse_propagate_assign(ssa, op_array, opline, ssa_op);
 			}
 		}
-	}
+	} FOREACH_INSTR_NUM_END();
 
 	FOREACH_PHI(phi) {
 		zend_ssa_var *var = &ssa->vars[phi->ssa_var];

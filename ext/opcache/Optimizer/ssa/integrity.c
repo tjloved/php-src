@@ -140,7 +140,7 @@ int ssa_verify_integrity(zend_ssa *ssa, const char *extra) {
 	}
 
 	/* Instructions */
-	for (i = 0; i < op_array->last; i++) {
+	FOREACH_INSTR_NUM(i) {
 		zend_ssa_op *ssa_op = &ssa->ops[i];
 		zend_op *opline = &op_array->opcodes[i];
 		if (is_var_type(opline->op1_type)) {
@@ -249,7 +249,7 @@ int ssa_verify_integrity(zend_ssa *ssa, const char *extra) {
 						VAR(ssa_op->result_def), VAR_NUM(opline->result.var), INSTR(i));
 			}
 		}
-	}
+	} FOREACH_INSTR_NUM_END();
 
 	/* Phis */
 	FOREACH_PHI(phi) {

@@ -72,7 +72,7 @@ void ssa_optimize_assign(ssa_opt_ctx *ctx) {
 	zend_op_array *op_array = ctx->op_array;
 	zend_ssa *ssa = ctx->ssa;
 	int i;
-	for (i = 0; i < op_array->last; i++) {
+	FOREACH_INSTR_NUM(i) {
 		zend_op *opline = &op_array->opcodes[i];
 		zend_ssa_op *ssa_op = &ssa->ops[i];
 
@@ -95,5 +95,5 @@ void ssa_optimize_assign(ssa_opt_ctx *ctx) {
 			ssa_op->result_def = ssa_op->op1_def;
 			ssa_op->op1_def = -1;
 		}
-	}
+	} FOREACH_INSTR_NUM_END();
 }

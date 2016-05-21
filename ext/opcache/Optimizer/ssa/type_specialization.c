@@ -36,7 +36,7 @@ void ssa_optimize_type_specialization(ssa_opt_ctx *ctx) {
 	zend_op_array *op_array = ctx->op_array;
 	zend_ssa *ssa = ctx->ssa;
 	int i;
-	for (i = 0; i < op_array->last; i++) {
+	FOREACH_INSTR_NUM(i) {
 		zend_op *opline = &op_array->opcodes[i];
 		zend_ssa_op *ssa_op = &ssa->ops[i];
 		uint32_t t1 = OP1_INFO();
@@ -238,6 +238,6 @@ void ssa_optimize_type_specialization(ssa_opt_ctx *ctx) {
 				}
 				break;
 		}
-	}
+	} FOREACH_INSTR_NUM_END();
 }
 
