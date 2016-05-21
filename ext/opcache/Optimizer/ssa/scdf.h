@@ -31,6 +31,10 @@ void scdf_init(scdf_ctx *scdf, const zend_op_array *op_array, zend_ssa *ssa, voi
 void scdf_solve(scdf_ctx *scdf, const char *name);
 void scdf_free(scdf_ctx *scdf);
 
+void scdf_remove_unreachable_blocks(
+	scdf_ctx *scdf, uint32_t *stat_dead_blocks,
+	uint32_t *stat_dead_block_instrs, uint32_t *stat_dead_block_phis);
+
 static inline void scdf_add_to_worklist(scdf_ctx *scdf, int var_num) {
 	zend_ssa *ssa = scdf->ssa;
 	zend_ssa_var *var = &ssa->vars[var_num];

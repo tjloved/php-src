@@ -180,3 +180,41 @@ void scdf_solve(scdf_ctx *ctx, const char *name) {
 		}
 	}
 }
+
+/* If a live range starts in a reachable block and ends in an unreachable block, we should
+ * not eliminate the latter. While it cannot be reached, the FREE opcode of the loop var
+ * is necessary for the correctness of temporary compaction. */
+static zend_bool kept_alive_by_live_range(scdf_ctx *scdf, uint32_t block) {
+	uint32_t i;
+	const zend_op_array *op_array = scdf->op_array;
+	const zend_cfg *cfg = &scdf->ssa->cfg;
+	for (i = 0; i < op_array->last_live_range; i++) {
+		zend_live_range *live_range = &op_array->live_range[i];
+		uint32_t start_block = cfg->map[live_range->start];
+		uint32_t end_block = cfg->map[live_range->end];
+
+		if (end_block == block && start_block != block
+				&& zend_bitset_in(scdf->executable_blocks, start_block)) {
+			return 1;
+		}
+	}
+	return 0;
+}
+
+/* Removes unreachable blocks. This will remove both the instructions (and phis) in the
+ * blocks, as well as remove them from the successor / predecessor lists and mark them
+ * unreachable. Blocks already marked unreachable are not removed. */
+void scdf_remove_unreachable_blocks(
+		scdf_ctx *scdf, uint32_t *stat_dead_blocks,
+		uint32_t *stat_dead_block_instrs, uint32_t *stat_dead_block_phis) {
+	zend_ssa *ssa = scdf->ssa;
+	int i;
+	for (i = 0; i < ssa->cfg.blocks_count; i++) {
+		if (!zend_bitset_in(scdf->executable_blocks, i)
+				&& (ssa->cfg.blocks[i].flags & ZEND_BB_REACHABLE)
+				&& !kept_alive_by_live_range(scdf, i)) {
+			(*stat_dead_blocks)++;
+			remove_block(ssa, i, stat_dead_block_instrs, stat_dead_block_phis);
+		}
+	}
+}
