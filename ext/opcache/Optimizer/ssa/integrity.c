@@ -273,14 +273,16 @@ int ssa_verify_integrity(zend_ssa *ssa, const char *extra) {
 		int *predecessors = &cfg->predecessors[block->predecessor_offset];
 		int s, j;
 
-		if (i != 0 && block->start != (block-1)->end + 1) {
-			FAIL("Block %d start %d not adjacent to %d\n", i, block->start, (block-1)->end);
+		if (i != 0 && block->start != (block-1)->start + (block-1)->len) {
+			FAIL("Block %d start %d not adjacent to %d\n",
+				i, block->start, (block-1)->start + (block-1)->len);
 		}
-		if (i != cfg->blocks_count-1 && block->end != (block+1)->start - 1) {
-			FAIL("Block %d end %d not adjacent to %d\n", i, block->end, (block+1)->start);
+		if (i != cfg->blocks_count-1 && block->start + block->len != (block+1)->start) {
+			FAIL("Block %d end %d not adjacent to %d\n",
+				i, block->start + block->len, (block+1)->start);
 		}
 
-		for (j = block->start; j <= block->end; j++) {
+		for (j = block->start; j < block->start + block->len; j++) {
 			if (cfg->map[j] != i) {
 				FAIL("Instr " INSTRFMT " not associated with block %d\n", INSTR(j), i);
 			}

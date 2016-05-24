@@ -85,11 +85,11 @@ static int compute_dominance_preorder_recursive(context *ctx, int num, int block
 	zend_basic_block *block = &ssa->cfg.blocks[block_num];
 	zend_ssa_block *ssa_block = &ssa->blocks[block_num];
 	zend_ssa_phi *phi;
-	int i;
+	int i, end = block->start + block->len;
 	for (phi = ssa_block->phis; phi; phi = phi->next) {
 		ctx->predom[phi->ssa_var] = num++;
 	}
-	for (i = block->start; i <= block->end; i++) {
+	for (i = block->start; i < end; i++) {
 		zend_ssa_op *ssa_op = &ssa->ops[i];
 		if (ssa_op->result_def >= 0) {
 			ctx->predom[ssa_op->result_def] = num++;
@@ -616,7 +616,8 @@ static void convert_pcopies_to_cvs(context *ctx) {
 
 static inline zend_bool has_jump_instr(
 		const zend_op_array *op_array, const zend_basic_block *block) {
-	return block->successors[1] >= 0 || op_array->opcodes[block->end].opcode == ZEND_JMP;
+	return block->successors[1] >= 0
+		|| op_array->opcodes[block->start + block->len - 1].opcode == ZEND_JMP;
 }
 
 static void compute_shiftlist(context *ctx) {
@@ -632,7 +633,7 @@ static void compute_shiftlist(context *ctx) {
 
 		*block_shiftlist++ = shift;
 
-		if (!(block->flags & ZEND_BB_REACHABLE)) {
+		if (!(block->flags & ZEND_BB_REACHABLE) || block->len == 0) {
 			continue;
 		}
 
@@ -641,7 +642,7 @@ static void compute_shiftlist(context *ctx) {
 		}
 
 		shift += pcopy_estimated_num_copies(&ctx->blocks[i].early);
-		while (j < block->end) {
+		while (j < block->start + block->len - 1) {
 			shiftlist[j++] = shift;
 		}
 
@@ -750,8 +751,10 @@ static void insert_copies(context *ctx) {
 	int i;
 	for (i = 0; i < cfg->blocks_count; i++) {
 		const zend_basic_block *block = &cfg->blocks[i];
+		zend_op *last_opcode = &op_array->opcodes[block->start + block->len - 1];
 		zend_bool has_jump;
-		if (!(block->flags & ZEND_BB_REACHABLE)) {
+
+		if (!(block->flags & ZEND_BB_REACHABLE) || block->len == 0) {
 			continue;
 		}
 
@@ -763,21 +766,19 @@ static void insert_copies(context *ctx) {
 			op_array->opcodes[block->start].lineno);
 		new += pcopy_estimated_num_copies(&ctx->blocks[i].early);
 
-		while (old < &op_array->opcodes[block->end]) {
+		while (old < last_opcode) {
 			copy_instr(new++, old++, op_array, new_opcodes, block_shiftlist, ssa);
 		}
 
 		// TODO This is pretty ugly
 		has_jump = has_jump_instr(op_array, block);
 		if (has_jump) {
-			pcopy_sequentialize(ctx, new, &ctx->blocks[i].late,
-				op_array->opcodes[block->end].lineno);
+			pcopy_sequentialize(ctx, new, &ctx->blocks[i].late, last_opcode->lineno);
 			new += pcopy_estimated_num_copies(&ctx->blocks[i].late);
 			copy_instr(new++, old++, op_array, new_opcodes, block_shiftlist, ssa);
 		} else {
 			copy_instr(new++, old++, op_array, new_opcodes, block_shiftlist, ssa);
-			pcopy_sequentialize(ctx, new, &ctx->blocks[i].late,
-				op_array->opcodes[block->end].lineno);
+			pcopy_sequentialize(ctx, new, &ctx->blocks[i].late, last_opcode->lineno);
 			new += pcopy_estimated_num_copies(&ctx->blocks[i].late);
 		}
 	}
@@ -862,7 +863,6 @@ static void adjust_cfg(context *ctx) {
 		block->start += shift;
 		shift += pcopy_estimated_num_copies(&info->early);
 		shift += pcopy_estimated_num_copies(&info->late);
-		block->end += shift;
 	}
 }
 

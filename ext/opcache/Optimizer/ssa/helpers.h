@@ -72,7 +72,8 @@
 #define FOREACH_INSTR_NUM(i) do { \
 	zend_basic_block *_block; \
 	FOREACH_BLOCK(_block) { \
-		for ((i) = _block->start; (i) <= _block->end; (i)++) {
+		uint32_t _end = _block->start + _block->len; \
+		for ((i) = _block->start; (i) < _end; (i)++) {
 #define FOREACH_INSTR_NUM_END() \
 		} \
 	} FOREACH_BLOCK_END(); \

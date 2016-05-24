@@ -291,7 +291,7 @@ void try_propagate_cv_tmp_assignment(
 			return;
 		}
 
-		if (use <= op_num || use > block->end) {
+		if (use <= op_num || use >= block->start + block->len) {
 			/* Use in different block. We'd have to ensure postdomination for this (or special case
 			 * the non-refcounted case, in which case we'd still be violating IR invariants) */
 			return;
