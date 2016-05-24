@@ -177,6 +177,11 @@ void scdf_solve(scdf_ctx *ctx, const char *name) {
 					handle_instr(ctx, i, &ctx->op_array->opcodes[j], &ssa->ops[j]);
 				}
 			}
+
+			if (block->len == 0) {
+				/* Zero length blocks don't have a last instruction that would normally do this */
+				mark_edge_feasible(ctx, i, block->successors[0], 0);
+			}
 		}
 	}
 }

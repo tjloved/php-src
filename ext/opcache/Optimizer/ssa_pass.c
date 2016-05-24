@@ -227,7 +227,8 @@ static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) 
 	}
 
 	info = ZEND_FUNC_INFO(op_array);
-	if (zend_build_cfg(&ctx->arena, op_array, 0, &info->ssa.cfg, &info->flags) != SUCCESS) {
+	if (zend_build_cfg(&ctx->arena, op_array,
+			ZEND_CFG_NO_ENTRY_PREDECESSORS, &info->ssa.cfg, &info->flags) != SUCCESS) {
 		return;
 	}
 
