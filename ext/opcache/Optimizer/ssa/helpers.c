@@ -309,7 +309,7 @@ void remove_block(zend_ssa *ssa, int i, uint32_t *num_instr, uint32_t *num_phi) 
 	}
 
 	/* Remove instructions in this block */
-	for (j = block->start; j <= block->end; j++) {
+	for (j = block->start; j < block->start + block->len; j++) {
 		if (op_array->opcodes[j].opcode == ZEND_NOP) {
 			continue;
 		}

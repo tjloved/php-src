@@ -38,8 +38,9 @@ static inline zend_bool have_arginfo(
 }
 
 static void process_block(context *ctx, zend_op_array *op_array, zend_basic_block *block) {
-	zend_op *opline = &op_array->opcodes[block->start], *end = &op_array->opcodes[block->end];
-	for (; opline <= end; opline++) {
+	zend_op *opline = &op_array->opcodes[block->start];
+	zend_op *end = opline + block->len;
+	for (; opline < end; opline++) {
 		if (opline->opcode == ZEND_INIT_FCALL_BY_NAME) {
 			// TODO: We're effectively skipping the opcodes of the argument list here
 			zend_string *lcname = Z_STR_P(&ZEND_OP2_LITERAL(opline) + 1);

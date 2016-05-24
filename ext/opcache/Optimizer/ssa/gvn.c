@@ -369,12 +369,12 @@ static void gvn_solve(context *ctx) {
 			uint32_t n = postorder[i];
 			const zend_basic_block *block = &cfg->blocks[n];
 			const zend_ssa_block *ssa_block = &ssa->blocks[n];
-			int j;
+			int j, end = block->start + block->len;
 			zend_ssa_phi *phi;
 			for (phi = ssa_block->phis; phi; phi = phi->next) {
 				changed |= handle_phi(ctx, phi);
 			}
-			for (j = block->start; j <= block->end; j++) {
+			for (j = block->start; j < end; j++) {
 				changed |= handle_instr(ctx, &ssa->ops[j], &op_array->opcodes[j]);
 			}
 		}

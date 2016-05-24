@@ -83,7 +83,7 @@ static void handle_instr(scdf_ctx *ctx, int block_num, zend_op *opline, zend_ssa
 	zend_basic_block *block = &ctx->ssa->cfg.blocks[block_num];
 	ctx->handlers.visit_instr(ctx, ctx->ctx, opline, ssa_op);
 
-	if (block->end == opline - ctx->op_array->opcodes) {
+	if (opline - ctx->op_array->opcodes == block->start + block->len - 1) {
 		zend_bool suc[2] = {0};
 		if (get_feasible_successors(ctx, block, opline, ssa_op, suc)) {
 			if (suc[0]) {
@@ -171,8 +171,8 @@ void scdf_solve(scdf_ctx *ctx, const char *name) {
 			}
 
 			{
-				int j;
-				for (j = block->start; j <= block->end; j++) {
+				int j, end = block->start + block->len;
+				for (j = block->start; j < end; j++) {
 					zend_bitset_excl(ctx->instr_worklist, j);
 					handle_instr(ctx, i, &ctx->op_array->opcodes[j], &ssa->ops[j]);
 				}

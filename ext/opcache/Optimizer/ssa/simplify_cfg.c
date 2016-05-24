@@ -97,15 +97,16 @@ static void merge_blocks(zend_cfg *cfg, int block1_num, int block2_num) {
 
 	/* First block now contains instructions of second block and
 	 * all the intermediate unreachable blocks */
-	update_block_map(cfg, block1->end + 1, block2->end, block1_num);
-	block1->end = block2->end;
+	update_block_map(cfg, block1->start + block1->len,
+		block2->start + block2->len - 1, block1_num);
+	block1->len = block2->start + block2->len - block1->start;
 
 	/* Second block and all intermediate unreachable blocks are now empty */
 	{
 		zend_basic_block *b = block1;
 		while (b++ != block2) {
-			b->start = block1->end + 1;
-			b->end = block1->end;
+			b->start = block1->start + block1->len;
+			b->len = 0;
 		}
 	}
 
@@ -134,9 +135,9 @@ void ssa_optimize_simplify_cfg(ssa_opt_ctx *ssa_ctx) {
 		if (block->successors[0] > i && block->successors[1] < 0) {
 			zend_basic_block *next = &cfg->blocks[block->successors[0]];
 			zend_ssa_block *next_ssa = &ssa->blocks[block->successors[0]];
-			if (num_predecessors(cfg, next) == 1
+			if (block->len != 0 && num_predecessors(cfg, next) == 1
 					&& blocks_unreachable(cfg, i + 1, block->successors[0] - 1)) {
-				zend_op *opline = &op_array->opcodes[block->end];
+				zend_op *opline = &op_array->opcodes[block->start + block->len - 1];
 				if (next_ssa->phis) {
 					/* The block may contain pi statements -- unclear if we ought to just drop
 					 * them and merge or leave them alone and not merge. */
