@@ -35,6 +35,7 @@ void scdf_remove_unreachable_blocks(
 	scdf_ctx *scdf, uint32_t *stat_dead_blocks,
 	uint32_t *stat_dead_block_instrs, uint32_t *stat_dead_block_phis);
 
+/* Add uses to worklist */
 static inline void scdf_add_to_worklist(scdf_ctx *scdf, int var_num) {
 	zend_ssa *ssa = scdf->ssa;
 	zend_ssa_var *var = &ssa->vars[var_num];
@@ -46,6 +47,16 @@ static inline void scdf_add_to_worklist(scdf_ctx *scdf, int var_num) {
 	FOREACH_PHI_USE(var, phi) {
 		zend_bitset_incl(scdf->phi_var_worklist, phi->ssa_var);
 	} FOREACH_PHI_USE_END();
+}
+
+/* This should usually not be necessary, however it's used for type narrowing. */
+static inline void scdf_add_def_to_worklist(scdf_ctx *scdf, int var_num) {
+	zend_ssa_var *var = &scdf->ssa->vars[var_num];
+	if (var->definition >= 0) {
+		zend_bitset_incl(scdf->instr_worklist, var->definition);
+	} else if (var->definition_phi) {
+		zend_bitset_incl(scdf->phi_var_worklist, var_num);
+	}
 }
 
 static inline zend_bool scdf_is_edge_feasible(scdf_ctx *scdf, int from, int to) {
