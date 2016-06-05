@@ -60,6 +60,7 @@ static inline zend_bool can_tmpvar_op1(zend_op *opline) {
 		case ZEND_SEND_REF:
 		case ZEND_SEND_VAR_EX:
 		case ZEND_SEND_VAR_NO_REF:
+		case ZEND_SEND_VAR_NO_REF_EX:
 		case ZEND_SEND_UNPACK:
 		case ZEND_SEND_ARRAY:
 		case ZEND_SEND_USER:
