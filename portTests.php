@@ -29,6 +29,7 @@ $blacklist = [
     'Zend/tests/generators/errors/yield_outside_function_error.phpt',
     'Zend/tests/binary.phpt',
     'Zend/tests/bug70918.phpt',
+    'Zend/tests/oct_overflow_char.phpt',
     'tests/lang/bug35176.phpt',
     'tests/basic/027.phpt',
 ];
