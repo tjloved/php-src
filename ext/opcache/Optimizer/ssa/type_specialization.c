@@ -271,6 +271,28 @@ void ssa_optimize_type_specialization(ssa_opt_ctx *ctx) {
 				remove_instr(ssa, opline, ssa_op);
 				OPT_STAT(type_spec_elided)++;
 				break;
+			case ZEND_BOOL:
+				if (!MUST_BE(t1, MAY_BE_TRUE|MAY_BE_FALSE)) {
+					break;
+				}
+
+				// TODO Actually elide
+				opline->opcode = ZEND_QM_ASSIGN;
+				OPT_STAT(type_spec_elided)++;
+				break;
+			case ZEND_CAST:
+			{
+				uint32_t type = opline->extended_value == _IS_BOOL
+					? (MAY_BE_TRUE|MAY_BE_FALSE) : (1 << opline->extended_value);
+				if (!MUST_BE(t1, type)) {
+					break;
+				}
+
+				// TODO
+				opline->opcode = ZEND_QM_ASSIGN;
+				OPT_STAT(type_spec_elided)++;
+				break;
+			}
 		}
 	} FOREACH_INSTR_NUM_END();
 }
