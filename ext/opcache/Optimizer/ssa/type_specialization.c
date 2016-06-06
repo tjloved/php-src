@@ -32,6 +32,30 @@ static void normalize_op2_type(
 	}
 }
 
+static inline zend_bool can_elide_return_type_check(
+		zend_op_array *op_array, zend_ssa *ssa, zend_ssa_op *ssa_op) {
+	zend_arg_info *info = &op_array->arg_info[-1];
+	zend_ssa_var_info *use_info = &ssa->var_info[ssa_op->op1_use];
+	zend_ssa_var_info *def_info = &ssa->var_info[ssa_op->op1_def];
+
+	/* A type is possible that is not in the allowed types */
+	if ((use_info->type & (MAY_BE_ANY|MAY_BE_UNDEF)) & ~(def_info->type & MAY_BE_ANY)) {
+		return 0;
+	}
+
+	if (info->type_hint == IS_CALLABLE) {
+		return 0;
+	}
+
+	if (info->class_name) {
+		if (!use_info->ce || !def_info->ce || !instanceof_function(use_info->ce, def_info->ce)) {
+			return 0;
+		}
+	}
+
+	return 1;
+}
+
 void ssa_optimize_type_specialization(ssa_opt_ctx *ctx) {
 	zend_op_array *op_array = ctx->op_array;
 	zend_ssa *ssa = ctx->ssa;
@@ -236,6 +260,16 @@ void ssa_optimize_type_specialization(ssa_opt_ctx *ctx) {
 				} else {
 					OPT_STAT(ts_not_must_be_array)++;
 				}
+				break;
+			case ZEND_VERIFY_RETURN_TYPE:
+				if (ssa_op->op1_def < 0 || !can_elide_return_type_check(op_array, ssa, ssa_op)) {
+					break;
+				}
+
+				rename_var_uses(ssa, ssa_op->op1_def, ssa_op->op1_use);
+				remove_op1_def(ssa, ssa_op);
+				remove_instr(ssa, opline, ssa_op);
+				OPT_STAT(type_spec_elided)++;
 				break;
 		}
 	} FOREACH_INSTR_NUM_END();
