@@ -3934,7 +3934,7 @@ static zend_bool get_feasible_successors(
 		zend_op *opline, zend_ssa_op *ssa_op, zend_bool *suc) {
 	const zend_op_array *op_array = scdf->op_array;
 	zend_ssa *ssa = scdf->ssa;
-	uint32_t t1 = OP1_INFO();
+	uint32_t t1, t1_orig = OP1_INFO();
 	zend_bool is_true;
 
 	/* We can't determine the branch target at compile-time for these */
@@ -3946,15 +3946,12 @@ static zend_bool get_feasible_successors(
 		case ZEND_FE_FETCH_R:
 		case ZEND_FE_FETCH_RW:
 		case ZEND_NEW:
-		// TODO on these three:
-		case ZEND_COALESCE:
-		case ZEND_FE_RESET_R:
-		case ZEND_FE_RESET_RW:
 			suc[0] = 1;
 			suc[1] = 1;
 			return 1;
 	}
 
+	t1 = t1_orig;
 	if (t1 & MAY_BE_UNDEF) {
 		t1 |= MAY_BE_NULL;
 	}
@@ -3963,6 +3960,28 @@ static zend_bool get_feasible_successors(
 	/* Type not yet known */
 	if (!t1) {
 		return 0;
+	}
+
+	if (opline->opcode == ZEND_COALESCE) {
+		if (t1 & MAY_BE_NULL) {
+			suc[1] = 1;
+		}
+		if (t1 & ~MAY_BE_NULL) {
+			suc[0] = 1;
+		}
+		return 1;
+	}
+
+	if (opline->opcode == ZEND_FE_RESET_R || opline->opcode == ZEND_FE_RESET_RW) {
+		/* Either not traversable or empty array */
+		if (!(t1_orig & (MAY_BE_ARRAY_KEY_ANY|MAY_BE_OBJECT))) {
+			suc[0] = 1;
+			return 1;
+		}
+
+		suc[0] = 1;
+		suc[1] = 1;
+		return 1;
 	}
 
 	/* We can only make static descisions about null/false/true */
