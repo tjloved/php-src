@@ -164,6 +164,7 @@ static zend_bool can_replace_op1(
 		case ZEND_ROPE_ADD:
 		case ZEND_ROPE_END:
 		case ZEND_BIND_STATIC:
+		case ZEND_BIND_GLOBAL:
 			return 0;
 		case ZEND_UNSET_VAR:
 		case ZEND_ISSET_ISEMPTY_VAR:
@@ -192,26 +193,30 @@ static zend_bool can_replace_op2(
 		case ZEND_DECLARE_INHERITED_CLASS_DELAYED:
 		case ZEND_DECLARE_ANON_INHERITED_CLASS:
 		case ZEND_BIND_LEXICAL:
+		case ZEND_FE_FETCH_R:
+		case ZEND_FE_FETCH_RW:
 			return 0;
 	}
 	return 1;
 }
 
-static zend_bool try_replace_op1(scp_ctx *ctx, int var, zend_op *opline, zend_ssa_op *ssa_op) {
+static zend_bool try_replace_op1(
+		scp_ctx *ctx, zend_op *opline, zend_ssa_op *ssa_op, int var, zval *value) {
 	if (ssa_op->op1_use == var && can_replace_op1(ctx->op_array, opline, ssa_op)) {
-		zval value;
-		ZVAL_DUP(&value, &ctx->values[var]);
-		if (zend_optimizer_update_op1_const(ctx->op_array, opline, &value)) {
+		zval zv;
+		ZVAL_DUP(&zv, value);
+		if (zend_optimizer_update_op1_const(ctx->op_array, opline, &zv)) {
 			return 1;
 		}
 	}
 	return 0;
 }
-static zend_bool try_replace_op2(scp_ctx *ctx, int var, zend_op *opline, zend_ssa_op *ssa_op) {
+static zend_bool try_replace_op2(
+		scp_ctx *ctx, zend_op *opline, zend_ssa_op *ssa_op, int var, zval *value) {
 	if (ssa_op->op2_use == var && can_replace_op2(ctx->op_array, opline, ssa_op)) {
-		zval value;
-		ZVAL_DUP(&value, &ctx->values[var]);
-		if (zend_optimizer_update_op2_const(ctx->op_array, opline, &value)) {
+		zval zv;
+		ZVAL_DUP(&zv, value);
+		if (zend_optimizer_update_op2_const(ctx->op_array, opline, &zv)) {
 			return 1;
 		}
 	}
@@ -1141,31 +1146,76 @@ void scp_visit_phi(scdf_ctx *scdf, void *void_ctx, zend_ssa_phi *phi) {
 	}
 }
 
+static zval *value_from_type_and_range(scp_ctx *ctx, int var_num, zval *tmp) {
+	zend_ssa *ssa = ctx->ssa;
+	zend_ssa_var_info *info = &ssa->var_info[var_num];
+
+	if (ssa->vars[var_num].var >= ctx->op_array->last_var) {
+		// TODO Non-CVs may cause issues with FREEs
+		return NULL;
+	}
+
+	if (info->type & MAY_BE_UNDEF) {
+		return NULL;
+	}
+
+	if (MUST_BE(info->type, MAY_BE_NULL)) {
+		ZVAL_NULL(tmp);
+		return tmp;
+	}
+	if (MUST_BE(info->type, MAY_BE_FALSE)) {
+		ZVAL_FALSE(tmp);
+		return tmp;
+	}
+	if (MUST_BE(info->type, MAY_BE_TRUE)) {
+		ZVAL_TRUE(tmp);
+		return tmp;
+	}
+
+	if (MUST_BE(info->type, MAY_BE_LONG) && info->has_range
+			&& !info->range.overflow && !info->range.underflow
+			&& info->range.min == info->range.max) {
+		ZVAL_LONG(tmp, info->range.min);
+		return tmp;
+	}
+
+	return NULL;
+}
+
 /* This will try to replace uses of SSA variables we have determined to be constant. Not all uses
  * can be replaced, because some instructions don't accept constant operands or only accept them
  * if they have a certain type. */
 static void replace_constant_operands(scp_ctx *ctx) {
-	int i;
 	zend_ssa *ssa = ctx->ssa;
-	for (i = 0; i < ssa->vars_count; ++i) {
+	int i;
+	zval tmp;
+
+	for (i = 0; i < ssa->vars_count; i++) {
 		zend_ssa_var *var = &ssa->vars[i];
+		zval *value;
 		int use;
-		if (!value_known(&ctx->values[i])) {
-			continue;
+
+		if (value_known(&ctx->values[i])) {
+			value = &ctx->values[i];
+		} else {
+			value = value_from_type_and_range(ctx, i, &tmp);
+			if (!value) {
+				continue;
+			}
 		}
 
 		OPT_STAT(scp_const_vars)++;
 		FOREACH_USE(var, use) {
 			zend_op *opline = &ctx->op_array->opcodes[use];
 			zend_ssa_op *ssa_op = &ssa->ops[use];
-			if (try_replace_op1(ctx, i, opline, ssa_op)) {
+			if (try_replace_op1(ctx, opline, ssa_op, i, value)) {
 				ZEND_ASSERT(ssa_op->op1_def == -1);
 				OPT_STAT(scp_const_operands)++;
 				remove_op1_use(ssa, ssa_op);
 			}
-			if (try_replace_op2(ctx, i, opline, ssa_op)) {
-				OPT_STAT(scp_const_operands)++;
+			if (try_replace_op2(ctx, opline, ssa_op, i, value)) {
 				ZEND_ASSERT(ssa_op->op2_def == -1);
+				OPT_STAT(scp_const_operands)++;
 				remove_op2_use(ssa, ssa_op);
 			}
 		} FOREACH_USE_END();
