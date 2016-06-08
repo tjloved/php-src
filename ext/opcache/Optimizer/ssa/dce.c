@@ -296,13 +296,18 @@ static zend_bool dce_instr(context *ctx, zend_op *opline, zend_ssa_op *ssa_op) {
 
 // TODO Move this somewhere else (CFG simplification?)
 static void simplify_jumps(zend_ssa *ssa, zend_op_array *op_array) {
-	int i;
-	FOREACH_INSTR_NUM(i) {
-		zend_op *opline = &op_array->opcodes[i];
-		zend_ssa_op *ssa_op = &ssa->ops[i];
+	zend_basic_block *block;
+	FOREACH_BLOCK(block) {
+		int block_num = block - ssa->cfg.blocks;
+		zend_op *opline = &op_array->opcodes[block->start + block->len - 1];
+		zend_ssa_op *ssa_op = &ssa->ops[block->start + block->len - 1];
 		zval *op1;
 
-		/* Convert jump-and-set into jump if result is not used  */
+		if (block->len == 0) {
+			continue;
+		}
+
+		/* Convert jump-and-set into jump if result is not used */
 		switch (opline->opcode) {
 			case ZEND_JMPZ_EX:
 				ZEND_ASSERT(ssa_op->result_def >= 0);
@@ -319,6 +324,22 @@ static void simplify_jumps(zend_ssa *ssa, zend_op_array *op_array) {
 					opline->opcode = ZEND_JMPNZ;
 					opline->result_type = IS_UNUSED;
 					remove_result_def(ssa, ssa_op);
+				}
+				break;
+		}
+
+		/* Convert jump-and-set to QM_ASSIGN/BOOL if the "else" branch is not taken. */
+		switch (opline->opcode) {
+			case ZEND_JMPZ_EX:
+			case ZEND_JMPNZ_EX:
+				if (block->successors[1] < 0 && block->successors[0] != block_num + 1) {
+					opline->opcode = ZEND_BOOL;
+				}
+				break;
+			case ZEND_JMP_SET:
+			case ZEND_COALESCE:
+				if (block->successors[1] < 0 && block->successors[0] != block_num + 1) {
+					opline->opcode = ZEND_QM_ASSIGN;
 				}
 				break;
 		}
@@ -368,7 +389,7 @@ static void simplify_jumps(zend_ssa *ssa, zend_op_array *op_array) {
 				}
 				break;
 		}
-	} FOREACH_INSTR_NUM_END();
+	} FOREACH_BLOCK_END();
 }
 
 static inline int get_common_phi_source(zend_ssa *ssa, zend_ssa_phi *phi) {
