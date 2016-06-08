@@ -1049,7 +1049,6 @@ zend_bool scp_get_feasible_successors(
 		case ZEND_DECLARE_ANON_INHERITED_CLASS:
 		case ZEND_FE_FETCH_R:
 		case ZEND_FE_FETCH_RW:
-		case ZEND_NEW:
 			suc[0] = 1;
 			suc[1] = 1;
 			return 1;
