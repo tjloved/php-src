@@ -549,7 +549,6 @@ zend_bool get_feasible_successors(
 		case ZEND_DECLARE_ANON_INHERITED_CLASS:
 		case ZEND_FE_FETCH_R:
 		case ZEND_FE_FETCH_RW:
-		case ZEND_NEW:
 		case ZEND_COALESCE:
 		case ZEND_FE_RESET_R:
 		case ZEND_FE_RESET_RW:
