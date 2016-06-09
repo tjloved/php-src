@@ -2163,6 +2163,7 @@ static uint32_t zend_fetch_arg_info(const zend_script *script, zend_arg_info *ar
 	return tmp;
 }
 
+#define CONDITIONAL 1
 #define COMBINE_SCP 1
 
 typedef struct _ti_context {
@@ -3940,6 +3941,12 @@ static zend_bool get_feasible_successors(
 	zend_ssa *ssa = scdf->ssa;
 	uint32_t t1, t1_orig = OP1_INFO();
 	zend_bool is_true;
+
+#if !CONDITIONAL
+	suc[0] = 1;
+	suc[1] = 1;
+	return 1;
+#endif
 
 	/* We can't determine the branch target at compile-time for these */
 	switch (opline->opcode) {
