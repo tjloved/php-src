@@ -162,18 +162,22 @@
 	} while (0)
 
 static inline uint32_t to_bool_type(uint32_t t) {
+	uint32_t tmp = 0;
 	if (t & MAY_BE_UNDEF) {
 		t |= MAY_BE_NULL;
 	}
+
 	if ((t & MAY_BE_ANY) & ~(MAY_BE_NULL|MAY_BE_FALSE|MAY_BE_TRUE)) {
 		return MAY_BE_TRUE|MAY_BE_FALSE;
-	} else if ((t & MAY_BE_ANY) == MAY_BE_TRUE) {
-		return MAY_BE_TRUE;
-	} else if (t & (MAY_BE_FALSE|MAY_BE_NULL)) {
-		return MAY_BE_FALSE;
-	} else {
-		return 0;
 	}
+
+	if (t & MAY_BE_TRUE) {
+		tmp |= MAY_BE_TRUE;
+	}
+	if (t & (MAY_BE_FALSE|MAY_BE_NULL)) {
+		tmp |= MAY_BE_FALSE;
+	}
+	return tmp;
 }
 
 static inline uint32_t invert_bool_type(uint32_t t) {
