@@ -2259,13 +2259,19 @@ static void zend_update_type_info(
 			UPDATE_SSA_TYPE(MAY_BE_LONG, ssa_ops[i].result_def);
 			break;
 		case ZEND_BOOL:
-		case ZEND_JMPZ_EX:
-		case ZEND_JMPNZ_EX:
 			tmp = MAY_BE_RC1 | to_bool_type(t1);
 			UPDATE_SSA_TYPE(tmp, ssa_ops[i].result_def);
 			break;
 		case ZEND_BOOL_NOT:
 			tmp = MAY_BE_RC1 | invert_bool_type(to_bool_type(t1));
+			UPDATE_SSA_TYPE(tmp, ssa_ops[i].result_def);
+			break;
+		case ZEND_JMPZ_EX:
+			tmp = MAY_BE_RC1 | MAY_BE_FALSE;
+			UPDATE_SSA_TYPE(tmp, ssa_ops[i].result_def);
+			break;
+		case ZEND_JMPNZ_EX:
+			tmp = MAY_BE_RC1 | MAY_BE_TRUE;
 			UPDATE_SSA_TYPE(tmp, ssa_ops[i].result_def);
 			break;
 		case ZEND_IS_IDENTICAL:
