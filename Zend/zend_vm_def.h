@@ -8143,14 +8143,23 @@ ZEND_VM_HANDLER(194, ZEND_FETCH_DIM_INT, TMPVAR|CV, CONST|TMPVARCV)
 	zend_free_op free_op1;
 	zval *op1 = GET_OP1_ZVAL_PTR_UNDEF(BP_VAR_R);
 	zval *op2 = GET_OP2_ZVAL_PTR_UNDEF(BP_VAR_R);
-	zval *retval = zend_hash_index_find(Z_ARRVAL_P(op1), Z_LVAL_P(op2));
-	SAVE_OPLINE();
-	if (EXPECTED(retval)) {
-		ZVAL_COPY(EX_VAR(opline->result.var), retval);
+	zval *retval;
+
+	ZEND_HASH_INDEX_FIND(Z_ARRVAL_P(op1), Z_LVAL_P(op2), retval,
+		ZEND_VM_C_LABEL(fetch_dim_int_not_found));
+	ZVAL_COPY(EX_VAR(opline->result.var), retval);
+	if (OP1_TYPE & (IS_TMP_VAR|IS_VAR)) {
+		SAVE_OPLINE();
+		FREE_OP1();
+		ZEND_VM_NEXT_OPCODE_CHECK_EXCEPTION();
 	} else {
-		zend_error(E_NOTICE, "Undefined offset: " ZEND_LONG_FMT, Z_LVAL_P(op2));
-		ZVAL_NULL(EX_VAR(opline->result.var));
+		ZEND_VM_NEXT_OPCODE();
 	}
+
+ZEND_VM_C_LABEL(fetch_dim_int_not_found):
+	SAVE_OPLINE();
+	zend_error(E_NOTICE, "Undefined offset: " ZEND_LONG_FMT, Z_LVAL_P(op2));
+	ZVAL_NULL(EX_VAR(opline->result.var));
 	FREE_OP1();
 	ZEND_VM_NEXT_OPCODE_CHECK_EXCEPTION();
 }

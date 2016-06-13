@@ -38507,14 +38507,23 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FETCH_DIM_INT_SPEC_CV_CONST_HA
 
 	zval *op1 = _get_zval_ptr_cv_undef(execute_data, opline->op1.var);
 	zval *op2 = EX_CONSTANT(opline->op2);
-	zval *retval = zend_hash_index_find(Z_ARRVAL_P(op1), Z_LVAL_P(op2));
-	SAVE_OPLINE();
-	if (EXPECTED(retval)) {
-		ZVAL_COPY(EX_VAR(opline->result.var), retval);
+	zval *retval;
+
+	ZEND_HASH_INDEX_FIND(Z_ARRVAL_P(op1), Z_LVAL_P(op2), retval,
+		fetch_dim_int_not_found);
+	ZVAL_COPY(EX_VAR(opline->result.var), retval);
+	if (IS_CV & (IS_TMP_VAR|IS_VAR)) {
+		SAVE_OPLINE();
+
+		ZEND_VM_NEXT_OPCODE_CHECK_EXCEPTION();
 	} else {
-		zend_error(E_NOTICE, "Undefined offset: " ZEND_LONG_FMT, Z_LVAL_P(op2));
-		ZVAL_NULL(EX_VAR(opline->result.var));
+		ZEND_VM_NEXT_OPCODE();
 	}
+
+fetch_dim_int_not_found:
+	SAVE_OPLINE();
+	zend_error(E_NOTICE, "Undefined offset: " ZEND_LONG_FMT, Z_LVAL_P(op2));
+	ZVAL_NULL(EX_VAR(opline->result.var));
 
 	ZEND_VM_NEXT_OPCODE_CHECK_EXCEPTION();
 }
@@ -48000,14 +48009,23 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FETCH_DIM_INT_SPEC_CV_TMPVARCV
 
 	zval *op1 = _get_zval_ptr_cv_undef(execute_data, opline->op1.var);
 	zval *op2 = EX_VAR(opline->op2.var);
-	zval *retval = zend_hash_index_find(Z_ARRVAL_P(op1), Z_LVAL_P(op2));
-	SAVE_OPLINE();
-	if (EXPECTED(retval)) {
-		ZVAL_COPY(EX_VAR(opline->result.var), retval);
+	zval *retval;
+
+	ZEND_HASH_INDEX_FIND(Z_ARRVAL_P(op1), Z_LVAL_P(op2), retval,
+		fetch_dim_int_not_found);
+	ZVAL_COPY(EX_VAR(opline->result.var), retval);
+	if (IS_CV & (IS_TMP_VAR|IS_VAR)) {
+		SAVE_OPLINE();
+
+		ZEND_VM_NEXT_OPCODE_CHECK_EXCEPTION();
 	} else {
-		zend_error(E_NOTICE, "Undefined offset: " ZEND_LONG_FMT, Z_LVAL_P(op2));
-		ZVAL_NULL(EX_VAR(opline->result.var));
+		ZEND_VM_NEXT_OPCODE();
 	}
+
+fetch_dim_int_not_found:
+	SAVE_OPLINE();
+	zend_error(E_NOTICE, "Undefined offset: " ZEND_LONG_FMT, Z_LVAL_P(op2));
+	ZVAL_NULL(EX_VAR(opline->result.var));
 
 	ZEND_VM_NEXT_OPCODE_CHECK_EXCEPTION();
 }
@@ -50051,14 +50069,23 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FETCH_DIM_INT_SPEC_TMPVAR_CONS
 	zend_free_op free_op1;
 	zval *op1 = _get_zval_ptr_var(opline->op1.var, execute_data, &free_op1);
 	zval *op2 = EX_CONSTANT(opline->op2);
-	zval *retval = zend_hash_index_find(Z_ARRVAL_P(op1), Z_LVAL_P(op2));
-	SAVE_OPLINE();
-	if (EXPECTED(retval)) {
-		ZVAL_COPY(EX_VAR(opline->result.var), retval);
+	zval *retval;
+
+	ZEND_HASH_INDEX_FIND(Z_ARRVAL_P(op1), Z_LVAL_P(op2), retval,
+		fetch_dim_int_not_found);
+	ZVAL_COPY(EX_VAR(opline->result.var), retval);
+	if ((IS_TMP_VAR|IS_VAR) & (IS_TMP_VAR|IS_VAR)) {
+		SAVE_OPLINE();
+		zval_ptr_dtor_nogc(free_op1);
+		ZEND_VM_NEXT_OPCODE_CHECK_EXCEPTION();
 	} else {
-		zend_error(E_NOTICE, "Undefined offset: " ZEND_LONG_FMT, Z_LVAL_P(op2));
-		ZVAL_NULL(EX_VAR(opline->result.var));
+		ZEND_VM_NEXT_OPCODE();
 	}
+
+fetch_dim_int_not_found:
+	SAVE_OPLINE();
+	zend_error(E_NOTICE, "Undefined offset: " ZEND_LONG_FMT, Z_LVAL_P(op2));
+	ZVAL_NULL(EX_VAR(opline->result.var));
 	zval_ptr_dtor_nogc(free_op1);
 	ZEND_VM_NEXT_OPCODE_CHECK_EXCEPTION();
 }
@@ -53530,14 +53557,23 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FETCH_DIM_INT_SPEC_TMPVAR_TMPV
 	zend_free_op free_op1;
 	zval *op1 = _get_zval_ptr_var(opline->op1.var, execute_data, &free_op1);
 	zval *op2 = EX_VAR(opline->op2.var);
-	zval *retval = zend_hash_index_find(Z_ARRVAL_P(op1), Z_LVAL_P(op2));
-	SAVE_OPLINE();
-	if (EXPECTED(retval)) {
-		ZVAL_COPY(EX_VAR(opline->result.var), retval);
+	zval *retval;
+
+	ZEND_HASH_INDEX_FIND(Z_ARRVAL_P(op1), Z_LVAL_P(op2), retval,
+		fetch_dim_int_not_found);
+	ZVAL_COPY(EX_VAR(opline->result.var), retval);
+	if ((IS_TMP_VAR|IS_VAR) & (IS_TMP_VAR|IS_VAR)) {
+		SAVE_OPLINE();
+		zval_ptr_dtor_nogc(free_op1);
+		ZEND_VM_NEXT_OPCODE_CHECK_EXCEPTION();
 	} else {
-		zend_error(E_NOTICE, "Undefined offset: " ZEND_LONG_FMT, Z_LVAL_P(op2));
-		ZVAL_NULL(EX_VAR(opline->result.var));
+		ZEND_VM_NEXT_OPCODE();
 	}
+
+fetch_dim_int_not_found:
+	SAVE_OPLINE();
+	zend_error(E_NOTICE, "Undefined offset: " ZEND_LONG_FMT, Z_LVAL_P(op2));
+	ZVAL_NULL(EX_VAR(opline->result.var));
 	zval_ptr_dtor_nogc(free_op1);
 	ZEND_VM_NEXT_OPCODE_CHECK_EXCEPTION();
 }
