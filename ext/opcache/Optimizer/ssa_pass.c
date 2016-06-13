@@ -250,7 +250,8 @@ static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) 
 		return;
 	}
 
-	if (zend_build_ssa(&ctx->arena, op_array, 0, &info->ssa, &info->flags) != SUCCESS) {
+	if (zend_build_ssa(&ctx->arena, ctx->script, op_array, 0,
+			&info->ssa, &info->flags) != SUCCESS) {
 		return;
 	}
 
