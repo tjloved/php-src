@@ -2325,12 +2325,30 @@ static void zend_update_type_info(
 			}
 			UPDATE_SSA_TYPE(tmp, ssa_ops[i].result_def);
 			break;
+		case ZEND_INSTANCEOF:
+			tmp = MAY_BE_RC1;
+			if (!(t1 & MAY_BE_OBJECT)) {
+				tmp |= MAY_BE_FALSE;
+			} else if ((t1 & (MAY_BE_ANY|MAY_BE_UNDEF)) == MAY_BE_OBJECT
+					&& ssa_var_info[ssa_ops[i].op1_use].ce
+					&& opline->op2_type == IS_CONST) {
+				zval *zv = CRT_CONSTANT_EX(op_array, opline->op2, ssa->rt_constants);
+				zend_class_entry *ce = get_class_entry(script, Z_STR_P(zv+1));
+				if (ce && instanceof_function(ssa_var_info[ssa_ops[i].op1_use].ce, ce)) {
+					tmp |= MAY_BE_TRUE;
+				} else {
+					tmp |= MAY_BE_FALSE|MAY_BE_TRUE;
+				}
+			} else {
+				tmp |= MAY_BE_FALSE|MAY_BE_TRUE;
+			}
+			UPDATE_SSA_TYPE(tmp, ssa_ops[i].result_def);
+			break;
 		case ZEND_BOOL_XOR:
 		case ZEND_IS_EQUAL:
 		case ZEND_IS_NOT_EQUAL:
 		case ZEND_IS_SMALLER:
 		case ZEND_IS_SMALLER_OR_EQUAL:
-		case ZEND_INSTANCEOF:
 		case ZEND_CASE:
 		case ZEND_ISSET_ISEMPTY_DIM_OBJ:
 		case ZEND_ISSET_ISEMPTY_PROP_OBJ:
