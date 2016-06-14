@@ -876,7 +876,9 @@ void scp_visit_instr(scdf_ctx *scdf, void *void_ctx, zend_op *opline, zend_ssa_o
 			break;
 		case ZEND_ROPE_ADD:
 		case ZEND_ROPE_END:
-			// TODO Quadratic complexity, see INIT_ARRAY
+			// TODO The way this is currently implemented will result in quadratic runtime
+			// This is not necessary, the way the algorithm works it's okay to reuse the same
+			// string for all SSA vars with some extra checks
 			SKIP_IF_TOP(op1);
 			SKIP_IF_TOP(op2);
 			if (ct_eval_binary(&zv, ZEND_CONCAT, op1, op2) == SUCCESS) {
@@ -889,9 +891,6 @@ void scp_visit_instr(scdf_ctx *scdf, void *void_ctx, zend_op *opline, zend_ssa_o
 		case ZEND_INIT_ARRAY:
 		case ZEND_ADD_ARRAY_ELEMENT:
 		{
-			// TODO The way this is currently implemented will result in quadratic runtime
-			// This is not necessary, the way the algorithm works it's okay to reuse the same
-			// array for all SSA vars with some extra checks
 			zval *result = NULL;
 			if (opline->extended_value & ZEND_ARRAY_ELEMENT_REF) {
 				SET_RESULT_BOT(result);
@@ -913,8 +912,16 @@ void scp_visit_instr(scdf_ctx *scdf, void *void_ctx, zend_op *opline, zend_ssa_o
 				SKIP_IF_TOP(op2);
 			}
 
+			/* We want to avoid keeping around intermediate arrays for each SSA variable in the
+			 * ADD_ARRAY_ELEMENT chain. We do this by only keeping the array on the last opcode
+			 * and use a NULL value everywhere else. */
+			if (Z_TYPE(ctx->values[ssa_op->result_def]) == IS_NULL) {
+				break;
+			}
+
 			if (result) {
-				ZVAL_DUP(&zv, result);
+				ZVAL_COPY_VALUE(&zv, result);
+				ZVAL_NULL(result);
 			} else {
 				array_init(&zv);
 			}
