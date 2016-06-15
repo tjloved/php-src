@@ -432,7 +432,8 @@ fi
 	Optimizer/ssa/ssa_destruction.c \
 	Optimizer/ssa/simplify_cfg.c \
 	Optimizer/ssa/misc.c \
-	Optimizer/ssa/domtree.c,
+	Optimizer/ssa/domtree.c \
+	Optimizer/ssa/verify_inference.c,
 	shared,,-DZEND_ENABLE_STATIC_TSRMLS_CACHE=1,,yes)
 
   PHP_ADD_BUILD_DIR([$ext_builddir/Optimizer], 1)

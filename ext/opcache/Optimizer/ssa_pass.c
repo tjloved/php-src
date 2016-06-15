@@ -277,8 +277,17 @@ static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) 
 		collect_ssa_stats(op_array, &info->ssa);
 	}
 
-	if (ZCG(accel_directives).opt_statistics > 1) {
+	if (ZCG(accel_directives).opt_statistics == 2) {
 		dump_instruction_trace(op_array, &info->ssa);
+	}
+
+	if (ZCG(accel_directives).opt_statistics == 3) {
+		ctx->optimization_level &= ~ZEND_OPTIMIZER_PASS_9;
+		ssa_verify_inference(ctx, op_array, &info->ssa);
+		if (should_dump(op_array, 1)) {
+			zend_dump_op_array(op_array, 0, "with integrity checks", NULL);
+		}
+		return;
 	}
 
 #if SSA_VERIFY_INTEGRITY > 1

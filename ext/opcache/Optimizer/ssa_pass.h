@@ -30,6 +30,7 @@ void ssa_optimize_destroy_ssa(ssa_opt_ctx *ctx);
 void ssa_optimize_misc(ssa_opt_ctx *ctx);
 
 int ssa_verify_integrity(zend_ssa *ssa, const char *extra);
+void ssa_verify_inference(zend_optimizer_ctx *opt_ctx, zend_op_array *op_array, zend_ssa *ssa);
 
 #endif
 
