@@ -1113,6 +1113,9 @@ static zend_never_inline ZEND_COLD void zend_wrong_string_offset(void)
 			opline++;
 			end = EG(current_execute_data)->func->op_array.opcodes +
 				EG(current_execute_data)->func->op_array.last;
+			while (opline->opcode == ZEND_ASSERT_TYPE && opline < end) {
+				opline++;
+			}
 			while (opline < end) {
 				if (opline->op1_type == IS_VAR && opline->op1.var == var) {
 					switch (opline->opcode) {

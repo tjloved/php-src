@@ -8241,6 +8241,34 @@ ZEND_VM_HANDLER(197, ZEND_ENSURE_HAVE_THIS, ANY, ANY)
 	ZEND_VM_NEXT_OPCODE();
 }
 
+ZEND_VM_HANDLER(198, ZEND_ASSERT_TYPE, TMPVARCV, ANY)
+{
+	USE_OPLINE
+	zval *op1 = GET_OP1_ZVAL_PTR_UNDEF(BP_VAR_R);
+	uint32_t type = opline->extended_value;
+
+	if (Z_TYPE_P(op1) == IS_INDIRECT) {
+		op1 = Z_INDIRECT_P(op1);
+	}
+
+	if (type & (1 << Z_TYPE_P(op1))) {
+		ZEND_VM_NEXT_OPCODE();
+	}
+	if (Z_TYPE_P(op1) == _IS_ERROR && (type & MAY_BE_ERROR)) {
+		ZEND_VM_NEXT_OPCODE();
+	}
+
+	const zend_op *prev_opline = opline;
+	while (prev_opline->opcode == ZEND_ASSERT_TYPE) {
+		prev_opline--;
+	}
+
+	SAVE_OPLINE();
+	zend_throw_error(NULL, "Type mismatch in %s",
+		zend_get_opcode_name(prev_opline->opcode));
+	HANDLE_EXCEPTION();
+}
+
 ZEND_VM_TYPE_SPEC_HANDLER(ZEND_ADD, (res_info == MAY_BE_LONG && op1_info == MAY_BE_LONG && op2_info == MAY_BE_LONG), ZEND_ADD_LONG_NO_OVERFLOW, CONST|TMPVARCV, CONST|TMPVARCV, SPEC(NO_CONST_CONST,COMMUTATIVE))
 {
 	USE_OPLINE

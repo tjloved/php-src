@@ -260,6 +260,7 @@ END_EXTERN_C()
 #define ZEND_MOV_UNCOUNTED                   195
 #define ZEND_DIV_FLOAT                       196
 #define ZEND_ENSURE_HAVE_THIS                197
+#define ZEND_ASSERT_TYPE                     198
 #define ZEND_ADD_INT                         200
 #define ZEND_SUB_INT                         201
 #define ZEND_ADD_FLOAT                       202
