@@ -75,6 +75,9 @@ static zend_bool should_skip(zend_op *opline, zend_op *end) {
 		case ZEND_FE_RESET_RW:
 		case ZEND_FE_FETCH_R:
 		case ZEND_FE_FETCH_RW:
+		/* The final result is only available after multiple instructions */
+		case ZEND_FETCH_DIM_W:
+		case ZEND_FETCH_DIM_RW:
 			return 1;
 	}
 	return 0;

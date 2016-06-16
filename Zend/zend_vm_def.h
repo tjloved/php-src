@@ -8260,6 +8260,7 @@ ZEND_VM_HANDLER(198, ZEND_ASSERT_TYPE, TMPVARCV, ANY)
 		if (type & MAY_BE_ARRAY_KEY_ANY) {
 			zend_string *str;
 			zval *val;
+			int i = 0;
 			ZEND_HASH_FOREACH_STR_KEY_VAL_IND(Z_ARRVAL_P(op1), str, val) {
 				if (str) {
 					if (!(type & MAY_BE_ARRAY_KEY_STRING)) {
@@ -8270,7 +8271,12 @@ ZEND_VM_HANDLER(198, ZEND_ASSERT_TYPE, TMPVARCV, ANY)
 						ZEND_VM_C_GOTO(wrong_type);
 					}
 				}
-				break; /* Sample one element */
+				if (!(type & (1 << (Z_TYPE_P(val) + MAY_BE_ARRAY_SHIFT)))) {
+					ZEND_VM_C_GOTO(wrong_type);
+				}
+				if (++i >= 10) {
+					break; /* Only sample some elements */
+				}
 			} ZEND_HASH_FOREACH_END();
 			ZEND_VM_NEXT_OPCODE();
 		} else {
