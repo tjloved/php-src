@@ -91,11 +91,6 @@ void ssa_optimize_compact_vars(ssa_opt_ctx *ctx) {
 		op_array->vars = names;
 	}
 
-	/* Update $this reference */
-	if (op_array->this_var != (uint32_t) -1) {
-		op_array->this_var = NUM_VAR(cv_map[VAR_NUM(op_array->this_var)]);
-	}
-
 	OPT_STAT(vars_orig_cvs) += op_array->last_var;
 	OPT_STAT(vars_dead_cvs) += op_array->last_var - num_cvs;
 	op_array->last_var = num_cvs;
