@@ -183,7 +183,7 @@ static void insert_type_checks(context *ctx) {
 			/* Need to honor use_as_double if we're adding type checks */
 			if (opline->opcode == ZEND_ASSIGN && opline->op2_type == IS_CONST
 					&& ssa_op->op1_def >= 0 && ssa->var_info[ssa_op->op1_def].use_as_double) {
-				zval *op2 = CT_CONSTANT_EX(op_array, new_opline->op2.constant);
+				zval *op2 = CT_CONSTANT_EX(op_array, opline->op2.constant);
 				convert_to_double(op2);
 			}
 			if (!should_skip(&ctx->op_array->opcodes[j], end)) {
