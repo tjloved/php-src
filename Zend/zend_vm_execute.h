@@ -53591,19 +53591,44 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_ASSERT_TYPE_SPEC_TMPVARCV_HAND
 	USE_OPLINE
 	zval *op1 = EX_VAR(opline->op1.var);
 	uint32_t type = opline->extended_value;
+	const zend_op *prev_opline;
 
 	if (Z_TYPE_P(op1) == IS_INDIRECT) {
 		op1 = Z_INDIRECT_P(op1);
 	}
 
 	if (type & (1 << Z_TYPE_P(op1))) {
-		ZEND_VM_NEXT_OPCODE();
-	}
-	if (Z_TYPE_P(op1) == _IS_ERROR && (type & MAY_BE_ERROR)) {
+		if (Z_TYPE_P(op1) != IS_ARRAY) {
+			ZEND_VM_NEXT_OPCODE();
+		}
+
+		if (type & MAY_BE_ARRAY_KEY_ANY) {
+			zend_string *str;
+			zval *val;
+			ZEND_HASH_FOREACH_STR_KEY_VAL_IND(Z_ARRVAL_P(op1), str, val) {
+				if (str) {
+					if (!(type & MAY_BE_ARRAY_KEY_STRING)) {
+						goto wrong_type;
+					}
+				} else {
+					if (!(type & MAY_BE_ARRAY_KEY_LONG)) {
+						goto wrong_type;
+					}
+				}
+				break; /* Sample one element */
+			} ZEND_HASH_FOREACH_END();
+			ZEND_VM_NEXT_OPCODE();
+		} else {
+			if (zend_hash_num_elements(Z_ARRVAL_P(op1)) == 0) {
+				ZEND_VM_NEXT_OPCODE();
+			}
+		}
+	} else if (Z_TYPE_P(op1) == _IS_ERROR && (type & MAY_BE_ERROR)) {
 		ZEND_VM_NEXT_OPCODE();
 	}
 
-	const zend_op *prev_opline = opline;
+wrong_type:
+	prev_opline = opline;
 	while (prev_opline->opcode == ZEND_ASSERT_TYPE) {
 		prev_opline--;
 	}
