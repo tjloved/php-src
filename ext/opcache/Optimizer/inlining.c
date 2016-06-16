@@ -68,7 +68,6 @@
 
 typedef struct _merge_info {
 	uint32_t tmp_offset;
-	uint32_t this_var;
 	/* Shiftlist for instructions */
 	int32_t *shiftlist;
 	/* Map from old live_range offsets to new ones */
@@ -563,12 +562,7 @@ int32_t *create_shiftlists(zend_optimizer_ctx *ctx, zend_op_array *op_array, inl
 #undef NEXT
 }
 
-static inline uint32_t translate_cv(
-		uint32_t num, uint32_t cv_offset, uint32_t old_this_var, uint32_t new_this_var) {
-	if (num == old_this_var) {
-		return new_this_var;
-	}
-
+static inline uint32_t translate_cv(uint32_t num, uint32_t cv_offset) {
 	return num + cv_offset * sizeof(zval);
 }
 
@@ -640,9 +634,7 @@ static void merge_opcodes(
 
 				/* Adjust CV and CONST offsets */
 				if (new_opline->op1_type == IS_CV) {
-					new_opline->op1.var = translate_cv(
-						new_opline->op1.var, cv_offset,
-						info->fbc->this_var, info->merge.this_var);
+					new_opline->op1.var = translate_cv(new_opline->op1.var, cv_offset);
 				} else if (new_opline->op1_type == IS_CONST) {
 					if (info->fbc != op_array) {
 						ZEND_PASS_TWO_UNDO_CONSTANT(info->fbc, new_opline->op1);
@@ -650,9 +642,7 @@ static void merge_opcodes(
 					new_opline->op1.constant += literal_offset;
 				}
 				if (new_opline->op2_type == IS_CV) {
-					new_opline->op2.var = translate_cv(
-						new_opline->op2.var, cv_offset,
-						info->fbc->this_var, info->merge.this_var);
+					new_opline->op2.var = translate_cv(new_opline->op2.var, cv_offset);
 				} else if (new_opline->op2_type == IS_CONST) {
 					if (info->fbc != op_array) {
 						ZEND_PASS_TWO_UNDO_CONSTANT(info->fbc, new_opline->op2);
@@ -660,9 +650,7 @@ static void merge_opcodes(
 					new_opline->op2.constant += literal_offset;
 				}
 				if (new_opline->result_type == IS_CV) {
-					new_opline->result.var = translate_cv(
-						new_opline->result.var, cv_offset,
-						info->fbc->this_var, info->merge.this_var);
+					new_opline->result.var = translate_cv(new_opline->result.var, cv_offset);
 				}
 
 				if (new_opline->opcode == ZEND_RECV_INIT) {
@@ -845,11 +833,6 @@ static void merge_try_catch(
 #undef TO_NEW
 }
 
-static inline zend_bool has_proper_this_var(zend_op_array *op_array) {
-	return op_array->this_var != (uint32_t) -1
-		&& op_array->scope && !(op_array->fn_flags & ZEND_ACC_STATIC);
-}
-
 static void inline_calls(zend_optimizer_ctx *ctx, zend_op_array *op_array, inline_info *info) {
 	merge_info merge;
 	uint32_t new_num_opcodes = op_array->last;
@@ -859,17 +842,11 @@ static void inline_calls(zend_optimizer_ctx *ctx, zend_op_array *op_array, inlin
 	uint32_t new_num_cache_slots = op_array->cache_size;
 	uint32_t new_num_live_ranges = op_array->last_live_range;
 	uint32_t new_num_try_catch = op_array->last_try_catch;
-	uint32_t new_this_var = op_array->this_var;
-	uint32_t tmp_offset = op_array->this_var;
+	uint32_t tmp_offset;
 
 	/* Compute new sizes for op_array structures */
 	inline_info *cur;
 	for (cur = info; cur; cur = cur->next) {
-		if (new_this_var == (uint32_t) -1 && has_proper_this_var(info->fbc)) {
-			// TODO We'll be leaving behind dead $this variables
-			new_this_var = new_num_cvs + cur->fbc->this_var;
-		}
-
 		new_num_opcodes += cur->opnum_diff;
 		new_num_literals += cur->fbc->last_literal;
 		new_num_cvs += cur->fbc->last_var;
@@ -884,17 +861,10 @@ static void inline_calls(zend_optimizer_ctx *ctx, zend_op_array *op_array, inlin
 
 	/* Compute TMP base offsets and this_vars */
 	merge.tmp_offset = new_num_cvs - op_array->last_var;
-	merge.this_var = new_this_var;
 	tmp_offset = new_num_cvs + op_array->T;
 	for (cur = info; cur; cur = cur->next) {
 		cur->merge.tmp_offset = tmp_offset - cur->fbc->last_var;
 		tmp_offset += cur->fbc->T;
-
-		if (has_proper_this_var(cur->fbc)) {
-			cur->merge.this_var = new_this_var;
-		} else {
-			cur->merge.this_var = cur->fbc->this_var;
-		}
 	}
 
 	{
@@ -943,7 +913,6 @@ static void inline_calls(zend_optimizer_ctx *ctx, zend_op_array *op_array, inlin
 
 		op_array->T = new_num_tmps;
 		op_array->cache_size = new_num_cache_slots;
-		op_array->this_var = new_this_var;
 	}
 	// TODO add/extend live range for return temporary
 }
