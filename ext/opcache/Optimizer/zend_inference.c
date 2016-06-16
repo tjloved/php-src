@@ -3703,7 +3703,7 @@ static int zend_type_narrowing(const zend_op_array *op_array, const zend_script 
 				ZEND_BITSET_FOREACH(visited, bitset_len, i) {
 					ssa->var_info[i].type &= ~MAY_BE_ANY;
 				} ZEND_BITSET_FOREACH_END();
-				scdf_add_def_to_worklist(scdf, i);
+				scdf_add_def_to_worklist(scdf, v);
 			}
 		}
 	}
