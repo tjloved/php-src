@@ -3,12 +3,13 @@ Instantiate stdClass
 --FILE--
 <?php
 
-$obj = new stdClass;
-
-echo get_class($obj)."\n";
-
-echo "Done\n";
-?>
+function fn674748588()
+{
+    $obj = new stdClass();
+    echo get_class($obj) . "\n";
+    echo "Done\n";
+}
+fn674748588();
 --EXPECTF--
 stdClass
 Done

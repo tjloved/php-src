@@ -6,14 +6,17 @@ error_reporting=E_ALL
 --FILE--
 <?php
 
-function f() {
+function f()
+{
     $php_errormsg = [1, 2, 3];
     echo $var;
     var_dump($php_errormsg);
 }
-f();
-
-?>
+function fn150367271()
+{
+    f();
+}
+fn150367271();
 --EXPECTF--
 Notice: Undefined variable: var in %s on line %d
 string(23) "Undefined variable: var"

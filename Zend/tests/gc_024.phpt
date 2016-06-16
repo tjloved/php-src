@@ -6,12 +6,16 @@ zend.enable_gc=1
 <?php if (!extension_loaded("spl")) print "skip SPL extension required"; ?>
 --FILE--
 <?php
-$a = new ArrayObject();
-$a[0] = $a;
-unset($a);
-var_dump(gc_collect_cycles());
-echo "ok\n";
-?>
+
+function fn1671203041()
+{
+    $a = new ArrayObject();
+    $a[0] = $a;
+    unset($a);
+    var_dump(gc_collect_cycles());
+    echo "ok\n";
+}
+fn1671203041();
 --EXPECT--
 int(2)
 ok

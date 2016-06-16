@@ -13,9 +13,13 @@ Content-Disposition: form-data; name="foobar"
 -----------------------------20896060251896012921717172737--
 --FILE--
 <?php
-var_dump($_FILES);
-var_dump($_POST);
-?>
+
+function fn1376766611()
+{
+    var_dump($_FILES);
+    var_dump($_POST);
+}
+fn1376766611();
 --EXPECTF--
 Warning: Invalid boundary in multipart/form-data POST data in %s
 array(0) {

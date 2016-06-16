@@ -5,7 +5,11 @@ zend.assertions=0
 assert.exception=1
 --FILE--
 <?php
-var_dump(assert(false));
-?>
+
+function fn245861088()
+{
+    var_dump(assert(false));
+}
+fn245861088();
 --EXPECT--
 bool(true)

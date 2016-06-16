@@ -3,11 +3,13 @@ Array addition is not commutative -- do not swap operands
 --FILE--
 <?php
 
-$array = [1, 2, 3];
-$array = [4, 5, 6] + $array;
-var_dump($array);
-
-?>
+function fn540130950()
+{
+    $array = [1, 2, 3];
+    $array = [4, 5, 6] + $array;
+    var_dump($array);
+}
+fn540130950();
 --EXPECT--
 array(3) {
   [0]=>

@@ -5,11 +5,13 @@ func_get_args with no args
 
 function foo()
 {
-	var_dump(func_get_args());	
+    var_dump(func_get_args());
 }
-foo();
-
-?>
+function fn1268194420()
+{
+    foo();
+}
+fn1268194420();
 --EXPECT--
 array(0) {
 }

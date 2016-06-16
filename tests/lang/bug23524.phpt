@@ -2,16 +2,21 @@
 Bug #23524 (Improper handling of constants in array indices)
 --FILE--
 <?php
-  echo "Begin\n";
-  define("THE_CONST",123);
-  function f($a=array(THE_CONST=>THE_CONST)) {
+
+function f($a = array(THE_CONST => THE_CONST))
+{
     print_r($a);
-  }
-  f();
-  f();
-  f();
-  echo "Done";
-?>
+}
+function fn921210335()
+{
+    echo "Begin\n";
+    define("THE_CONST", 123);
+    f();
+    f();
+    f();
+    echo "Done";
+}
+fn921210335();
 --EXPECT--
 Begin
 Array

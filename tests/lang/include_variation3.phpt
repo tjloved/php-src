@@ -2,7 +2,11 @@
 Including a file in the current script directory from eval'd code
 --FILE--
 <?php
-require_once 'include_files/eval.inc';
-?>
+
+function fn1739840673()
+{
+    require_once 'include_files/eval.inc';
+}
+fn1739840673();
 --EXPECT--
 Included!

@@ -2,23 +2,23 @@
 Ensure __autoload() allows for recursive calls if the class name differs.
 --FILE--
 <?php
-  function __autoload($name)
-  {
-      echo "IN:  " . __METHOD__ . "($name)\n";
-      
-      static $i = 0;
-      if ($i++ > 10) {
-          echo "-> Recursion detected - as expected.\n";
-          return;
-      }
-      
-      class_exists('UndefinedClass' . $i);
-      
-      echo "OUT: " . __METHOD__ . "($name)\n";
-  }
-  
-  var_dump(class_exists('UndefinedClass0'));
-?>
+
+function __autoload($name)
+{
+    echo "IN:  " . __METHOD__ . "({$name})\n";
+    static $i = 0;
+    if ($i++ > 10) {
+        echo "-> Recursion detected - as expected.\n";
+        return;
+    }
+    class_exists('UndefinedClass' . $i);
+    echo "OUT: " . __METHOD__ . "({$name})\n";
+}
+function fn347046454()
+{
+    var_dump(class_exists('UndefinedClass0'));
+}
+fn347046454();
 --EXPECTF--
 IN:  __autoload(UndefinedClass0)
 IN:  __autoload(UndefinedClass1)

@@ -7,10 +7,11 @@ function test(float $arg = true)
 {
     var_dump($arg);
 }
-
-test();
-
-?>
+function fn1689272157()
+{
+    test();
+}
+fn1689272157();
 --EXPECTF--
 
 Fatal error: Default value for parameters with a float type can only be float, integer, or NULL in %s on line %d

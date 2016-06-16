@@ -5,18 +5,18 @@ ZE2 Initializing static properties to arrays
 --FILE--
 <?php
 
-class test {
-	static public $ar = array();
+class test
+{
+    public static $ar = array();
 }
-
-var_dump(test::$ar);
-
-test::$ar[] = 1;
-
-var_dump(test::$ar);
-
-echo "Done\n";
-?>
+function fn78398451()
+{
+    var_dump(test::$ar);
+    test::$ar[] = 1;
+    var_dump(test::$ar);
+    echo "Done\n";
+}
+fn78398451();
 --EXPECTF--
 array(0) {
 }

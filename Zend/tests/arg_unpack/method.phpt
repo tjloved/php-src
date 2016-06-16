@@ -3,20 +3,23 @@ Unpack arguments for method calls
 --FILE--
 <?php
 
-class Foo {
-    public function test(...$args) {
+class Foo
+{
+    public function test(...$args)
+    {
         var_dump($args);
     }
-
-    public static function test2(...$args) {
+    public static function test2(...$args)
+    {
         var_dump($args);
     }
 }
-
-$foo = new Foo;
-Foo::test2(1, 2, ...[3, 4], ...[], ...[5]);
-
-?>
+function fn852462599()
+{
+    $foo = new Foo();
+    Foo::test2(1, 2, ...[3, 4], ...[], ...[5]);
+}
+fn852462599();
 --EXPECT--
 array(5) {
   [0]=>

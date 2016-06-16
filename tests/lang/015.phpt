@@ -2,7 +2,11 @@
 Testing include
 --FILE--
 <?php
-include "015.inc";
-?>
+
+function fn1685575344()
+{
+    include "015.inc";
+}
+fn1685575344();
 --EXPECT--
 Hello

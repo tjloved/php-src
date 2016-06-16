@@ -2,16 +2,19 @@
 Bug #66041: list() fails to unpack yielded ArrayAccess object
 --FILE--
 <?php
-function dumpElement() {
+
+function dumpElement()
+{
     list($value) = yield;
     var_dump($value);
-};
-
-$fixedArray = new SplFixedArray(1);
-$fixedArray[0] = 'the element';
-
-$generator = dumpElement();
-$generator->send($fixedArray);
-?>
+}
+function fn1905256977()
+{
+    $fixedArray = new SplFixedArray(1);
+    $fixedArray[0] = 'the element';
+    $generator = dumpElement();
+    $generator->send($fixedArray);
+}
+fn1905256977();
 --EXPECT--
 string(11) "the element"

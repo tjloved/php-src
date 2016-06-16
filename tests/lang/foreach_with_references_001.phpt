@@ -3,20 +3,19 @@ foreach() with references
 --FILE--
 <?php
 
-$arr = array(1 => "one", 2 => "two", 3 => "three");
-
-foreach($arr as $key => $val) {
-	$val = $key;
+function fn162807068()
+{
+    $arr = array(1 => "one", 2 => "two", 3 => "three");
+    foreach ($arr as $key => $val) {
+        $val = $key;
+    }
+    print_r($arr);
+    foreach ($arr as $key => &$val) {
+        $val = $key;
+    }
+    print_r($arr);
 }
-
-print_r($arr);
-
-foreach($arr as $key => &$val) {
-	$val = $key;
-}
-
-print_r($arr);
-
+fn162807068();
 --EXPECT--
 Array
 (

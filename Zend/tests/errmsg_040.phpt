@@ -3,12 +3,16 @@ errmsg: arrays are not allowed in class constants
 --FILE--
 <?php
 
-class test {
-	const TEST = array(1,2,3);
+class test
+{
+    const TEST = array(1, 2, 3);
 }
-var_dump(test::TEST);
-echo "Done\n";
-?>
+function fn1966198241()
+{
+    var_dump(test::TEST);
+    echo "Done\n";
+}
+fn1966198241();
 --EXPECTF--	
 array(3) {
   [0]=>

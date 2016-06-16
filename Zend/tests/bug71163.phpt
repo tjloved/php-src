@@ -2,24 +2,28 @@
 Bug #71163 (Segmentation Fault (cleanup_unfinished_calls))
 --FILE--
 <?php
-function __autoload($name) { 
-	eval ("class $name extends Exception { public static function foo() {}}");
-	throw new Exception("boom");
-}
 
-function test2() {
-	try {
-		Test::foo();
-	} catch (Exception $e) {
-		echo "okey";
-	}
+function __autoload($name)
+{
+    eval("class {$name} extends Exception { public static function foo() {}}");
+    throw new Exception("boom");
 }
-
-function test() {
-	test2();
+function test2()
+{
+    try {
+        Test::foo();
+    } catch (Exception $e) {
+        echo "okey";
+    }
 }
-
-test();
-?>
+function test()
+{
+    test2();
+}
+function fn334921765()
+{
+    test();
+}
+fn334921765();
 --EXPECT--
 okey

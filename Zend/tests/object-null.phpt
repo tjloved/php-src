@@ -6,14 +6,15 @@ Test whether an object is NULL or not.
 class Bla
 {
 }
-
-$b = new Bla;
-
-var_dump($b != null);
-var_dump($b == null);
-var_dump($b !== null);
-var_dump($b === null);
-?>
+function fn1564001825()
+{
+    $b = new Bla();
+    var_dump($b != null);
+    var_dump($b == null);
+    var_dump($b !== null);
+    var_dump($b === null);
+}
+fn1564001825();
 --EXPECT--
 bool(true)
 bool(false)

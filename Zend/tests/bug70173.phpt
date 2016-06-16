@@ -6,8 +6,12 @@ if (PHP_INT_SIZE != 4) die("skip this test is for 32bit platforms only");
 ?>
 --FILE--
 <?php
-$var = 2900000000;
-var_dump($var);
-?>
+
+function fn1267088629()
+{
+    $var = 2900000000;
+    var_dump($var);
+}
+fn1267088629();
 --EXPECT--
 float(2900000000)

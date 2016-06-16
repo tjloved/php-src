@@ -3,14 +3,19 @@ redefining constructor (__construct second)
 --FILE--
 <?php
 
-class test {
-	function test() {
-	}
-	function __construct() {
-	}
+class test
+{
+    function test()
+    {
+    }
+    function __construct()
+    {
+    }
 }
-
-echo "Done\n";
-?>
+function fn1556450122()
+{
+    echo "Done\n";
+}
+fn1556450122();
 --EXPECTF--	
 Done

@@ -1,6 +1,12 @@
 --TEST--
 Strlen() function test
 --FILE--
-<?php echo strlen("abcdef")?>
+<?php
+
+function fn676373775()
+{
+    echo strlen("abcdef");
+}
+fn676373775();
 --EXPECT--
 6

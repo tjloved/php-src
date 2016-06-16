@@ -5,12 +5,14 @@ func_get_arg on non-existent arg
 
 function foo($a)
 {
-	var_dump(func_get_arg(2));	
+    var_dump(func_get_arg(2));
 }
-foo(2, 3);
-echo "\n";
-
-?>
+function fn1438304488()
+{
+    foo(2, 3);
+    echo "\n";
+}
+fn1438304488();
 --EXPECTF--
 Warning: func_get_arg():  Argument 2 not passed to function in %s on line %d
 bool(false)

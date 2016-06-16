@@ -2,7 +2,9 @@
 Bug #71604: Aborted Generators continue after nested finally
 --FILE--
 <?php
-function gen() {
+
+function gen()
+{
     try {
         try {
             yield;
@@ -16,10 +18,11 @@ function gen() {
     }
     print "NOTREACHED\n";
 }
-
-gen()->current();
-
-?>
+function fn1874092215()
+{
+    gen()->current();
+}
+fn1874092215();
 --EXPECT--
 INNER
 OUTER

@@ -2,8 +2,12 @@
 Square bracket array shortcut test
 --FILE--
 <?php
-print_r([1, 2, 3]);
-?>
+
+function fn1602723254()
+{
+    print_r([1, 2, 3]);
+}
+fn1602723254();
 --EXPECT--
 Array
 (

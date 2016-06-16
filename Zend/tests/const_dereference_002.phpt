@@ -2,12 +2,15 @@
 Const string dereference
 --FILE--
 <?php
-error_reporting(E_ALL);
 
-var_dump("foobar"[3]);
-var_dump("foobar"[2][0]);
-var_dump("foobar"["foo"]["bar"]);
-
+function fn1224310689()
+{
+    error_reporting(E_ALL);
+    var_dump("foobar"[3]);
+    var_dump("foobar"[2][0]);
+    var_dump("foobar"["foo"]["bar"]);
+}
+fn1224310689();
 --EXPECTF--
 string(1) "b"
 string(1) "o"

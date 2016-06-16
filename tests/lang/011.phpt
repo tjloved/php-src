@@ -1,23 +1,24 @@
 --TEST--
 Testing nested functions
 --FILE--
-<?php 
+<?php
+
 function F()
 {
-	$a = "Hello ";
-	return($a);
+    $a = "Hello ";
+    return $a;
 }
-
 function G()
 {
-  static $myvar = 4;
-  
-  echo "$myvar ";
-  echo F();
-  echo "$myvar";
+    static $myvar = 4;
+    echo "{$myvar} ";
+    echo F();
+    echo "{$myvar}";
 }
-
-G();
-?>
+function fn953221072()
+{
+    G();
+}
+fn953221072();
 --EXPECT--
 4 Hello 4

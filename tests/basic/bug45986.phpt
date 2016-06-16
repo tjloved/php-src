@@ -6,7 +6,11 @@ sebs@php.net
 Testfest 2009 Munich 
 --FILE--
 <?php
-rename('foo', 'bar');
-?>
+
+function fn355511248()
+{
+    rename('foo', 'bar');
+}
+fn355511248();
 --EXPECTF--
-Warning: %s in %sbug45986.php on line 2
+Warning: %s in %sbug45986.php on line %d

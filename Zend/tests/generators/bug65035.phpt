@@ -3,18 +3,20 @@ Bug #65035: yield / exit segfault
 --FILE--
 <?php
 
-function gen() {
+function gen()
+{
     fn();
     yield;
 }
-
-function fn() {
+function fn()
+{
     exit('Done');
 }
-
-$gen = gen();
-$gen->current();
-
-?>
+function fn1805882749()
+{
+    $gen = gen();
+    $gen->current();
+}
+fn1805882749();
 --EXPECT--
 Done

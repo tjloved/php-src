@@ -2,11 +2,15 @@
 Simple While Loop Test
 --FILE--
 <?php
-$a=1; 
-while ($a<10) {
-	echo $a;
-	$a++;
+
+function fn1904744606()
+{
+    $a = 1;
+    while ($a < 10) {
+        echo $a;
+        $a++;
+    }
 }
-?>
+fn1904744606();
 --EXPECT--
 123456789

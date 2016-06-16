@@ -2,19 +2,23 @@
 Private property inheritance check
 --FILE--
 <?php
-Class A {
-	private $c;
-}
 
-Class B extends A {
-	private $c;
+class A
+{
+    private $c;
 }
-
-Class C extends B {
+class B extends A
+{
+    private $c;
 }
-
-var_dump(new C);
-?>
+class C extends B
+{
+}
+function fn296936641()
+{
+    var_dump(new C());
+}
+fn296936641();
 --EXPECTF--
 object(C)#%d (2) {
   [%u|b%"c":%u|b%"B":private]=>

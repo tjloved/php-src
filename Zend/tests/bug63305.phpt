@@ -2,19 +2,19 @@
 Bug #63305 (zend_mm_heap corrupted with traits)
 --FILE--
 <?php
-new Attachment("");
 
-function __autoload($class) {
+function __autoload($class)
+{
     switch ($class) {
-    case "Attachment":
-        eval(<<<'PHP'
+        case "Attachment":
+            eval(<<<'PHP'
 class Attachment extends File {
 }
 PHP
-    );
-        break;
-    case "File":
-        eval(<<<'PHP'
+);
+            break;
+        case "File":
+            eval(<<<'PHP'
 class File {
     use TDatabaseObject {
         TDatabaseObject::__construct as private databaseObjectConstruct;
@@ -23,21 +23,25 @@ class File {
     }
 }
 PHP
-    );
-        break;
-    case "TDatabaseObject":
-        eval(<<<'PHP'
+);
+            break;
+        case "TDatabaseObject":
+            eval(<<<'PHP'
 trait TDatabaseObject {
     public function __construct() {
     }
 }
 PHP
-    );
-        break;
+);
+            break;
     }
     return TRUE;
 }
-echo "okey";
-?>
+function fn955613256()
+{
+    new Attachment("");
+    echo "okey";
+}
+fn955613256();
 --EXPECT--
 okey

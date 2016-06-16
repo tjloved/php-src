@@ -5,10 +5,12 @@ disable_functions=phpinfo
 --FILE--
 <?php
 
-phpinfo();
-
-echo "Done\n";
-?>
+function fn1814703011()
+{
+    phpinfo();
+    echo "Done\n";
+}
+fn1814703011();
 --EXPECTF--	
 Warning: phpinfo() has been disabled for security reasons in %s on line %d
 Done

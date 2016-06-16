@@ -9,8 +9,12 @@ if (!function_exists('zend_test_func2')) {
 
 --FILE--
 <?php
-zend_test_func2();
-echo "==DONE==\n"
-?>
+
+function fn779383760()
+{
+    zend_test_func2();
+    echo "==DONE==\n";
+}
+fn779383760();
 --EXPECTF--
 ==DONE==

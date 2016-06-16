@@ -6,13 +6,14 @@ zend.multibyte=1
 --FILE--
 <?php
 
-declare(encoding = 1);
-declare(encoding = 11111111111111);
-declare(encoding = M_PI);
-
-print 'DONE';
-
-?>
+declare (encoding=1);
+declare (encoding=11111111111111);
+declare (encoding=M_PI);
+function fn883054922()
+{
+    print 'DONE';
+}
+fn883054922();
 --EXPECTF--
 Warning: Unsupported encoding [1] in %sdeclare_003.php on line %d
 

@@ -14,9 +14,13 @@ Content-Type: text/plain-file1
 1
 --FILE--
 <?php
-var_dump($_FILES);
-var_dump($_POST);
-?>
+
+function fn2123114737()
+{
+    var_dump($_FILES);
+    var_dump($_POST);
+}
+fn2123114737();
 --EXPECTF--
 array(1) {
   [%u|b%"file1"]=>

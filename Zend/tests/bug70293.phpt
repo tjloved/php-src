@@ -5,12 +5,15 @@ zend.assertions=-1
 --FILE--
 <?php
 
-function f() {
+function f()
+{
     assert(@$a ?: 1);
     echo "OK";
-};
-f();
-
-?>
+}
+function fn2082566158()
+{
+    f();
+}
+fn2082566158();
 --EXPECT--
 OK

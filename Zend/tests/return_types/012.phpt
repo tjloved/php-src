@@ -3,18 +3,23 @@ Method returned callable, expected callable
 
 --FILE--
 <?php
-class foo {
-    public function bar() : callable {
+
+class foo
+{
+    public function bar() : callable
+    {
         $test = "one";
-        return function() use($test) : array {
+        return function () use($test) : array {
             return array($test);
         };
     }
 }
-
-$baz = new foo();
-var_dump($baz->bar());
-
+function fn1902320034()
+{
+    $baz = new foo();
+    var_dump($baz->bar());
+}
+fn1902320034();
 --EXPECT--
 object(Closure)#2 (2) {
   ["static"]=>

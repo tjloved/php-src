@@ -2,15 +2,19 @@
 Bug #35163.3 (Array elements can lose references)
 --FILE--
 <?php
-$a = new stdClass;
-$a->b = array(1);
-$a->b[] =& $a->b;
-$a->b[] =& $a->b;
-$a->b[0] = 2;
-var_dump($a);
-$a->b = null;
-$a = null;
-?>
+
+function fn926527046()
+{
+    $a = new stdClass();
+    $a->b = array(1);
+    $a->b[] =& $a->b;
+    $a->b[] =& $a->b;
+    $a->b[0] = 2;
+    var_dump($a);
+    $a->b = null;
+    $a = null;
+}
+fn926527046();
 --EXPECTF--
 object(stdClass)#%d (1) {
   ["b"]=>

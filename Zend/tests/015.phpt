@@ -3,16 +3,18 @@ trigger_error() tests
 --FILE--
 <?php
 
-var_dump(trigger_error());
-var_dump(trigger_error("error"));
-var_dump(trigger_error(array()));
-var_dump(trigger_error("error", -1));
-var_dump(trigger_error("error", 0));
-var_dump(trigger_error("error", E_USER_WARNING));
-var_dump(trigger_error("error", E_USER_DEPRECATED));
-
-echo "Done\n";
-?>
+function fn24535439()
+{
+    var_dump(trigger_error());
+    var_dump(trigger_error("error"));
+    var_dump(trigger_error(array()));
+    var_dump(trigger_error("error", -1));
+    var_dump(trigger_error("error", 0));
+    var_dump(trigger_error("error", E_USER_WARNING));
+    var_dump(trigger_error("error", E_USER_DEPRECATED));
+    echo "Done\n";
+}
+fn24535439();
 --EXPECTF--	
 Warning: trigger_error() expects at least 1 parameter, 0 given in %s on line %d
 NULL

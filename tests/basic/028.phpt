@@ -68,8 +68,12 @@ testname
 -----------------------------20896060251896012921717172737--
 --FILE--
 <?php
-var_dump($_POST);
-?>
+
+function fn476940717()
+{
+    var_dump($_POST);
+}
+fn476940717();
 --EXPECT--
 array(15) {
   ["name1"]=>

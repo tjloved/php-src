@@ -3,21 +3,26 @@ Testing indirect method call
 --FILE--
 <?php
 
-class foo {
-	public $x = 1;
-
-	public function getX() {
-		return $this->x;
-	}
-	public function setX($val) {
-		$this->x = $val;
-		return $this;
-	}
+class foo
+{
+    public $x = 1;
+    public function getX()
+    {
+        return $this->x;
+    }
+    public function setX($val)
+    {
+        $this->x = $val;
+        return $this;
+    }
 }
+function fn1911497466()
+{
+    $X = (new foo())->setX(10)->getX();
+    var_dump($X);
+    // int(10)
 
-$X = (new foo)->setX(10)->getX();
-var_dump($X); // int(10)
-
-?>
+}
+fn1911497466();
 --EXPECT--
 int(10)

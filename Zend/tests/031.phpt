@@ -1,11 +1,15 @@
 --TEST--
 Testing array with '[]' passed as argument by value
 --FILE--
-<?php 
+<?php
 
-function test($var) { }
-test($arr[]);
-
-?>
+function test($var)
+{
+}
+function fn211086971()
+{
+    test($arr[]);
+}
+fn211086971();
 --EXPECTF--
 Fatal error: Cannot use [] for reading in %s on line %d

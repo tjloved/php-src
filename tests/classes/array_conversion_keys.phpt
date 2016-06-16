@@ -2,14 +2,18 @@
 Verifies the correct conversion of objects to arrays
 --FILE--
 <?php
+
 class foo
 {
-	private $private = 'private';
-	protected $protected = 'protected';
-	public $public = 'public';
+    private $private = 'private';
+    protected $protected = 'protected';
+    public $public = 'public';
 }
-var_export((array) new foo);
-?>
+function fn1417129642()
+{
+    var_export((array) new foo());
+}
+fn1417129642();
 --EXPECTF--
 array (
   '' . "\0" . 'foo' . "\0" . 'private' => 'private',

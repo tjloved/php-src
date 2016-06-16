@@ -3,12 +3,14 @@ strict_types=1 code including explicitly strict_types=0 code
 --FILE--
 <?php
 
-declare(strict_types=1);
+declare (strict_types=1);
+function fn78788175()
+{
+    // file that's explicitly weak
+    require 'strict_include_explicit_weak_2.inc';
+    // calls within that file should stay weak, despite being included by strict fille
 
-// file that's explicitly weak
-require 'strict_include_explicit_weak_2.inc';
-
-// calls within that file should stay weak, despite being included by strict fille
-?>
+}
+fn78788175();
 --EXPECTF--
 Success!

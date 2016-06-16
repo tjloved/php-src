@@ -9,7 +9,11 @@ if (!function_exists('zend_test_func')) {
 
 --FILE--
 <?php
-zend_test_func();
-?>
+
+function fn243904531()
+{
+    zend_test_func();
+}
+fn243904531();
 --EXPECTF--
 Fatal error: Return value of zend_test_func() must be of the type array, null returned in %s on line %d

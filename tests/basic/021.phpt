@@ -18,9 +18,13 @@ bug37276
 -----------------------------20896060251896012921717172737--
 --FILE--
 <?php
-var_dump($_FILES);
-var_dump($_POST);
-?>
+
+function fn1238794477()
+{
+    var_dump($_FILES);
+    var_dump($_POST);
+}
+fn1238794477();
 --EXPECTF--
 array(1) {
   ["pics"]=>

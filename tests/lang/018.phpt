@@ -1,16 +1,18 @@
 --TEST--
 eval() test
 --FILE--
-<?php 
+<?php
 
-error_reporting(0);
-
-$message = "echo \"hey\n\";";
-
-for ($i=0; $i<10; $i++) {
-  eval($message);
-  echo $i."\n";
+function fn1376673024()
+{
+    error_reporting(0);
+    $message = "echo \"hey\n\";";
+    for ($i = 0; $i < 10; $i++) {
+        eval($message);
+        echo $i . "\n";
+    }
 }
+fn1376673024();
 --EXPECT--
 hey
 0

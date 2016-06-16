@@ -3,15 +3,14 @@ empty doc test (heredoc)
 --FILE--
 <?php
 
-require_once 'nowdoc.inc';
-
-print <<<ENDOFHEREDOC
+function fn1015345595()
+{
+    require_once 'nowdoc.inc';
+    print <<<ENDOFHEREDOC
 ENDOFHEREDOC;
-
-$x = <<<ENDOFHEREDOC
+    $x = <<<ENDOFHEREDOC
 ENDOFHEREDOC;
-
-print "{$x}";
-
-?>
+    print "{$x}";
+}
+fn1015345595();
 --EXPECT--

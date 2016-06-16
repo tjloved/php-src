@@ -2,10 +2,16 @@
 print_r(Object)
 --FILE--
 <?php
-class Foo {}
-$foo = new Foo;
-print_r($foo);
-?>
+
+class Foo
+{
+}
+function fn354992772()
+{
+    $foo = new Foo();
+    print_r($foo);
+}
+fn354992772();
 --EXPECTF--
 Foo Object
 (

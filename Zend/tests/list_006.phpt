@@ -3,9 +3,11 @@ Testing nested list() with empty array
 --FILE--
 <?php
 
-list($a, list($b, list(list($d)))) = array();
-
-?>
+function fn1042151396()
+{
+    list($a, list($b, list(list($d)))) = array();
+}
+fn1042151396();
 --EXPECTF--
 Notice: Undefined offset: 0 in %s on line %d
 

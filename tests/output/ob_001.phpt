@@ -2,7 +2,11 @@
 output buffering - nothing
 --FILE--
 <?php
-echo "foo\n";
-?>
+
+function fn2025538372()
+{
+    echo "foo\n";
+}
+fn2025538372();
 --EXPECT--
 foo

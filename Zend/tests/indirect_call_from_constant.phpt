@@ -10,16 +10,14 @@ class Test
         echo "Method called!\n";
     }
 }
-
-['Test', 'method']();
-
-'Test::method'();
-
-(['Test', 'method'])();
-
-('Test::method')();
-
-?>
+function fn544461077()
+{
+    ['Test', 'method']();
+    ('Test::method')();
+    ['Test', 'method']();
+    ('Test::method')();
+}
+fn544461077();
 --EXPECT--
 Method called!
 Method called!

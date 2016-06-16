@@ -3,14 +3,18 @@ Bug #70179 ($this refcount issue)
 --FILE--
 <?php
 
-class X {
-	function __invoke() {
-		var_dump($this);
-	}
+class X
+{
+    function __invoke()
+    {
+        var_dump($this);
+    }
 }
-(new X)();
-
-?>
+function fn457322225()
+{
+    (new X())();
+}
+fn457322225();
 --EXPECT--
 object(X)#1 (0) {
 }

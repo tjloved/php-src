@@ -2,14 +2,20 @@
 Bug #34358 (Fatal error: Cannot re-assign $this(again))
 --FILE--
 <?php
-class foo {
-  function bar() {
-    $ref = &$this;
-  }
+
+class foo
+{
+    function bar()
+    {
+        $ref =& $this;
+    }
 }
-$x = new foo();
-$x->bar();
-echo "ok\n";
-?>
+function fn479850462()
+{
+    $x = new foo();
+    $x->bar();
+    echo "ok\n";
+}
+fn479850462();
 --EXPECT--
 ok

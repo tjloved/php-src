@@ -5,14 +5,17 @@ track_errors=1
 --FILE--
 <?php
 
-function test() {
+function test()
+{
     $php_errormsg = 1;
     echo $undef;
     var_dump($php_errormsg + 1);
 }
-test();
-
-?>
+function fn865603517()
+{
+    test();
+}
+fn865603517();
 --EXPECTF--
 Notice: Undefined variable: undef in %s on line %d
 

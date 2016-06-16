@@ -26,9 +26,13 @@ file1
 -----------------------------20896060251896012921717172737--
 --FILE--
 <?php
-var_dump($_FILES);
-var_dump($_POST);
-?>
+
+function fn969162206()
+{
+    var_dump($_FILES);
+    var_dump($_POST);
+}
+fn969162206();
 --EXPECTF--
 array(1) {
   ["pics"]=>

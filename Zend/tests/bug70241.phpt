@@ -5,13 +5,15 @@ zend.assertions=-1
 --FILE--
 <?php
 
-function foo () {
-	assert(yield 1);
-	return null;
+function foo()
+{
+    assert((yield 1));
+    return null;
 }
-
-var_dump(foo() instanceof Generator);
-
-?>
+function fn1308027860()
+{
+    var_dump(foo() instanceof Generator);
+}
+fn1308027860();
 --EXPECT--
 bool(true)

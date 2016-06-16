@@ -4,10 +4,14 @@ GC 025: Automatic GC on request shutdown
 zend.enable_gc=1
 --FILE--
 <?php
-$a = array(array());
-$a[0][0] =& $a[0];
-unset($a);
-echo "ok\n"
-?>
+
+function fn560127951()
+{
+    $a = array(array());
+    $a[0][0] =& $a[0];
+    unset($a);
+    echo "ok\n";
+}
+fn560127951();
 --EXPECT--
 ok

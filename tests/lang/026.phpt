@@ -1,6 +1,12 @@
 --TEST--
 Testing string scanner confirmance
 --FILE--
-<?php echo "\"\t\\'" . '\n\\\'a\\\b\\' ?>
+<?php
+
+function fn1759638701()
+{
+    echo "\"\t\\'" . '\\n\\\'a\\\\b\\';
+}
+fn1759638701();
 --EXPECT--
 "	\'\n\'a\\b\

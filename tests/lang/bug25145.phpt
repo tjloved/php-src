@@ -5,10 +5,12 @@ Bug #25145 (SEGV on recpt of form input with name like "123[]")
 --FILE--
 <?php
 
-var_dump($_REQUEST);
-echo "Done\n";
-
-?>
+function fn705464400()
+{
+    var_dump($_REQUEST);
+    echo "Done\n";
+}
+fn705464400();
 --EXPECT--
 array(1) {
   [123]=>

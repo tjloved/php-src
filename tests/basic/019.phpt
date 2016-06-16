@@ -4,8 +4,12 @@ POST Method test and arrays - 7
 a[]=1&a[]]=3&a[[]=4
 --FILE--
 <?php
-var_dump($_POST['a']); 
-?>
+
+function fn1680989443()
+{
+    var_dump($_POST['a']);
+}
+fn1680989443();
 --EXPECT--
 array(3) {
   [0]=>

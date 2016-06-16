@@ -6,11 +6,15 @@ sebs@php.net
 Testfest 2009 Munich
 --FILE--
 <?php
-ob_start();
-$status = ob_get_status(true);
-ob_end_clean();
-var_dump($status);
-?>
+
+function fn1472307145()
+{
+    ob_start();
+    $status = ob_get_status(true);
+    ob_end_clean();
+    var_dump($status);
+}
+fn1472307145();
 --EXPECT--
 array(1) {
   [0]=>

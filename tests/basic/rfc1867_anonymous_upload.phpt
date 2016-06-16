@@ -21,9 +21,13 @@ Content-Type: text/plain-file2
 -----------------------------20896060251896012921717172737--
 --FILE--
 <?php
-var_dump($_FILES);
-var_dump($_POST);
-?>
+
+function fn248262888()
+{
+    var_dump($_FILES);
+    var_dump($_POST);
+}
+fn248262888();
 --EXPECTF--
 array(2) {
   [%d]=>

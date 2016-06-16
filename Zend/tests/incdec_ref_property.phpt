@@ -3,19 +3,21 @@ Incrementing and decrementing a referenced property
 --FILE--
 <?php
 
-$obj = new stdClass;
-$obj->prop = 1;
-$ref =& $obj->prop;
-var_dump(++$obj->prop);
-var_dump($obj->prop);
-var_dump($obj->prop++);
-var_dump($obj->prop);
-var_dump(--$obj->prop);
-var_dump($obj->prop);
-var_dump($obj->prop--);
-var_dump($obj->prop);
-
-?>
+function fn733748885()
+{
+    $obj = new stdClass();
+    $obj->prop = 1;
+    $ref =& $obj->prop;
+    var_dump(++$obj->prop);
+    var_dump($obj->prop);
+    var_dump($obj->prop++);
+    var_dump($obj->prop);
+    var_dump(--$obj->prop);
+    var_dump($obj->prop);
+    var_dump($obj->prop--);
+    var_dump($obj->prop);
+}
+fn733748885();
 --EXPECT--
 int(2)
 int(2)

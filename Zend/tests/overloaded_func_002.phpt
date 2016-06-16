@@ -6,8 +6,12 @@ if (!PHP_DEBUG) die("skip only run in debug version");
 ?>
 --FILE--
 <?php
-$a = new _ZendTestClass();
-var_dump($a->{trim(" test")}());
-?>
+
+function fn1533956941()
+{
+    $a = new _ZendTestClass();
+    var_dump($a->{trim(" test")}());
+}
+fn1533956941();
 --EXPECT--
 string(4) "test"

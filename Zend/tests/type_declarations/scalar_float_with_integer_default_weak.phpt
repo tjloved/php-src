@@ -7,9 +7,10 @@ function test(float $arg = 0)
 {
     var_dump($arg);
 }
-
-test();
-
-?>
+function fn1565354954()
+{
+    test();
+}
+fn1565354954();
 --EXPECT--
 float(0)

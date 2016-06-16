@@ -5,12 +5,13 @@ zend.enable_gc=1
 --FILE--
 <?php
 
-$a = array(array());
-$a[] =& $a;
-
-var_dump(each($a[1]));
-
-?>
+function fn1404976068()
+{
+    $a = array(array());
+    $a[] =& $a;
+    var_dump(each($a[1]));
+}
+fn1404976068();
 --EXPECTF--
 array(4) {
   [1]=>

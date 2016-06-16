@@ -11,18 +11,23 @@ if ($zend_mm_enabled === "0") {
 ?>
 --FILE--
 <?php
-class A {
-	public $arr;
-	public function core() {
-		$this->arr["no_pack"] = 1;
-		while (1) {
-			$this->arr[] = 1;
-		}
-	}
-}
 
-$a = new A;
-$a->core();
-?>
+class A
+{
+    public $arr;
+    public function core()
+    {
+        $this->arr["no_pack"] = 1;
+        while (1) {
+            $this->arr[] = 1;
+        }
+    }
+}
+function fn735643060()
+{
+    $a = new A();
+    $a->core();
+}
+fn735643060();
 --EXPECTF--
 Fatal error: Allowed memory size of 2097152 bytes exhausted%s(tried to allocate %d bytes) in %s on line %d

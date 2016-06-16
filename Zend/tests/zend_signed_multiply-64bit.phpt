@@ -4,10 +4,14 @@ Zend signed multiply 64-bit
 <?php if ((1 << 31) < 0) print "skip Running on 32-bit target"; ?>
 --FILE--
 <?php
-var_dump(0x80000000 * -0xffffffff);
-var_dump(0x80000001 * 0xfffffffe);
-var_dump(0x80000001 * -0xffffffff);
-?>
+
+function fn318868535()
+{
+    var_dump(0x80000000 * -0xffffffff);
+    var_dump(0x80000001 * 0xfffffffe);
+    var_dump(0x80000001 * -0xffffffff);
+}
+fn318868535();
 --EXPECTF--
 int(-9223372034707292160)
 int(9223372036854775806)

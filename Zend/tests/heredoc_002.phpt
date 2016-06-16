@@ -3,21 +3,20 @@ basic binary heredoc syntax
 --FILE--
 <?php
 
-require_once 'nowdoc.inc';
-
-print b<<<ENDOFHEREDOC
+function fn382840077()
+{
+    require_once 'nowdoc.inc';
+    print <<<ENDOFHEREDOC
 This is a heredoc test.
 
 ENDOFHEREDOC;
-
-$x = b<<<ENDOFHEREDOC
+    $x = <<<ENDOFHEREDOC
 This is another heredoc test.
 
 ENDOFHEREDOC;
-
-print "{$x}";
-
-?>
+    print "{$x}";
+}
+fn382840077();
 --EXPECT--
 This is a heredoc test.
 This is another heredoc test.

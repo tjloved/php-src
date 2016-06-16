@@ -4,12 +4,17 @@ Bug #54585 (track_errors causes segfault)
 track_errors=On
 --FILE--
 <?php
-function testing($source) {
-                unset($source[$cos]);
+
+function testing($source)
+{
+    unset($source[$cos]);
 }
-testing($_GET);
-echo "ok\n";
-?>
+function fn83774984()
+{
+    testing($_GET);
+    echo "ok\n";
+}
+fn83774984();
 --EXPECTF--
-Notice: Undefined variable: cos in %sbug54585.php on line 3
+Notice: Undefined variable: cos in %sbug54585.php on line %d
 ok

@@ -5,15 +5,18 @@ ZE2 iterators cannot implement Traversable alone
 --FILE--
 <?php
 
-class test implements Traversable {
+class test implements Traversable
+{
 }
+function fn2134249765()
+{
+    $obj = new test();
+    foreach ($obj as $v) {
+    }
+    print "Done\n";
+    /* the error doesn't show the filename but 'Unknown' */
 
-$obj = new test;
-
-foreach($obj as $v);
-
-print "Done\n";
-/* the error doesn't show the filename but 'Unknown' */
-?>
+}
+fn2134249765();
 --EXPECTF--
 Fatal error: Class test must implement interface Traversable as part of either Iterator or IteratorAggregate in %s on line %d

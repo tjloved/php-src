@@ -3,7 +3,8 @@ try { return } finally { return } in generator
 --FILE--
 <?php
 
-function gen() {
+function gen()
+{
     try {
         try {
             echo "before return\n";
@@ -17,16 +18,19 @@ function gen() {
     } finally {
         echo "outer finally run\n";
     }
-
     echo "code after finally\n";
+    yield;
+    // force generator
 
-    yield; // force generator
 }
+function fn103993077()
+{
+    $gen = gen();
+    $gen->rewind();
+    // force run
 
-$gen = gen();
-$gen->rewind(); // force run
-
-?>
+}
+fn103993077();
 --EXPECTF--
 before return
 before return in inner finally

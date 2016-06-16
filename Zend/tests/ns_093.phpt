@@ -4,24 +4,15 @@ Group use declarations and whitespace nuances
 <?php
 
 // should not throw syntax errors
-
-use Foo\Bar     \{ A };
-
-use Foo\Bar\    { B };
-
-use Foo\Bar
-\{
-    C
-};
-
-use Foo\Bar\
+use Foo\Bar\{A};
+use Foo\Bar\{B};
+use Foo\Bar\{C};
+use Foo\Bar\{D};
+function fn586224153()
 {
-    D
-};
-
-echo "\nDone\n";
-
-
+    echo "\nDone\n";
+}
+fn586224153();
 --EXPECTF--
 
 Done

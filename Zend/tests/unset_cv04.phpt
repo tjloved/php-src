@@ -2,14 +2,19 @@
 unset() CV 4 (unset() local variable in included file)
 --FILE--
 <?php
-function f() {
-  $x = "ok\n";
-  echo $x;
-  include "unset.inc";
-  echo $x;
+
+function f()
+{
+    $x = "ok\n";
+    echo $x;
+    include "unset.inc";
+    echo $x;
 }
-f();
-?>
+function fn1960619789()
+{
+    f();
+}
+fn1960619789();
 --EXPECTF--
 ok
 

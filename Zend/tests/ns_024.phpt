@@ -2,6 +2,11 @@
 024: __NAMESPACE__ constant out of namespace
 --FILE--
 <?php
-var_dump(__NAMESPACE__);
+
+function fn842326611()
+{
+    var_dump(__NAMESPACE__);
+}
+fn842326611();
 --EXPECT--
 string(0) ""

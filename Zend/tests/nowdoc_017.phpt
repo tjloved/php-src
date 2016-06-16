@@ -1,16 +1,18 @@
 --TEST--
 Testing nowdoc in default value for property
 --FILE--
-<?php 
+<?php
 
-class foo {
+class foo
+{
     public $bar = <<<'EOT'
 bar
 EOT;
 }
-
-print "ok!\n";
-
-?>
+function fn2130497348()
+{
+    print "ok!\n";
+}
+fn2130497348();
 --EXPECT--
 ok!

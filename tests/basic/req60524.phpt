@@ -9,6 +9,12 @@ if (substr(PHP_OS, 0, 3) == 'WIN') {
 }
 ?>
 --FILE--
-<?php echo sys_get_temp_dir(); ?>
+<?php
+
+function fn904088461()
+{
+    echo sys_get_temp_dir();
+}
+fn904088461();
 --EXPECT--
 /path/to/temp/dir

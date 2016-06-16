@@ -3,12 +3,15 @@ Closure 028: Trying to use lambda directly in foreach
 --FILE--
 <?php
 
-foreach (function(){ return 1; } as $y) { 
-	var_dump($y);	
+function fn435128065()
+{
+    foreach (function () {
+        return 1;
+    } as $y) {
+        var_dump($y);
+    }
+    print "ok\n";
 }
-
-print "ok\n";
-
-?>
+fn435128065();
 --EXPECT--
 ok

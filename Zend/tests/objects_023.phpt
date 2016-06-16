@@ -1,15 +1,15 @@
 --TEST--
 Creating instances dynamically
 --FILE--
-<?php 
+<?php
 
-$arr = array(new stdClass, 'stdClass');
-
-new $arr[0]();
-new $arr[1]();
-
-print "ok\n";
-
-?>
+function fn2078706707()
+{
+    $arr = array(new stdClass(), 'stdClass');
+    new $arr[0]();
+    new $arr[1]();
+    print "ok\n";
+}
+fn2078706707();
 --EXPECT--
 ok

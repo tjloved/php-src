@@ -5,13 +5,15 @@ opcache.enable=0
 --FILE--
 <?php
 
-$a = true;
-if (isset($a) && 0) {
-	var_dump(true);
-} else {
-	var_dump(false);
+function fn444474094()
+{
+    $a = true;
+    if (isset($a) && 0) {
+        var_dump(true);
+    } else {
+        var_dump(false);
+    }
 }
-
-?>
+fn444474094();
 --EXPECT--
 bool(false)

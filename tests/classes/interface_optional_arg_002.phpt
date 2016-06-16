@@ -5,20 +5,22 @@ default argument value in interface implementation
 --FILE--
 <?php
 
-interface test {
-	public function bar();
+interface test
+{
+    public function bar();
 }
-
-class foo implements test {
-
-	public function bar($arg = 2) {
-		var_dump($arg);
-	}
+class foo implements test
+{
+    public function bar($arg = 2)
+    {
+        var_dump($arg);
+    }
 }
-
-$foo = new foo;
-$foo->bar();
-
-?>
+function fn1470913148()
+{
+    $foo = new foo();
+    $foo->bar();
+}
+fn1470913148();
 --EXPECT--
 int(2)

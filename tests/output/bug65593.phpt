@@ -1,11 +1,16 @@
 --TEST--
 Bug #65593 (ob_start(function(){ob_start();});)
 --FILE--
-<?php 
-echo "Test\n";
+<?php
 
-ob_start(function(){ob_start();});
-?>
+function fn136455393()
+{
+    echo "Test\n";
+    ob_start(function () {
+        ob_start();
+    });
+}
+fn136455393();
 --EXPECTF--
 Test
 

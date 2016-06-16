@@ -1,38 +1,31 @@
 --TEST--
 Testing nowdocs with escape sequences
 --FILE--
-<?php 
+<?php
 
-$test = <<<'TEST'
+function fn295907299()
+{
+    $test = <<<'TEST'
 TEST;
-
-var_dump(strlen($test));
-
-$test = <<<'TEST'
+    var_dump(strlen($test));
+    $test = <<<'TEST'
 \
 TEST;
-
-var_dump(strlen($test));
-
-$test = <<<'TEST'
+    var_dump(strlen($test));
+    $test = <<<'TEST'
 \0
 TEST;
-
-var_dump(strlen($test));
-
-$test = <<<'TEST'
+    var_dump(strlen($test));
+    $test = <<<'TEST'
 \n
 TEST;
-
-var_dump(strlen($test));
-
-$test = <<<'TEST'
+    var_dump(strlen($test));
+    $test = <<<'TEST'
 \\'
 TEST;
-
-var_dump(strlen($test));
-
-?>
+    var_dump(strlen($test));
+}
+fn295907299();
 --EXPECT--
 int(0)
 int(1)

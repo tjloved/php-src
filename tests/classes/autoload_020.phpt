@@ -2,13 +2,16 @@
 Ensure __autoload() is triggered during unserialization.
 --FILE--
 <?php
-  function __autoload($name)
-  {
-      echo "in autoload: $name\n";
-  }
-  
-  var_dump(unserialize('O:1:"C":0:{}'));
-?>
+
+function __autoload($name)
+{
+    echo "in autoload: {$name}\n";
+}
+function fn1897182814()
+{
+    var_dump(unserialize('O:1:"C":0:{}'));
+}
+fn1897182814();
 --EXPECTF--
 in autoload: C
 object(__PHP_Incomplete_Class)#%d (1) {

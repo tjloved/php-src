@@ -11,7 +11,11 @@ if ($zend_mm_enabled === "0") {
 ?>
 --FILE--
 <?php
-unserialize('a:2:{i:0;O:9:"000000000":10000000');
-?>
+
+function fn329500865()
+{
+    unserialize('a:2:{i:0;O:9:"000000000":10000000');
+}
+fn329500865();
 --EXPECTF--
 Fatal error: Allowed memory size of 2097152 bytes exhausted%s(tried to allocate %d bytes) in %s on line %d
