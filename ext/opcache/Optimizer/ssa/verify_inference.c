@@ -17,7 +17,7 @@ static inline uint32_t num_def_operands(zend_ssa_op *ssa_op) {
 }
 
 static void emit_type_check(
-		zend_ssa *ssa, zend_op *opline, int var, int op_type, int ssa_var) {
+		zend_ssa *ssa, zend_op *opline, int var, int op_type, int ssa_var, uint32_t lineno) {
 	uint32_t type = ssa->var_info[ssa_var].type;
 
 	if (type & MAY_BE_CLASS) {
@@ -32,23 +32,24 @@ static void emit_type_check(
 	opline->op2_type = IS_UNUSED;
 	opline->result_type = IS_UNUSED;
 	opline->extended_value = type;
+	opline->lineno = lineno;
 }
 
 static zend_op *emit_type_checks(
 		zend_ssa *ssa, zend_op *new_opline, zend_op *opline, zend_ssa_op *ssa_op) {
 	if (ssa_op->result_def >= 0) {
 		emit_type_check(ssa, new_opline,
-			opline->result.var, opline->result_type, ssa_op->result_def);
+			opline->result.var, opline->result_type, ssa_op->result_def, opline->lineno);
 		new_opline++;
 	}
 	if (ssa_op->op1_def >= 0) {
 		emit_type_check(ssa, new_opline,
-			opline->op1.var, opline->op1_type, ssa_op->op1_def);
+			opline->op1.var, opline->op1_type, ssa_op->op1_def, opline->lineno);
 		new_opline++;
 	}
 	if (ssa_op->op2_def >= 0) {
 		emit_type_check(ssa, new_opline,
-			opline->op2.var, opline->op2_type, ssa_op->op2_def);
+			opline->op2.var, opline->op2_type, ssa_op->op2_def, opline->lineno);
 		new_opline++;
 	}
 	return new_opline;
