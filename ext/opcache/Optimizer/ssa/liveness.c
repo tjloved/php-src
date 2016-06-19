@@ -263,26 +263,7 @@ static inline zend_bool ssa_is_live_at_op(
 			}
 		} FOREACH_USE_END();
 		FOREACH_PHI_USE(var, phi) {
-			if (phi->pi >= 0) {
-				if (phi->pi != block) {
-					DEBUG_PRINT("Live due to use in phi for %d via predecessor %d\n",
-						phi->ssa_var, phi->pi);
-					return 1;
-				}
-			} else {
-				zend_basic_block *phi_block = &ssa->cfg.blocks[phi->block];
-				int i, end = phi_block->predecessors_count;
-				for (i = 0; i < end; i++) {
-					if (phi->sources[i] == var_num) {
-						int predecessor = ssa->cfg.predecessors[phi_block->predecessor_offset + i];
-						if (predecessor != block) {
-							DEBUG_PRINT("Live due to use in phi for %d via predecessor %d\n",
-								phi->ssa_var, predecessor);
-							return 1;
-						}
-					}
-				}
-			}
+			return 1;
 		} FOREACH_PHI_USE_END();
 		return 0;
 	} else {

@@ -949,8 +949,9 @@ static void check_interferences(ssa_opt_ctx *ssa_ctx) {
 
 			if (interfere(ssa, liveness, i, j)) {
 				fprintf(stderr,
-					"%d and %d for var %d ($%s) interfere\n",
-					i, j, var, ZSTR_VAL(ssa_ctx->op_array->vars[var]));
+					"%d and %d for var %d ($%s) interfere (%s)\n",
+					i, j, var, ZSTR_VAL(ssa_ctx->op_array->vars[var]),
+					ZSTR_VAL(ssa_ctx->op_array->function_name));
 			}
 		}
 	}
