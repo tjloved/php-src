@@ -33,7 +33,11 @@ static void handle_assign(
 			zend_ssa_op *def_ssa_op = &ssa->ops[var->definition];
 			zend_op *def_opline = &op_array->opcodes[var->definition];
 			/* Check that it's an "ordinary" result */
-			if (def_ssa_op->result_use < 0 && def_ssa_op->result_def == ssa_op->op2_use) {
+			if (def_ssa_op->result_use < 0 && def_ssa_op->result_def == ssa_op->op2_use
+					// TODO These are correct, but result in non-conventional SSA!
+					//&& def_opline->opcode != ZEND_FE_FETCH_R
+					//&& def_opline->opcode != ZEND_FE_FETCH_RW
+			) {
 				OPT_STAT(assign_contracted_assign)++;
 				/* Move CV into result of instruction */
 				COPY_NODE(def_opline->result, opline->op1);
