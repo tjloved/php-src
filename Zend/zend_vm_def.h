@@ -8164,6 +8164,27 @@ ZEND_VM_C_LABEL(fetch_dim_int_not_found):
 	ZEND_VM_NEXT_OPCODE_CHECK_EXCEPTION();
 }
 
+ZEND_VM_HANDLER(206, ZEND_FETCH_DIM_INT_W, CV, CONST|TMPVARCV)
+{
+	USE_OPLINE
+	zend_free_op free_op1;
+	zval *op1 = GET_OP1_ZVAL_PTR_PTR_UNDEF(BP_VAR_W);
+	zval *op2 = GET_OP2_ZVAL_PTR_UNDEF(BP_VAR_R);
+	zval *retval;
+
+	SEPARATE_ARRAY(op1);
+	ZEND_HASH_INDEX_FIND(Z_ARRVAL_P(op1), Z_LVAL_P(op2), retval,
+		ZEND_VM_C_LABEL(fetch_dim_int_w_not_found));
+	ZVAL_INDIRECT(EX_VAR(opline->result.var), retval);
+	ZEND_VM_NEXT_OPCODE();
+
+ZEND_VM_C_LABEL(fetch_dim_int_w_not_found):
+	SAVE_OPLINE();
+	retval = zend_hash_index_add_new(Z_ARRVAL_P(op1), Z_LVAL_P(op2), &EG(uninitialized_zval));
+	ZVAL_INDIRECT(EX_VAR(opline->result.var), retval);
+	ZEND_VM_NEXT_OPCODE_CHECK_EXCEPTION();
+}
+
 ZEND_VM_HANDLER(195, ZEND_MOV_UNCOUNTED, CONST|TMPVARCV, ANY)
 {
 	USE_OPLINE

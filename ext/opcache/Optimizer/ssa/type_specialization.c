@@ -231,11 +231,17 @@ void ssa_optimize_type_specialization(ssa_opt_ctx *ctx) {
 				OPT_STAT(type_spec_arithm)++;
 				break;
 			case ZEND_FETCH_DIM_R:
+			case ZEND_FETCH_DIM_W:
 				if (!MUST_BE(t1, MAY_BE_ARRAY) || opline->op1_type == IS_CONST) {
 					break;
 				}
-				if (MUST_BE(t2, MAY_BE_LONG)) {
+				if (!MUST_BE(t2, MAY_BE_LONG)) {
+					break;
+				}
+				if (opline->opcode == ZEND_FETCH_DIM_R) {
 					opline->opcode = ZEND_FETCH_DIM_INT;
+				} else if (opline->op1_type == IS_CV) {
+					opline->opcode = ZEND_FETCH_DIM_INT_W;
 				}
 				break;
 			//case ZEND_FETCH_DIM_R:
