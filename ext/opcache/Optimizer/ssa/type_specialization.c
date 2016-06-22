@@ -230,6 +230,18 @@ void ssa_optimize_type_specialization(ssa_opt_ctx *ctx) {
 				ssa_op->op1_def = -1;
 				OPT_STAT(type_spec_arithm)++;
 				break;
+			case ZEND_POST_INC:
+			case ZEND_POST_DEC:
+				if (opline->op1_type != IS_CV || !MUST_BE(t1, MAY_BE_LONG)) {
+					break;
+				}
+				if (opline->opcode == ZEND_POST_INC) {
+					opline->opcode = ZEND_POST_INC_INT;
+				} else {
+					opline->opcode = ZEND_POST_DEC_INT;
+				}
+				OPT_STAT(type_spec_arithm)++;
+				break;
 			case ZEND_FETCH_DIM_R:
 			case ZEND_FETCH_DIM_W:
 				if (!MUST_BE(t1, MAY_BE_ARRAY) || opline->op1_type == IS_CONST) {
