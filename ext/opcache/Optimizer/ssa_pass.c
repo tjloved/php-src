@@ -199,12 +199,14 @@ static inline void debug_dump(
 
 static inline void run_pass(
 		ssa_opt_ctx *ctx, void (*optimize_fn)(ssa_opt_ctx *ctx),
-		const char *name, uint32_t debug_level) {
-	optimize_fn(ctx);
+		const char *name, uint32_t level) {
+	if (ZCG(accel_directives).ssa_opt_level & level) {
+		optimize_fn(ctx);
 #if SSA_VERIFY_INTEGRITY > 1
-	ssa_verify_integrity(ctx->ssa, name);
+		ssa_verify_integrity(ctx->ssa, name);
 #endif
-	debug_dump(ctx->op_array, ctx->ssa, name, debug_level);
+		debug_dump(ctx->op_array, ctx->ssa, name, level);
+	}
 }
 
 static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) {
@@ -318,9 +320,9 @@ static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) 
 	run_pass(&ssa_ctx, ssa_optimize_dce, "after DCE 2", 128);
 	run_pass(&ssa_ctx, ssa_optimize_assign, "after assignment contraction", 256);
 
-	ssa_optimize_misc(&ssa_ctx);
-	ssa_optimize_type_specialization(&ssa_ctx);
-	ssa_optimize_object_specialization(&ssa_ctx);
+	run_pass(&ssa_ctx, ssa_optimize_misc, "after misc", 512);
+	run_pass(&ssa_ctx, ssa_optimize_type_specialization, "after type specialization", 1024);
+	run_pass(&ssa_ctx, ssa_optimize_object_specialization, "after object spec", 2048);
 
 #if SSA_VERIFY_INTEGRITY
 	ssa_verify_integrity(&info->ssa, "after SSA pass");
@@ -331,7 +333,7 @@ static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) 
 	/*ssa_optimize_destroy_ssa(&ssa_ctx);*/
 	ssa_optimize_compact_vars(&ssa_ctx);
 
-	if (should_dump(op_array, 512)) {
+	if (should_dump(op_array, 4096)) {
 		/* Rebuild the CFG, so SSA destruction doesn't have to maintain it */
 		if (zend_build_cfg(&ctx->arena, op_array, 0, &info->ssa.cfg, &info->flags) != SUCCESS) {
 			return;
