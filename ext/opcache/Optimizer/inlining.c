@@ -210,11 +210,17 @@ static inline zend_bool should_inline(
 		/* The DFA optimizations don't support op_arrays with try/catch, so don't inline them. */
 		return 0;
 	}
+	if (source == target && pass > 1) {
+		/* Inline recursive functions to two levels only */
+		return 0;
+	}
 	if (source->last > 500) {
 		return 0;
 	}
-	if (source == target && pass > 1) {
-		/* Inline recursive functions to two levels only */
+	if (source->last_var > 1 + num_const_args) {
+		return 0;
+	}
+	if (source->last > 30 + 10 * num_const_args) {
 		return 0;
 	}
 	return 1;
@@ -939,7 +945,7 @@ void zend_optimize_inlining(zend_op_array *op_array, zend_optimizer_ctx *ctx) {
 	}
 
 	checkpoint = zend_arena_checkpoint(ctx->arena);
-	for (i = 0; i < 3; i++) {
+	for (i = 0; i < 1; i++) {
 		info = find_inlinable_calls(op_array, ctx, i);
 		if (info) {
 			inline_calls(ctx, op_array, info);
