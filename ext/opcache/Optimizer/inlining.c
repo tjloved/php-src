@@ -205,12 +205,16 @@ static inline zend_bool can_inline_into(zend_op_array *op_array) {
 
 /* Inlining heuristic */
 static inline zend_bool should_inline(
-		zend_op_array *target, zend_op_array *source, uint32_t num_const_args) {
+		zend_op_array *target, zend_op_array *source, uint32_t num_const_args, uint32_t pass) {
 	if (source->last_try_catch) {
 		/* The DFA optimizations don't support op_arrays with try/catch, so don't inline them. */
 		return 0;
 	}
 	if (source->last > 500) {
+		return 0;
+	}
+	if (source == target && pass > 1) {
+		/* Inline recursive functions to two levels only */
 		return 0;
 	}
 	return 1;
@@ -368,7 +372,8 @@ static uint32_t get_num_const_args(zend_op_array *fbc, zend_op *opline, uint32_t
 	}
 }
 
-static inline_info *find_inlinable_calls(zend_op_array *op_array, zend_optimizer_ctx *ctx) {
+static inline_info *find_inlinable_calls(
+		zend_op_array *op_array, zend_optimizer_ctx *ctx, uint32_t pass) {
 	zend_op *opline = op_array->opcodes;
 	zend_op *end = opline + op_array->last;
 	inline_info *info_head = NULL, *info_tail = NULL;
@@ -388,7 +393,7 @@ static inline_info *find_inlinable_calls(zend_op_array *op_array, zend_optimizer
 		if (fbc) {
 			uint32_t num_args_passed = opline->extended_value;
 			uint32_t num_const_args = get_num_const_args(fbc, opline, num_args_passed);
-			if (should_inline(op_array, fbc, num_const_args)
+			if (should_inline(op_array, fbc, num_const_args, pass)
 					&& can_inline_scope(fbc, op_array)
 					&& can_inline_from(fbc, num_args_passed, fbc != op_array)) {
 				inline_info *info;
@@ -933,7 +938,7 @@ void zend_optimize_inlining(zend_op_array *op_array, zend_optimizer_ctx *ctx) {
 
 	checkpoint = zend_arena_checkpoint(ctx->arena);
 	for (i = 0; i < 3; i++) {
-		info = find_inlinable_calls(op_array, ctx);
+		info = find_inlinable_calls(op_array, ctx, i);
 		if (info) {
 			inline_calls(ctx, op_array, info);
 		}
