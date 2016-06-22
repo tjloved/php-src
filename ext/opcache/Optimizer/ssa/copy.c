@@ -178,7 +178,8 @@ static int try_propagate_cv_assignment(ssa_opt_ctx *ctx, zend_op *opline, zend_s
 	return SUCCESS;
 }
 
-static inline zend_bool can_tmpvar_op1(zend_op *opline) {
+static inline zend_bool can_tmpvar_op1(
+		zend_op_array *op_array, zend_op *opline, zend_ssa_op *ssa_op) {
 	switch (opline->opcode) {
 		case ZEND_ISSET_ISEMPTY_VAR:
 			/* Quick set gives special meaning to CV */
@@ -227,7 +228,15 @@ static inline zend_bool can_tmpvar_op1(zend_op *opline) {
 		case ZEND_BIND_GLOBAL:
 		case ZEND_FE_RESET_RW:
 			return 0;
+		case ZEND_INIT_ARRAY:
+		case ZEND_ADD_ARRAY_ELEMENT:
+			return !(opline->extended_value & ZEND_ARRAY_ELEMENT_REF);
+		case ZEND_YIELD:
+			return !(op_array->fn_flags & ZEND_ACC_RETURN_REFERENCE);
 		default:
+			if (ssa_op->op1_def != -1) {
+				ZEND_ASSERT(0);
+			}
 			return 1;
 	}
 }
@@ -303,7 +312,7 @@ void try_propagate_cv_tmp_assignment(
 			return;
 		}
 		if (use_ssa_op->op1_use == lhs_var_num) {
-			if (!can_tmpvar_op1(use_opline)) {
+			if (!can_tmpvar_op1(op_array, use_opline, use_ssa_op)) {
 				return;
 			}
 			if (use_ssa_op->op2_use == lhs_var_num) {
@@ -381,7 +390,8 @@ void try_propagate_tmp_tmp_assignment(
 
 		/* If switching from VAR to TMP, ensure it's supported by uses. */
 		if (opline->result_type == IS_VAR && opline->op1_type == IS_TMP_VAR) {
-			if (use_op->op1_use == ssa_op->result_def && !can_tmpvar_op1(use_opline)) {
+			if (use_op->op1_use == ssa_op->result_def
+					&& !can_tmpvar_op1(op_array, use_opline, use_op)) {
 				return;
 			}
 			if (use_op->op2_use == ssa_op->result_def && !can_tmpvar_op2(use_opline)) {
