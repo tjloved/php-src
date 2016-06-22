@@ -37,6 +37,11 @@ static inline zend_bool var_has_inplace_writes(
 			// TODO allow if same name?
 			return 1;
 		}
+		if (use_opline->opcode == ZEND_SEND_VAR_NO_REF
+				|| use_opline->opcode == ZEND_SEND_VAR_NO_REF_EX) {
+			/* Can't propagate CV into this opcode */
+			return 1;
+		}
 		if (has_improper_op1_use(use_opline)) {
 			continue;
 		}
