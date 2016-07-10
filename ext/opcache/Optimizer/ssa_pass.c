@@ -116,6 +116,18 @@ static int get_common_phi_source(zend_ssa *ssa, zend_ssa_phi *phi) {
 	return common_source;
 }
 
+/* We assume that unreachable blocks are empty in some places -- make sure this is the case
+ * even if the block pass is not used. */
+static void remove_unreachable_blocks(zend_ssa *ssa) {
+	int i;
+	for (i = 0; i < ssa->cfg.blocks_count; i++) {
+		if (!(ssa->cfg.blocks[i].flags & ZEND_BB_REACHABLE)
+				&& !(ssa->cfg.blocks[i].flags & ZEND_BB_UNREACHABLE_FREE)) {
+			remove_block(ssa, i, NULL, NULL);
+		}
+	}
+}
+
 /* Used to be important to drop phis from RC inference vars. The things it finds now indicate bugs
  * in SSA construction (result not minimal or not pruned). Currently there still exists at least
  * one case where we generate non-minimal SSA due to incorrect handling of pi statements. */
@@ -268,6 +280,9 @@ static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) 
 	if (zend_ssa_find_sccs(op_array, &info->ssa) != SUCCESS){
 		return;
 	}
+
+	/* Should happen before inference */
+	remove_unreachable_blocks(&info->ssa);
 
 	call_map = compute_call_map(ctx, info, op_array);
 

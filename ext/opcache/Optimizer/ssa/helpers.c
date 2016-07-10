@@ -305,7 +305,9 @@ void remove_block(zend_ssa *ssa, int i, uint32_t *num_instr, uint32_t *num_phi) 
 	for (phi = ssa_block->phis; phi; phi = phi->next) {
 		remove_uses_of_var(ssa, phi->ssa_var);
 		remove_phi(ssa, phi);
-		(*num_phi)++;
+		if (num_phi) {
+			(*num_phi)++;
+		}
 	}
 
 	/* Remove instructions in this block */
@@ -316,7 +318,9 @@ void remove_block(zend_ssa *ssa, int i, uint32_t *num_instr, uint32_t *num_phi) 
 
 		remove_defs_of_instr(ssa, &ssa->ops[j]);
 		remove_instr(ssa, &op_array->opcodes[j], &ssa->ops[j]);
-		(*num_instr)++;
+		if (num_instr) {
+			(*num_instr)++;
+		}
 	}
 
 	for (s = 0; s < 2; s++) {

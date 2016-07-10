@@ -52,7 +52,8 @@ static inline int num_predecessors(const zend_cfg *cfg, const zend_basic_block *
 static inline zend_bool blocks_unreachable(zend_cfg *cfg, int start, int end) {
 	int j;
 	for (j = start; j <= end; j++) {
-		if (cfg->blocks[j].flags & ZEND_BB_REACHABLE) {
+		if ((cfg->blocks[j].flags & ZEND_BB_REACHABLE)
+				|| (cfg->blocks[j].flags & ZEND_BB_UNREACHABLE_FREE)) {
 			return 0;
 		}
 	}

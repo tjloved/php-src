@@ -281,12 +281,12 @@ int ssa_verify_integrity(zend_ssa *ssa, const char *extra) {
 		int *predecessors = &cfg->predecessors[block->predecessor_offset];
 		int s, j;
 
-		if (i != 0 && block->start != (block-1)->start + (block-1)->len) {
-			FAIL("Block %d start %d not adjacent to %d\n",
+		if (i != 0 && block->start < (block-1)->start + (block-1)->len) {
+			FAIL("Block %d start %d smaller previous end %d\n",
 				i, block->start, (block-1)->start + (block-1)->len);
 		}
-		if (i != cfg->blocks_count-1 && block->start + block->len != (block+1)->start) {
-			FAIL("Block %d end %d not adjacent to %d\n",
+		if (i != cfg->blocks_count-1 && block->start + block->len > (block+1)->start) {
+			FAIL("Block %d end %d greater next start %d\n",
 				i, block->start + block->len, (block+1)->start);
 		}
 
