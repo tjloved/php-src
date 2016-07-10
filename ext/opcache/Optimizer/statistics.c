@@ -41,6 +41,8 @@ void zend_optimizer_statistics_shutdown() {
 	PRINT_NORM_STAT(inlining_instrs, instrs);
 	PRINT_STAT(inlining_arg_assigns);
 
+	PRINT_STAT(cloned_funcs);
+
 	PRINT_NORM_STAT(trivial_phis, phis);
 
 	PRINT_NORM_STAT(scp_const_vars, ssa_vars);

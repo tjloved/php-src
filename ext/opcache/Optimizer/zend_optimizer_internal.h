@@ -23,6 +23,7 @@
 #define ZEND_OPTIMIZER_INTERNAL_H
 
 #include "zend_ssa.h"
+#include "zend_call_graph.h"
 
 #define ZEND_RESULT_TYPE(opline)		(opline)->result_type
 #define ZEND_RESULT(opline)				(opline)->result
@@ -101,6 +102,7 @@ void zend_optimize_func_calls(zend_op_array *op_array, zend_optimizer_ctx *ctx);
 void zend_optimize_cfg(zend_op_array *op_array, zend_optimizer_ctx *ctx);
 void zend_optimize_dfa(zend_op_array *op_array, zend_optimizer_ctx *ctx);
 void zend_optimize_inlining(zend_op_array *op_array, zend_optimizer_ctx *ctx);
+void zend_optimize_cloning(zend_call_graph *call_graph, zend_optimizer_ctx *ctx);
 int  zend_dfa_analyze_op_array(zend_op_array *op_array, zend_optimizer_ctx *ctx, zend_ssa *ssa, uint32_t *flags);
 void zend_dfa_optimize_op_array(zend_op_array *op_array, zend_optimizer_ctx *ctx, zend_ssa *ssa);
 void zend_optimize_temporary_variables(zend_op_array *op_array, zend_optimizer_ctx *ctx);

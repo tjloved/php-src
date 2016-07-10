@@ -1007,6 +1007,21 @@ int zend_optimize_script(zend_script *script, zend_long optimization_level, zend
 
 	foreach_op_array(&ctx, zend_optimize_pass_set_1);
 	foreach_op_array(&ctx, zend_optimize_pass_set_2);
+
+	if ((ZEND_OPTIMIZER_PASS_13 & optimization_level) &&
+			zend_build_call_graph(&ctx.arena, script, ZEND_RT_CONSTANTS, &call_graph) == SUCCESS) {
+		/* pass 13: Function cloning */
+		int i;
+
+		zend_optimize_cloning(&call_graph, &ctx);
+
+		if (debug_level & ZEND_DUMP_AFTER_PASS_13) {
+			for (i = 0; i < call_graph.op_arrays_count; i++) {
+				zend_dump_op_array(call_graph.op_arrays[i], 0, "after pass 13", NULL);
+			}
+		}
+	}
+
 	foreach_op_array(&ctx, zend_optimize_pass_set_3);
 
 #if HAVE_DFA_PASS
@@ -1079,7 +1094,8 @@ int zend_optimize_script(zend_script *script, zend_long optimization_level, zend
 	/* Force stack size adjustement if inlining or SSA optimization is used */
 	if ((ZEND_OPTIMIZER_PASS_12 & optimization_level)
 			|| (ZEND_OPTIMIZER_PASS_8 & optimization_level)
-			|| (ZEND_OPTIMIZER_PASS_6 & optimization_level)) {
+			|| (ZEND_OPTIMIZER_PASS_6 & optimization_level)
+			|| (ZEND_OPTIMIZER_PASS_13 & optimization_level)) {
 		foreach_op_array(&ctx, zend_adjust_fcall_stack_size);
 	}
 
