@@ -233,6 +233,9 @@ static inline zend_bool can_tmpvar_op1(
 		case ZEND_BIND_GLOBAL:
 		case ZEND_FE_RESET_RW:
 			return 0;
+		case ZEND_VERIFY_RETURN_TYPE:
+			/* Technically possible, but requires op2_def adjustment */
+			return 0;
 		case ZEND_INIT_ARRAY:
 		case ZEND_ADD_ARRAY_ELEMENT:
 			return !(opline->extended_value & ZEND_ARRAY_ELEMENT_REF);
