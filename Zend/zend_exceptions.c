@@ -156,8 +156,9 @@ ZEND_API ZEND_COLD void zend_throw_exception_internal(zval *exception) /* {{{ */
 		if (exception && Z_OBJCE_P(exception) == zend_ce_parse_error) {
 			return;
 		}
-		if(EG(exception)) {
+		if (EG(exception)) {
 			zend_exception_error(EG(exception), E_ERROR);
+			return;
 		}
 		zend_error_noreturn(E_CORE_ERROR, "Exception thrown without a stack frame");
 	}
@@ -959,7 +960,6 @@ static void zend_error_helper(int type, const char *filename, const uint lineno,
 }
 /* }}} */
 
-/* This function doesn't return if it uses E_ERROR */
 ZEND_API ZEND_COLD void zend_exception_error(zend_object *ex, int severity) /* {{{ */
 {
 	zval exception, rv;
@@ -973,7 +973,11 @@ ZEND_API ZEND_COLD void zend_exception_error(zend_object *ex, int severity) /* {
 		zend_string *file = zval_get_string(GET_PROPERTY_SILENT(&exception, ZEND_STR_FILE));
 		zend_long line = zval_get_long(GET_PROPERTY_SILENT(&exception, ZEND_STR_LINE));
 
-		zend_error_helper(E_PARSE, ZSTR_VAL(file), line, "%s", ZSTR_VAL(message));
+		zend_bool orig_unclean_shutdown = CG(unclean_shutdown);
+		zend_try {
+			zend_error_helper(E_PARSE, ZSTR_VAL(file), line, "%s", ZSTR_VAL(message));
+		} zend_end_try();
+		CG(unclean_shutdown) = orig_unclean_shutdown;
 
 		zend_string_release(file);
 		zend_string_release(message);
@@ -981,6 +985,7 @@ ZEND_API ZEND_COLD void zend_exception_error(zend_object *ex, int severity) /* {
 		zval tmp, rv;
 		zend_string *str, *file = NULL;
 		zend_long line = 0;
+		zend_bool orig_unclean_shutdown;
 
 		zend_call_method_with_0_params(&exception, ce_exception, NULL, "__tostring", &tmp);
 		if (!EG(exception)) {
@@ -1015,13 +1020,21 @@ ZEND_API ZEND_COLD void zend_exception_error(zend_object *ex, int severity) /* {
 		file = zval_get_string(GET_PROPERTY_SILENT(&exception, ZEND_STR_FILE));
 		line = zval_get_long(GET_PROPERTY_SILENT(&exception, ZEND_STR_LINE));
 
-		zend_error_va(severity, (file && ZSTR_LEN(file) > 0) ? ZSTR_VAL(file) : NULL, line,
-			"Uncaught %s\n  thrown", ZSTR_VAL(str));
+		orig_unclean_shutdown = CG(unclean_shutdown);
+		zend_try {
+			zend_error_va(severity, (file && ZSTR_LEN(file) > 0) ? ZSTR_VAL(file) : NULL, line,
+				"Uncaught %s\n  thrown", ZSTR_VAL(str));
+		} zend_end_try();
+		CG(unclean_shutdown) = orig_unclean_shutdown;
 
 		zend_string_release(str);
 		zend_string_release(file);
 	} else {
-		zend_error(severity, "Uncaught exception '%s'", ZSTR_VAL(ce_exception->name));
+		zend_bool orig_unclean_shutdown = CG(unclean_shutdown);
+		zend_try {
+			zend_error(severity, "Uncaught exception '%s'", ZSTR_VAL(ce_exception->name));
+		} zend_end_try();
+		CG(unclean_shutdown) = orig_unclean_shutdown;
 	}
 
 	OBJ_RELEASE(ex);

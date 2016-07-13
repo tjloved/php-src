@@ -826,6 +826,7 @@ PHPDBG_COMMAND(ev) /* {{{ */
 			if (EG(exception)) {
 				ex = EG(exception);
 				zend_exception_error(EG(exception), E_ERROR);
+				zend_bailout();
 			} else {
 				phpdbg_xml("<eval %r>");
 				if (PHPDBG_G(flags) & PHPDBG_WRITE_XML) {

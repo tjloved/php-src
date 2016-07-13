@@ -1444,14 +1444,19 @@ ZEND_API int zend_execute_scripts(int type, zval *retval, int file_count, ...) /
 		}
 		zend_destroy_file_handle(file_handle);
 		if (op_array) {
+			zend_bool failure = 0;
 			zend_execute(op_array, retval);
 			zend_exception_restore();
 			zend_try_exception_handler();
 			if (EG(exception)) {
 				zend_exception_error(EG(exception), E_ERROR);
+				failure = 1;
 			}
 			destroy_op_array(op_array);
 			efree_size(op_array, sizeof(zend_op_array));
+			if (failure) {
+				return FAILURE;
+			}
 		} else if (type==ZEND_REQUIRE) {
 			va_end(files);
 			return FAILURE;
