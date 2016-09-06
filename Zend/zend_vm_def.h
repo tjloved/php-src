@@ -8165,7 +8165,7 @@ ZEND_VM_HANDLER(194, ZEND_FETCH_DIM_INT, TMPVAR|CV, CONST|TMPVARCV)
 
 	ZEND_HASH_INDEX_FIND(Z_ARRVAL_P(op1), Z_LVAL_P(op2), retval,
 		ZEND_VM_C_LABEL(fetch_dim_int_not_found));
-	ZVAL_COPY(EX_VAR(opline->result.var), retval);
+	ZVAL_COPY_UNREF(EX_VAR(opline->result.var), retval);
 	if (OP1_TYPE & (IS_TMP_VAR|IS_VAR)) {
 		SAVE_OPLINE();
 		FREE_OP1();

@@ -38511,7 +38511,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FETCH_DIM_INT_SPEC_CV_CONST_HA
 
 	ZEND_HASH_INDEX_FIND(Z_ARRVAL_P(op1), Z_LVAL_P(op2), retval,
 		fetch_dim_int_not_found);
-	ZVAL_COPY(EX_VAR(opline->result.var), retval);
+	ZVAL_COPY_UNREF(EX_VAR(opline->result.var), retval);
 	if (IS_CV & (IS_TMP_VAR|IS_VAR)) {
 		SAVE_OPLINE();
 
@@ -48034,7 +48034,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FETCH_DIM_INT_SPEC_CV_TMPVARCV
 
 	ZEND_HASH_INDEX_FIND(Z_ARRVAL_P(op1), Z_LVAL_P(op2), retval,
 		fetch_dim_int_not_found);
-	ZVAL_COPY(EX_VAR(opline->result.var), retval);
+	ZVAL_COPY_UNREF(EX_VAR(opline->result.var), retval);
 	if (IS_CV & (IS_TMP_VAR|IS_VAR)) {
 		SAVE_OPLINE();
 
@@ -50115,7 +50115,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FETCH_DIM_INT_SPEC_TMPVAR_CONS
 
 	ZEND_HASH_INDEX_FIND(Z_ARRVAL_P(op1), Z_LVAL_P(op2), retval,
 		fetch_dim_int_not_found);
-	ZVAL_COPY(EX_VAR(opline->result.var), retval);
+	ZVAL_COPY_UNREF(EX_VAR(opline->result.var), retval);
 	if ((IS_TMP_VAR|IS_VAR) & (IS_TMP_VAR|IS_VAR)) {
 		SAVE_OPLINE();
 		zval_ptr_dtor_nogc(free_op1);
@@ -53603,7 +53603,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FETCH_DIM_INT_SPEC_TMPVAR_TMPV
 
 	ZEND_HASH_INDEX_FIND(Z_ARRVAL_P(op1), Z_LVAL_P(op2), retval,
 		fetch_dim_int_not_found);
-	ZVAL_COPY(EX_VAR(opline->result.var), retval);
+	ZVAL_COPY_UNREF(EX_VAR(opline->result.var), retval);
 	if ((IS_TMP_VAR|IS_VAR) & (IS_TMP_VAR|IS_VAR)) {
 		SAVE_OPLINE();
 		zval_ptr_dtor_nogc(free_op1);
