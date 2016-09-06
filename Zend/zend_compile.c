@@ -2224,6 +2224,8 @@ ZEND_API int zend_is_smart_branch(zend_op *opline) /* {{{ */
 		case ZEND_INSTANCEOF:
 		case ZEND_TYPE_CHECK:
 		case ZEND_DEFINED:
+		case ZEND_IS_SMALLER_INT:
+		case ZEND_IS_SMALLER_FLOAT:
 			return 1;
 		default:
 			return 0;
