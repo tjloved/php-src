@@ -30,6 +30,9 @@ $blacklist = [
     'Zend/tests/binary.phpt',
     'Zend/tests/bug70918.phpt',
     'Zend/tests/oct_overflow_char.phpt',
+    'Zend/tests/nullable_types/nullable_type_parameters_do_not_have_default_value.phpt',
+    'Zend/tests/list_013.phpt',
+    'Zend/tests/bug72594.phpt',
     'tests/lang/bug35176.phpt',
     'tests/basic/027.phpt',
 ];
