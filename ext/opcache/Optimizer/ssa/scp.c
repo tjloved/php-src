@@ -165,6 +165,7 @@ static zend_bool can_replace_op1(
 		case ZEND_ROPE_END:
 		case ZEND_BIND_STATIC:
 		case ZEND_BIND_GLOBAL:
+		case ZEND_MAKE_REF:
 			return 0;
 		case ZEND_UNSET_VAR:
 		case ZEND_ISSET_ISEMPTY_VAR:

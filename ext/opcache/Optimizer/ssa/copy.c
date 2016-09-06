@@ -232,6 +232,7 @@ static inline zend_bool can_tmpvar_op1(
 		case ZEND_RETURN_BY_REF:
 		case ZEND_BIND_GLOBAL:
 		case ZEND_FE_RESET_RW:
+		case ZEND_MAKE_REF:
 			return 0;
 		case ZEND_VERIFY_RETURN_TYPE:
 			/* Technically possible, but requires op2_def adjustment */
