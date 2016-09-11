@@ -8299,6 +8299,24 @@ ZEND_VM_HANDLER(209, ZEND_RECV_INIT_FAST, NUM, CONST)
 	ZEND_VM_NEXT_OPCODE();
 }
 
+ZEND_VM_HANDLER(210, ZEND_SEND_VAR_FAST, VAR|CV, NUM)
+{
+	USE_OPLINE
+	zval *varptr, *arg;
+	zend_free_op free_op1;
+
+	varptr = GET_OP1_ZVAL_PTR_UNDEF(BP_VAR_R);
+	arg = ZEND_CALL_VAR(EX(call), opline->result.var);
+
+	if (OP1_TYPE == IS_CV) {
+		ZVAL_COPY(arg, varptr);
+	} else {
+		ZVAL_COPY_VALUE(arg, varptr);
+	}
+
+	ZEND_VM_NEXT_OPCODE();
+}
+
 ZEND_VM_HANDLER(198, ZEND_ASSERT_TYPE, TMPVARCV, ANY)
 {
 	USE_OPLINE

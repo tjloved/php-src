@@ -311,6 +311,12 @@ void ssa_optimize_type_specialization(ssa_opt_ctx *ctx) {
 				OPT_STAT(type_spec_elided)++;
 				break;
 			}
+			case ZEND_SEND_VAR:
+				if (t1 & (MAY_BE_UNDEF|MAY_BE_REF)) {
+					break;
+				}
+				opline->opcode = ZEND_SEND_VAR_FAST;
+				break;
 			case ZEND_RECV_INIT:
 			{
 				uint32_t arg_num = opline->op1.num;

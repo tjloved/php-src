@@ -271,7 +271,8 @@ END_EXTERN_C()
 #define ZEND_POST_INC_INT                    207
 #define ZEND_POST_DEC_INT                    208
 #define ZEND_RECV_INIT_FAST                  209
+#define ZEND_SEND_VAR_FAST                   210
 
-#define ZEND_VM_LAST_OPCODE                  209
+#define ZEND_VM_LAST_OPCODE                  210
 
 #endif
