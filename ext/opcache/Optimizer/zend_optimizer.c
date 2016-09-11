@@ -1008,7 +1008,7 @@ int zend_optimize_script(zend_script *script, zend_long optimization_level, zend
 	foreach_op_array(&ctx, zend_optimize_pass_set_1);
 	foreach_op_array(&ctx, zend_optimize_pass_set_2);
 
-	if ((ZEND_OPTIMIZER_PASS_13 & optimization_level) &&
+	if (0 && (ZEND_OPTIMIZER_PASS_13 & optimization_level) &&
 			zend_build_call_graph(&ctx.arena, script, ZEND_RT_CONSTANTS, &call_graph) == SUCCESS) {
 		/* pass 13: Function cloning */
 		int i;
