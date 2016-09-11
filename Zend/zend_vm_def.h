@@ -8280,6 +8280,25 @@ ZEND_VM_HANDLER(197, ZEND_ENSURE_HAVE_THIS, ANY, ANY)
 	ZEND_VM_NEXT_OPCODE();
 }
 
+
+ZEND_VM_HANDLER(209, ZEND_RECV_INIT_FAST, NUM, CONST)
+{
+	USE_OPLINE
+	uint32_t arg_num;
+	zval *param;
+
+	ZEND_VM_REPEATABLE_OPCODE
+
+	arg_num = opline->op1.num;
+	param = _get_zval_ptr_cv_undef_BP_VAR_W(execute_data, opline->result.var);
+	if (arg_num > EX_NUM_ARGS()) {
+		ZVAL_COPY_VALUE(param, EX_CONSTANT(opline->op2));
+	}
+
+	ZEND_VM_REPEAT_OPCODE(ZEND_RECV_INIT_FAST);
+	ZEND_VM_NEXT_OPCODE();
+}
+
 ZEND_VM_HANDLER(198, ZEND_ASSERT_TYPE, TMPVARCV, ANY)
 {
 	USE_OPLINE

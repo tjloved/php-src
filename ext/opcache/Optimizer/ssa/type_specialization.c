@@ -311,6 +311,20 @@ void ssa_optimize_type_specialization(ssa_opt_ctx *ctx) {
 				OPT_STAT(type_spec_elided)++;
 				break;
 			}
+			case ZEND_RECV_INIT:
+			{
+				uint32_t arg_num = opline->op1.num;
+				const zend_arg_info *arg_info = &op_array->arg_info[arg_num-1];
+				if (Z_CONSTANT_P(CT_CONSTANT_EX(op_array, opline->op2.constant))) {
+					break;
+				}
+				if (arg_info->type_hint) {
+					break;
+				}
+				
+				opline->opcode = ZEND_RECV_INIT_FAST;
+				break;
+			}
 		}
 	} FOREACH_INSTR_NUM_END();
 }
