@@ -128,7 +128,7 @@ void ssa_optimize_type_specialization(ssa_opt_ctx *ctx) {
 				}
 				break;
 			case ZEND_MOD:
-				if (MUST_BE(t1, MAY_BE_LONG) && opline->op2_type == IS_CONST) {
+				if (MUST_BE(t1, MAY_BE_LONG|MAY_BE_DOUBLE) && opline->op2_type == IS_CONST) {
 					zval *op2 = CT_CONSTANT_EX(op_array, opline->op2.constant);
 					if (Z_TYPE_P(op2) == IS_LONG && is_power_of_two(Z_LVAL_P(op2))) {
 						opline->opcode = ZEND_BW_AND;
