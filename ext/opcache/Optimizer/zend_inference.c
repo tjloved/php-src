@@ -3106,6 +3106,16 @@ static void zend_update_type_info(const zend_op_array *op_array,
 				UPDATE_SSA_TYPE(tmp, ssa_ops[i].result_def);
 			}
 			break;
+		case ZEND_ADD_ARRAY_UNPACK:
+			tmp = ssa_var_info[ssa_ops[i].result_use].type;
+			if (t1 & MAY_BE_ARRAY) {
+				tmp |= t1 & (MAY_BE_ARRAY_KEY_ANY|MAY_BE_ARRAY_OF_ANY|MAY_BE_ARRAY_OF_REF);
+			}
+			if (t1 & MAY_BE_OBJECT) {
+				tmp |= MAY_BE_ARRAY_KEY_ANY|MAY_BE_ARRAY_OF_ANY|MAY_BE_ARRAY_OF_REF;
+			}
+			UPDATE_SSA_TYPE(tmp, ssa_ops[i].result_def);
+			break;
 		case ZEND_UNSET_VAR:
 			ZEND_ASSERT(opline->extended_value & ZEND_QUICK_SET);
 			tmp = MAY_BE_UNDEF|MAY_BE_RCN;

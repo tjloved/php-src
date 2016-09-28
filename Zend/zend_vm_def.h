@@ -5325,6 +5325,133 @@ ZEND_VM_HANDLER(71, ZEND_INIT_ARRAY, CONST|TMP|VAR|UNUSED|CV, CONST|TMPVAR|UNUSE
 	}
 }
 
+ZEND_VM_HANDLER(100, ZEND_ADD_ARRAY_UNPACK, ANY, ANY)
+{
+	USE_OPLINE
+	zend_free_op free_op1;
+	zval *elems;
+	HashTable *dest;
+
+	SAVE_OPLINE();
+	elems = GET_OP1_ZVAL_PTR_DEREF(BP_VAR_R);
+	dest = Z_ARRVAL_P(EX_VAR(opline->result.var));
+
+	if (EXPECTED(Z_TYPE_P(elems) == IS_ARRAY)) {
+		zend_string *str_key;
+		zval *elem;
+		ZEND_HASH_FOREACH_STR_KEY_VAL_IND(Z_ARRVAL_P(elems), str_key, elem) {
+			if (UNEXPECTED(Z_ISREF_P(elem) && Z_REFCOUNT_P(elem) == 1)) {
+				ZVAL_DEREF(elem);
+			}
+			if (Z_REFCOUNTED_P(elem)) {
+				Z_ADDREF_P(elem);
+			}
+
+			if (str_key) {
+				zend_hash_update(dest, str_key, elem);
+			} else {
+				if (!zend_hash_next_index_insert(dest, elem)) {
+					zend_error(E_WARNING, "Cannot add element to the array as the next element is already occupied");
+					zval_ptr_dtor(elem);
+				}
+			}
+		} ZEND_HASH_FOREACH_END();
+	} else if (EXPECTED(Z_TYPE_P(elems) == IS_OBJECT && Z_OBJCE_P(elems)->get_iterator)) {
+		zend_class_entry *ce = Z_OBJCE_P(elems);
+		zend_object_iterator *iter = ce->get_iterator(ce, elems, 0);
+		if (UNEXPECTED(!iter)) {
+			FREE_OP1();
+			if (!EG(exception)) {
+				zend_throw_exception_ex(
+					NULL, 0, "Object of type %s did not create an Iterator", ZSTR_VAL(ce->name)
+				);
+			}
+			HANDLE_EXCEPTION();
+		}
+
+		if (iter->funcs->rewind) {
+			iter->funcs->rewind(iter);
+		}
+
+		while (iter->funcs->valid(iter) == SUCCESS) {
+			zval *elem;
+
+			if (UNEXPECTED(EG(exception) != NULL)) {
+				break;
+			}
+
+			elem = iter->funcs->get_current_data(iter);
+			if (UNEXPECTED(EG(exception) != NULL)) {
+				break;
+			}
+
+			if (UNEXPECTED(Z_ISREF_P(elem) && Z_REFCOUNT_P(elem) == 1)) {
+				ZVAL_DEREF(elem);
+			}
+			if (Z_REFCOUNTED_P(elem)) {
+				Z_ADDREF_P(elem);
+			}
+
+			if (EXPECTED(iter->funcs->get_current_key)) {
+				zval key;
+				iter->funcs->get_current_key(iter, &key);
+				if (UNEXPECTED(EG(exception) != NULL)) {
+					zval_ptr_dtor(elem);
+					break;
+				}
+
+				switch (Z_TYPE(key)) {
+					case IS_LONG:
+						if (!zend_hash_next_index_insert(dest, elem)) {
+							zend_error(E_WARNING, "Cannot add element to the array as the next element is already occupied");
+							zval_ptr_dtor(elem);
+						}
+						break;
+					case IS_STRING:
+						zend_symtable_update(dest, Z_STR(key), elem);
+						break;
+					case IS_NULL:
+						zend_hash_update(dest, ZSTR_EMPTY_ALLOC(), elem);
+						break;
+					case IS_DOUBLE:
+						zend_hash_index_update(dest, zend_dval_to_lval(Z_DVAL(key)), elem);
+						break;
+					case IS_FALSE:
+						zend_hash_index_update(dest, 0, elem);
+						break;
+					case IS_TRUE:
+						zend_hash_index_update(dest, 1, elem);
+						break;
+					case IS_RESOURCE:
+						zend_error(E_NOTICE, "Resource ID#%d used as offset, casting to integer (%d)", Z_RES_HANDLE(key), Z_RES_HANDLE(key));
+						zend_hash_index_update(dest, Z_RES_HANDLE(key), elem);
+						break;
+					default:
+						zend_error(E_WARNING, "Illegal offset type");
+						zval_ptr_dtor(elem);
+						break;
+				}
+
+				zval_ptr_dtor(&key);
+			} else {
+				if (!zend_hash_next_index_insert(dest, elem)) {
+					zend_error(E_WARNING, "Cannot add element to the array as the next element is already occupied");
+					zval_ptr_dtor(elem);
+				}
+			}
+
+			iter->funcs->move_forward(iter);
+		}
+
+		zend_iterator_dtor(iter);
+	} else {
+		zend_error(E_WARNING, "Only arrays and Traversables can be unpacked");
+	}
+
+	FREE_OP1();
+	ZEND_VM_NEXT_OPCODE_CHECK_EXCEPTION();
+}
+
 ZEND_VM_HANDLER(21, ZEND_CAST, CONST|TMP|VAR|CV, ANY, TYPE)
 {
 	USE_OPLINE

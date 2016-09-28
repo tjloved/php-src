@@ -1990,6 +1990,7 @@ static void zend_find_live_range(zend_op *opline, zend_uchar type, uint32_t var)
 		def--;
 		if (def->result_type == type && def->result.var == var) {
 			if (def->opcode == ZEND_ADD_ARRAY_ELEMENT ||
+				def->opcode == ZEND_ADD_ARRAY_UNPACK || 
 			    def->opcode == ZEND_ROPE_ADD) {
 			    /* not a real definition */
 				continue;
@@ -2034,6 +2035,7 @@ static zend_always_inline int zend_is_def_range(zend_op *opline, zend_uchar type
 	while (1) {
 		if (opline->result_type == type && opline->result.var == var) {
 			return opline->opcode != ZEND_ADD_ARRAY_ELEMENT &&
+				opline->opcode != ZEND_ADD_ARRAY_UNPACK &&
 				opline->opcode != ZEND_ROPE_ADD;
 		} else if (opline->opcode == ZEND_OP_DATA) {
 			return (opline-1)->result_type == type &&
@@ -2811,7 +2813,8 @@ static void zend_compile_list_assign(
 	uint32_t i;
 	zend_bool has_elems = 0;
 	zend_bool is_keyed =
-		list->children > 0 && list->child[0] != NULL && list->child[0]->child[1] != NULL;
+		list->children > 0 && list->child[0] != NULL
+		&& list->child[0]->kind == ZEND_AST_ARRAY_ELEM && list->child[0]->child[1] != NULL;
 
 	for (i = 0; i < list->children; ++i) {
 		zend_ast *elem_ast = list->child[i];
@@ -2825,6 +2828,10 @@ static void zend_compile_list_assign(
 			} else {
 				continue;
 			}
+		}
+
+		if (elem_ast->kind == ZEND_AST_UNPACK) {
+			zend_error(E_COMPILE_ERROR, "Cannot use unpacking in [] and list() assignments");
 		}
 
 		if (elem_ast->attr) {
@@ -6578,6 +6585,10 @@ static zend_bool zend_try_ct_eval_array(zval *result, zend_ast *ast) /* {{{ */
 			zend_error(E_COMPILE_ERROR, "Cannot use empty array elements in arrays");
 		}
 
+		if (elem_ast->kind == ZEND_AST_UNPACK) {
+			return 0;
+		}
+
 		zend_eval_const_expr(&elem_ast->child[0]);
 		zend_eval_const_expr(&elem_ast->child[1]);
 
@@ -7211,6 +7222,20 @@ void zend_compile_array(znode *result, zend_ast *ast) /* {{{ */
 
 		if (elem_ast == NULL) {
 			zend_error(E_COMPILE_ERROR, "Cannot use empty array elements in arrays");
+		}
+
+		if (elem_ast->kind == ZEND_AST_UNPACK) {
+			if (i == 0) {
+				/* Ensure we have an INIT_ARRAY */
+				opnum_init = get_next_op_number(CG(active_op_array));
+				opline = zend_emit_op_tmp(result, ZEND_INIT_ARRAY, NULL, NULL);
+				opline->extended_value = list->children << ZEND_ARRAY_SIZE_SHIFT;
+			}
+
+			zend_compile_expr(&value_node, elem_ast->child[0]);
+			opline = zend_emit_op(NULL, ZEND_ADD_ARRAY_UNPACK, &value_node, NULL);
+			SET_NODE(opline->result, result);
+			continue;
 		}
 
 		value_ast = elem_ast->child[0];

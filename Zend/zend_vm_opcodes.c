@@ -122,7 +122,7 @@ static const char *zend_vm_opcodes_names[187] = {
 	"ZEND_FETCH_OBJ_UNSET",
 	"ZEND_FETCH_LIST",
 	"ZEND_FETCH_CONSTANT",
-	NULL,
+	"ZEND_ADD_ARRAY_UNPACK",
 	"ZEND_EXT_STMT",
 	"ZEND_EXT_FCALL_BEGIN",
 	"ZEND_EXT_FCALL_END",
