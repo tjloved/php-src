@@ -584,7 +584,8 @@ static zend_op* _get_recv_op(zend_op_array *op_array, uint32_t offset)
 	++offset;
 	while (op < end) {
 		if ((op->opcode == ZEND_RECV || op->opcode == ZEND_RECV_INIT
-		    || op->opcode == ZEND_RECV_VARIADIC) && op->op1.num == offset)
+			|| op->opcode == ZEND_RECV_INIT_FAST || op->opcode == ZEND_RECV_VARIADIC)
+				&& op->op1.num == offset)
 		{
 			return op;
 		}
@@ -632,7 +633,8 @@ static void _parameter_string(smart_str *str, zend_function *fptr, struct _zend_
 	}
 	if (fptr->type == ZEND_USER_FUNCTION && !required) {
 		zend_op *precv = _get_recv_op((zend_op_array*)fptr, offset);
-		if (precv && precv->opcode == ZEND_RECV_INIT && precv->op2_type != IS_UNUSED) {
+		if (precv && (precv->opcode == ZEND_RECV_INIT || precv->opcode == ZEND_RECV_INIT_FAST)
+				&& precv->op2_type != IS_UNUSED) {
 			zval zv;
 
 			smart_str_appends(str, " = ");
@@ -1436,7 +1438,8 @@ static zend_op *_reflection_param_get_default_precv(INTERNAL_FUNCTION_PARAMETERS
 	}
 
 	precv = _get_recv_op((zend_op_array*)param->fptr, param->offset);
-	if (!precv || precv->opcode != ZEND_RECV_INIT || precv->op2_type == IS_UNUSED) {
+	if (!precv || (precv->opcode != ZEND_RECV_INIT && precv->opcode != ZEND_RECV_INIT_FAST)
+			|| precv->op2_type == IS_UNUSED) {
 		zend_throw_exception_ex(reflection_exception_ptr, 0, "Internal error: Failed to retrieve the default value");
 		return NULL;
 	}
@@ -2761,7 +2764,8 @@ ZEND_METHOD(reflection_parameter, isDefaultValueAvailable)
 	}
 
 	precv = _get_recv_op((zend_op_array*)param->fptr, param->offset);
-	if (!precv || precv->opcode != ZEND_RECV_INIT || precv->op2_type == IS_UNUSED) {
+	if (!precv || (precv->opcode != ZEND_RECV_INIT && precv->opcode != ZEND_RECV_INIT_FAST)
+			|| precv->op2_type == IS_UNUSED) {
 		RETURN_FALSE;
 	}
 	RETURN_TRUE;

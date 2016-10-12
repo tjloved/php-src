@@ -483,7 +483,7 @@ static ZEND_COLD zend_string *zend_get_function_declaration(const zend_function 
 
 						++idx;
 						while (op < end) {
-							if ((op->opcode == ZEND_RECV || op->opcode == ZEND_RECV_INIT)
+							if ((op->opcode == ZEND_RECV || op->opcode == ZEND_RECV_INIT || op->opcode == ZEND_RECV_INIT_FAST)
 									&& op->op1.num == (zend_ulong)idx)
 							{
 								precv = op;
@@ -491,7 +491,7 @@ static ZEND_COLD zend_string *zend_get_function_declaration(const zend_function 
 							++op;
 						}
 					}
-					if (precv && precv->opcode == ZEND_RECV_INIT && precv->op2_type != IS_UNUSED) {
+					if (precv && (precv->opcode == ZEND_RECV_INIT || precv->opcode == ZEND_RECV_INIT_FAST) && precv->op2_type != IS_UNUSED) {
 						zval *zv = RT_CONSTANT(&fptr->op_array, precv->op2);
 
 						if (Z_TYPE_P(zv) == IS_CONSTANT) {
