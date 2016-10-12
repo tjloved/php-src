@@ -347,6 +347,7 @@ static zend_op *find_call_opline(zend_op *opline) {
 			level--;
 		} else if (opline->opcode == ZEND_SEND_UNPACK
 				|| opline->opcode == ZEND_SEND_ARRAY
+				|| opline->opcode == ZEND_SEND_USER
 				|| opline->opcode == ZEND_SEND_VAR_NO_REF) {
 			if (level == 0) {
 				return NULL;
