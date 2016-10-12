@@ -4133,14 +4133,14 @@ static int zend_infer_types(
 			int i;
 			for (i = 0; i < ssa_vars_count; i++) {
 				if (ssa->vars[i].var == j) {
-					ssa_var_info[i].type |= MAY_BE_STRING | MAY_BE_RC1 | MAY_BE_RCN;
+					ssa_var_info[i].type |= MAY_BE_ANY | MAY_BE_ARRAY_KEY_ANY | MAY_BE_ARRAY_OF_ANY | MAY_BE_ARRAY_OF_REF | MAY_BE_REF;
 				}
 			}
 		} else if (zend_string_equals_literal(op_array->vars[j], "http_response_header")) {
 			int i;
 			for (i = 0; i < ssa_vars_count; i++) {
 				if (ssa->vars[i].var == j) {
-					ssa_var_info[i].type |= MAY_BE_ARRAY | MAY_BE_ARRAY_KEY_LONG | MAY_BE_ARRAY_OF_STRING | MAY_BE_RC1 | MAY_BE_RCN;
+					ssa_var_info[i].type |= MAY_BE_ANY | MAY_BE_ARRAY_KEY_ANY | MAY_BE_ARRAY_OF_ANY | MAY_BE_ARRAY_OF_REF | MAY_BE_REF;
 				}
 			}
 		}
