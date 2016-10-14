@@ -228,6 +228,7 @@ static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) 
 	ssa_liveness liveness;
 	ssa_opt_ctx ssa_ctx;
 	zend_call_info **call_map;
+	zend_bool verify_inference = ZCG(accel_directives).opt_statistics == 3;
 
 	/* We can't currently perform data-flow analysis for code using try/catch */
 	if (op_array->last_try_catch) {
@@ -264,8 +265,8 @@ static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) 
 		return;
 	}
 
-	if (zend_build_ssa(&ctx->arena, ctx->script, op_array, 0,
-			&info->ssa, &info->flags) != SUCCESS) {
+	if (zend_build_ssa(&ctx->arena, ctx->script, op_array,
+			verify_inference ? ZEND_SSA_RC_INFERENCE : 0, &info->ssa, &info->flags) != SUCCESS) {
 		return;
 	}
 
@@ -298,8 +299,11 @@ static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) 
 		dump_instruction_trace(op_array, &info->ssa);
 	}
 
-	if (ZCG(accel_directives).opt_statistics == 3) {
+	if (verify_inference) {
 		ctx->optimization_level &= ~ZEND_OPTIMIZER_PASS_9;
+		if (should_dump(op_array, 2)) {
+			zend_dump_op_array(op_array, ZEND_DUMP_SSA, "before integrity checks", &info->ssa);
+		}
 		ssa_verify_inference(ctx, op_array, &info->ssa);
 		if (should_dump(op_array, 1)) {
 			zend_dump_op_array(op_array, 0, "with integrity checks", NULL);

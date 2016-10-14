@@ -52,6 +52,15 @@ static zend_op *emit_type_checks(
 			opline->op2.var, opline->op2_type, ssa_op->op2_def, opline->lineno);
 		new_opline++;
 	}
+	if (ssa_op->op1_def >= 0 && ssa_op->op2_def >= 0
+			&& ssa->vars[ssa_op->op1_def].var == ssa->vars[ssa_op->op2_def].var) {
+		/* Handle super special case where the same var is def'd twice */
+		if (ssa_op->op1_def > ssa_op->op2_def) {
+			MAKE_NOP(new_opline - 1);
+		} else {
+			MAKE_NOP(new_opline - 2);
+		}
+	}
 	return new_opline;
 }
 
@@ -61,7 +70,7 @@ static zend_bool should_skip(zend_op *opline, zend_op *end) {
 		return 1;
 	}
 	switch (opline->opcode) {
-		/* These don't rerturn real strings */
+		/* These don't return real strings */
 		case ZEND_ROPE_INIT:
 		case ZEND_ROPE_ADD:
 			return 1;

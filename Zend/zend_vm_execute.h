@@ -52655,9 +52655,21 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_ASSERT_TYPE_SPEC_TMPVARCV_HAND
 	zval *op1 = EX_VAR(opline->op1.var);
 	uint32_t type = opline->extended_value;
 	const zend_op *prev_opline;
+	const char *errmsg = "-";
 
 	if (Z_TYPE_P(op1) == IS_INDIRECT) {
 		op1 = Z_INDIRECT_P(op1);
+	}
+
+	if (Z_REFCOUNTED_P(op1)) {
+		if (Z_REFCOUNT_P(op1) == 1 && !(type & (1 << 27))) { /* MAY_BE_RC1 */
+			errmsg = "RC1";
+			goto wrong_type;
+		}
+		if (Z_REFCOUNT_P(op1) > 1 && !(type & (1 << 28))) { /* MAY_BE_RCN */
+			errmsg = "RCN";
+			goto wrong_type;
+		}
 	}
 
 	if (type & (1 << Z_TYPE_P(op1))) {
@@ -52672,14 +52684,17 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_ASSERT_TYPE_SPEC_TMPVARCV_HAND
 			ZEND_HASH_FOREACH_STR_KEY_VAL_IND(Z_ARRVAL_P(op1), str, val) {
 				if (str) {
 					if (!(type & MAY_BE_ARRAY_KEY_STRING)) {
+						errmsg = "array key string";
 						goto wrong_type;
 					}
 				} else {
 					if (!(type & MAY_BE_ARRAY_KEY_LONG)) {
+						errmsg = "array key long";
 						goto wrong_type;
 					}
 				}
 				if (!(type & (1 << (Z_TYPE_P(val) + MAY_BE_ARRAY_SHIFT)))) {
+					errmsg = "array value";
 					goto wrong_type;
 				}
 				if (++i >= 10) {
@@ -52703,8 +52718,8 @@ wrong_type:
 	}
 
 	SAVE_OPLINE();
-	zend_throw_error(NULL, "Type mismatch in %s",
-		zend_get_opcode_name(prev_opline->opcode));
+	zend_throw_error(NULL, "Type mismatch (%s) in %s",
+		errmsg, zend_get_opcode_name(prev_opline->opcode));
 	HANDLE_EXCEPTION();
 }
 
