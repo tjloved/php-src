@@ -698,108 +698,6 @@ uint32_t zend_optimizer_classify_function(zend_string *name, uint32_t num_args) 
 	}
 }
 
-static void zend_optimize(zend_op_array      *op_array,
-                          zend_optimizer_ctx *ctx)
-{
-	if (op_array->type == ZEND_EVAL_CODE) {
-		return;
-	}
-
-	/* pass 1
-	 * - substitute persistent constants (true, false, null, etc)
-	 * - perform compile-time evaluation of constant binary and unary operations
-	 * - optimize series of ADD_STRING and/or ADD_CHAR
-	 * - convert CAST(IS_BOOL,x) into BOOL(x)
-         * - pre-evaluate constant function calls
-	 */
-	if (ZEND_OPTIMIZER_PASS_1 & ctx->optimization_level) {
-		zend_optimizer_pass1(op_array, ctx);
-		if (ctx->debug_level & ZEND_DUMP_AFTER_PASS_1) {
-			zend_dump_op_array(op_array, 0, "after pass 1", NULL);
-		}
-	}
-
-	/* pass 2:
-	 * - convert non-numeric constants to numeric constants in numeric operators
-	 * - optimize constant conditional JMPs
-	 */
-	if (ZEND_OPTIMIZER_PASS_2 & ctx->optimization_level) {
-		zend_optimizer_pass2(op_array);
-		if (ctx->debug_level & ZEND_DUMP_AFTER_PASS_2) {
-			zend_dump_op_array(op_array, 0, "after pass 2", NULL);
-		}
-	}
-
-	/* pass 3:
-	 * - optimize $i = $i+expr to $i+=expr
-	 * - optimize series of JMPs
-	 * - change $i++ to ++$i where possible
-	 */
-	if (ZEND_OPTIMIZER_PASS_3 & ctx->optimization_level) {
-		zend_optimizer_pass3(op_array);
-		if (ctx->debug_level & ZEND_DUMP_AFTER_PASS_3) {
-			zend_dump_op_array(op_array, 0, "after pass 3", NULL);
-		}
-	}
-
-	/* pass 5:
-	 * - CFG optimization
-	 */
-	if (ZEND_OPTIMIZER_PASS_5 & ctx->optimization_level) {
-		zend_optimize_cfg(op_array, ctx);
-		if (ctx->debug_level & ZEND_DUMP_AFTER_PASS_5) {
-			zend_dump_op_array(op_array, 0, "after pass 5", NULL);
-		}
-	}
-
-#if HAVE_DFA_PASS
-	/* pass 6:
-	 * - DFA optimization
-	 */
-	if (ZEND_OPTIMIZER_PASS_6 & ctx->optimization_level) {
-		zend_optimize_ssa(op_array, ctx);
-		//zend_optimize_dfa(op_array, ctx);
-		if (ctx->debug_level & ZEND_DUMP_AFTER_PASS_6) {
-			zend_dump_op_array(op_array, 0, "after pass 6", NULL);
-		}
-	}
-#endif
-
-	/* pass 9:
-	 * - Optimize temp variables usage
-	 */
-	if (ZEND_OPTIMIZER_PASS_9 & ctx->optimization_level) {
-		zend_optimize_temporary_variables(op_array, ctx);
-		if (ctx->debug_level & ZEND_DUMP_AFTER_PASS_9) {
-			zend_dump_op_array(op_array, 0, "after pass 9", NULL);
-		}
-	}
-
-	/* pass 10:
-	 * - remove NOPs
-	 */
-	if (ZEND_OPTIMIZER_PASS_10 & ctx->optimization_level) {
-		zend_optimizer_nop_removal(op_array);
-		if (ctx->debug_level & ZEND_DUMP_AFTER_PASS_10) {
-			zend_dump_op_array(op_array, 0, "after pass 10", NULL);
-		}
-	}
-
-	/* pass 11:
-	 * - Compact literals table
-	 */
-	if (ZEND_OPTIMIZER_PASS_11 & ctx->optimization_level) {
-		zend_optimizer_compact_literals(op_array, ctx);
-		if (ctx->debug_level & ZEND_DUMP_AFTER_PASS_11) {
-			zend_dump_op_array(op_array, 0, "after pass 11", NULL);
-		}
-	}
-
-	if (ctx->debug_level & ZEND_DUMP_AFTER_OPTIMIZER) {
-		zend_dump_op_array(op_array, 0, "after optimizer", NULL);
-	}
-}
-
 static void zend_revert_pass_two(zend_op_array *op_array)
 {
 	zend_op *opline, *end;
@@ -871,8 +769,6 @@ static void zend_optimize_pass_set_1(zend_op_array *op_array, zend_optimizer_ctx
 		return;
 	}
 
-	zend_revert_pass_two(op_array);
-
 	if (ctx->debug_level & ZEND_DUMP_BEFORE_OPTIMIZER) {
 		zend_dump_op_array(op_array, 0, "before optimizer", NULL);
 	}
@@ -884,8 +780,6 @@ static void zend_optimize_pass_set_1(zend_op_array *op_array, zend_optimizer_ctx
 			zend_dump_op_array(op_array, 0, "after pass 4", NULL);
 		}
 	}
-
-	zend_redo_pass_two(op_array);
 }
 
 /* Second pass set performs inlining. This must happen for all op_arrays at the same time,
@@ -896,8 +790,6 @@ static void zend_optimize_pass_set_2(zend_op_array *op_array, zend_optimizer_ctx
 		return;
 	}
 
-	zend_revert_pass_two(op_array);
-
 	/* pass 8: Function inlining */
 	if (ZEND_OPTIMIZER_PASS_8 & ctx->optimization_level) {
 		zend_optimize_inlining(op_array, ctx);
@@ -905,21 +797,116 @@ static void zend_optimize_pass_set_2(zend_op_array *op_array, zend_optimizer_ctx
 			zend_dump_op_array(op_array, 0, "after pass 8", NULL);
 		}
 	}
-
-	zend_redo_pass_two(op_array);
 }
 
 static void zend_optimize_pass_set_3(zend_op_array      *op_array,
                                    zend_optimizer_ctx *ctx)
 {
-	/* Revert pass_two() */
-	zend_revert_pass_two(op_array);
+	if (op_array->type == ZEND_EVAL_CODE) {
+		return;
+	}
 
-	/* Do actual optimizations */
-	zend_optimize(op_array, ctx);
+	/* pass 1
+	 * - substitute persistent constants (true, false, null, etc)
+	 * - perform compile-time evaluation of constant binary and unary operations
+	 * - optimize series of ADD_STRING and/or ADD_CHAR
+	 * - convert CAST(IS_BOOL,x) into BOOL(x)
+         * - pre-evaluate constant function calls
+	 */
+	if (ZEND_OPTIMIZER_PASS_1 & ctx->optimization_level) {
+		zend_optimizer_pass1(op_array, ctx);
+		if (ctx->debug_level & ZEND_DUMP_AFTER_PASS_1) {
+			zend_dump_op_array(op_array, 0, "after pass 1", NULL);
+		}
+	}
 
-	/* Redo pass_two() */
-	zend_redo_pass_two(op_array);
+	/* pass 2:
+	 * - convert non-numeric constants to numeric constants in numeric operators
+	 * - optimize constant conditional JMPs
+	 */
+	if (ZEND_OPTIMIZER_PASS_2 & ctx->optimization_level) {
+		zend_optimizer_pass2(op_array);
+		if (ctx->debug_level & ZEND_DUMP_AFTER_PASS_2) {
+			zend_dump_op_array(op_array, 0, "after pass 2", NULL);
+		}
+	}
+
+	/* pass 3:
+	 * - optimize $i = $i+expr to $i+=expr
+	 * - optimize series of JMPs
+	 * - change $i++ to ++$i where possible
+	 */
+	if (ZEND_OPTIMIZER_PASS_3 & ctx->optimization_level) {
+		zend_optimizer_pass3(op_array);
+		if (ctx->debug_level & ZEND_DUMP_AFTER_PASS_3) {
+			zend_dump_op_array(op_array, 0, "after pass 3", NULL);
+		}
+	}
+
+	/* pass 5:
+	 * - CFG optimization
+	 */
+	if (ZEND_OPTIMIZER_PASS_5 & ctx->optimization_level) {
+		zend_optimize_cfg(op_array, ctx);
+		if (ctx->debug_level & ZEND_DUMP_AFTER_PASS_5) {
+			zend_dump_op_array(op_array, 0, "after pass 5", NULL);
+		}
+	}
+
+#if HAVE_DFA_PASS
+	/* pass 6:
+	 * - DFA optimization
+	 */
+	if (ZEND_OPTIMIZER_PASS_6 & ctx->optimization_level) {
+		zend_optimize_ssa(op_array, ctx);
+		//zend_optimize_dfa(op_array, ctx);
+		if (ctx->debug_level & ZEND_DUMP_AFTER_PASS_6) {
+			zend_dump_op_array(op_array, 0, "after pass 6", NULL);
+		}
+	}
+#endif
+}
+
+static void zend_optimize_pass_set_4(zend_op_array      *op_array,
+                                   zend_optimizer_ctx *ctx)
+{
+	if (op_array->type == ZEND_EVAL_CODE) {
+		return;
+	}
+
+	/* pass 9:
+	 * - Optimize temp variables usage
+	 */
+	if (ZEND_OPTIMIZER_PASS_9 & ctx->optimization_level) {
+		zend_optimize_temporary_variables(op_array, ctx);
+		if (ctx->debug_level & ZEND_DUMP_AFTER_PASS_9) {
+			zend_dump_op_array(op_array, 0, "after pass 9", NULL);
+		}
+	}
+
+	/* pass 10:
+	 * - remove NOPs
+	 */
+	if (ZEND_OPTIMIZER_PASS_10 & ctx->optimization_level) {
+		zend_optimizer_nop_removal(op_array);
+		if (ctx->debug_level & ZEND_DUMP_AFTER_PASS_10) {
+			zend_dump_op_array(op_array, 0, "after pass 10", NULL);
+		}
+	}
+
+	/* pass 11:
+	 * - Compact literals table
+	 */
+	if (ZEND_OPTIMIZER_PASS_11 & ctx->optimization_level) {
+		zend_optimizer_compact_literals(op_array, ctx);
+		if (ctx->debug_level & ZEND_DUMP_AFTER_PASS_11) {
+			zend_dump_op_array(op_array, 0, "after pass 11", NULL);
+		}
+	}
+
+	if (ctx->debug_level & ZEND_DUMP_AFTER_OPTIMIZER) {
+		zend_dump_op_array(op_array, 0, "after optimizer", NULL);
+	}
 }
 
 static void zend_adjust_fcall_stack_size(zend_op_array *op_array, zend_optimizer_ctx *ctx)
@@ -992,6 +979,13 @@ static inline void foreach_op_array(
 	} ZEND_HASH_FOREACH_END();
 }
 
+static void revert_pass_two_stub(zend_op_array *op_array, zend_optimizer_ctx *ctx) {
+	zend_revert_pass_two(op_array);
+}
+static void redo_pass_two_stub(zend_op_array *op_array, zend_optimizer_ctx *ctx) {
+	zend_redo_pass_two(op_array);
+}
+
 int zend_optimize_script(zend_script *script, zend_long optimization_level, zend_long debug_level)
 {
 	zend_optimizer_ctx ctx;
@@ -1005,8 +999,12 @@ int zend_optimize_script(zend_script *script, zend_long optimization_level, zend
 	ctx.optimization_level = optimization_level;
 	ctx.debug_level = debug_level;
 
+	foreach_op_array(&ctx, revert_pass_two_stub);
 	foreach_op_array(&ctx, zend_optimize_pass_set_1);
 	foreach_op_array(&ctx, zend_optimize_pass_set_2);
+	foreach_op_array(&ctx, zend_optimize_pass_set_3);
+	foreach_op_array(&ctx, zend_optimize_pass_set_4);
+	foreach_op_array(&ctx, redo_pass_two_stub);
 
 	if (0 && (ZEND_OPTIMIZER_PASS_13 & optimization_level) &&
 			zend_build_call_graph(&ctx.arena, script, ZEND_RT_CONSTANTS, &call_graph) == SUCCESS) {
@@ -1021,8 +1019,6 @@ int zend_optimize_script(zend_script *script, zend_long optimization_level, zend
 			}
 		}
 	}
-
-	foreach_op_array(&ctx, zend_optimize_pass_set_3);
 
 #if HAVE_DFA_PASS
 	if (0 && (ZEND_OPTIMIZER_PASS_6 & optimization_level) &&

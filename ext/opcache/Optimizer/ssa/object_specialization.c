@@ -75,7 +75,7 @@ static zend_bool has_finalized_property_offsets(zend_script *script, zend_string
 		switch (opline->opcode) {
 			case ZEND_DECLARE_CLASS:
 			case ZEND_DECLARE_ANON_CLASS:
-				op1 = RT_CONSTANT(op_array, opline->op1);
+				op1 = CT_CONSTANT_EX(op_array, opline->op1.constant);
 				if (zend_string_equals_literal(Z_STR_P(op1), lcname)) {
 					return 1;
 				}
@@ -83,7 +83,7 @@ static zend_bool has_finalized_property_offsets(zend_script *script, zend_string
 			case ZEND_DECLARE_INHERITED_CLASS:
 			case ZEND_DECLARE_INHERITED_CLASS_DELAYED:
 			case ZEND_DECLARE_ANON_INHERITED_CLASS:
-				op1 = RT_CONSTANT(op_array, opline->op1);
+				op1 = CT_CONSTANT_EX(op_array, opline->op1.constant);
 				if (zend_string_equals_literal(Z_STR_P(op1), lcname)) {
 					return 0;
 				}

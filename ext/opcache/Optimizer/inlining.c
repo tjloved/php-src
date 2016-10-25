@@ -408,7 +408,7 @@ static inline_info *find_inlinable_calls(
 			uint32_t num_const_args = get_num_const_args(fbc, opline, num_args_passed);
 			if (should_inline(op_array, fbc, num_const_args, pass)
 					&& can_inline_scope(fbc, op_array)
-					&& can_inline_from(fbc, num_args_passed, fbc != op_array)) {
+					&& can_inline_from(fbc, num_args_passed, 0)) {
 				inline_info *info;
 				zend_op *call_opline = find_call_opline(opline);
 				if (!call_opline) {
@@ -654,17 +654,11 @@ static void merge_opcodes(
 				if (new_opline->op1_type == IS_CV) {
 					new_opline->op1.var = translate_cv(new_opline->op1.var, cv_offset);
 				} else if (new_opline->op1_type == IS_CONST) {
-					if (info->fbc != op_array) {
-						ZEND_PASS_TWO_UNDO_CONSTANT(info->fbc, new_opline->op1);
-					}
 					new_opline->op1.constant += literal_offset;
 				}
 				if (new_opline->op2_type == IS_CV) {
 					new_opline->op2.var = translate_cv(new_opline->op2.var, cv_offset);
 				} else if (new_opline->op2_type == IS_CONST) {
-					if (info->fbc != op_array) {
-						ZEND_PASS_TWO_UNDO_CONSTANT(info->fbc, new_opline->op2);
-					}
 					new_opline->op2.constant += literal_offset;
 				}
 				if (new_opline->result_type == IS_CV) {
