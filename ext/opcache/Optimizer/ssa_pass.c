@@ -222,7 +222,6 @@ static inline void run_pass(
 }
 
 static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) {
-	zend_call_graph call_graph;
 	zend_func_info *info;
 	cfg_info cfg_info;
 	ssa_liveness liveness;
@@ -232,12 +231,6 @@ static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) 
 
 	/* We can't currently perform data-flow analysis for code using try/catch */
 	if (op_array->last_try_catch) {
-		return;
-	}
-
-	/* We're rebuilding the call graph for every op array, as op arrays may be changed and
-	 * even reallocated during optimizations. */
-	if (zend_build_call_graph_ex(&ctx->arena, ctx->script, 0, &call_graph, op_array) != SUCCESS) {
 		return;
 	}
 
@@ -364,8 +357,18 @@ static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) 
 	}
 }
 
-void zend_optimize_ssa(zend_op_array *op_array, zend_optimizer_ctx *ctx) {
+void zend_optimize_ssa(zend_optimizer_ctx *ctx) {
 	void *checkpoint = zend_arena_checkpoint(ctx->arena);
-	optimize_ssa_impl(ctx, op_array);
+	zend_call_graph call_graph;
+	uint32_t i;
+
+	if (zend_build_call_graph_ex(&ctx->arena, ctx->script, 0, &call_graph, NULL) == SUCCESS) {
+		for (i = 0; i < call_graph.op_arrays_count; i++) {
+			void *checkpoint2 = zend_arena_checkpoint(ctx->arena);
+			optimize_ssa_impl(ctx, call_graph.op_arrays[i]);
+			zend_arena_release(&ctx->arena, checkpoint2);
+		}
+	}
+
 	zend_arena_release(&ctx->arena, checkpoint);
 }

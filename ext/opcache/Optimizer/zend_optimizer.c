@@ -852,19 +852,6 @@ static void zend_optimize_pass_set_3(zend_op_array      *op_array,
 			zend_dump_op_array(op_array, 0, "after pass 5", NULL);
 		}
 	}
-
-#if HAVE_DFA_PASS
-	/* pass 6:
-	 * - DFA optimization
-	 */
-	if (ZEND_OPTIMIZER_PASS_6 & ctx->optimization_level) {
-		zend_optimize_ssa(op_array, ctx);
-		//zend_optimize_dfa(op_array, ctx);
-		if (ctx->debug_level & ZEND_DUMP_AFTER_PASS_6) {
-			zend_dump_op_array(op_array, 0, "after pass 6", NULL);
-		}
-	}
-#endif
 }
 
 static void zend_optimize_pass_set_4(zend_op_array      *op_array,
@@ -1003,8 +990,6 @@ int zend_optimize_script(zend_script *script, zend_long optimization_level, zend
 	foreach_op_array(&ctx, zend_optimize_pass_set_1);
 	foreach_op_array(&ctx, zend_optimize_pass_set_2);
 	foreach_op_array(&ctx, zend_optimize_pass_set_3);
-	foreach_op_array(&ctx, zend_optimize_pass_set_4);
-	foreach_op_array(&ctx, redo_pass_two_stub);
 
 	if (0 && (ZEND_OPTIMIZER_PASS_13 & optimization_level) &&
 			zend_build_call_graph(&ctx.arena, script, ZEND_RT_CONSTANTS, &call_graph) == SUCCESS) {
@@ -1019,6 +1004,18 @@ int zend_optimize_script(zend_script *script, zend_long optimization_level, zend
 			}
 		}
 	}
+
+#if HAVE_DFA_PASS
+	/* pass 6:
+	 * - DFA optimization
+	 */
+	if (ZEND_OPTIMIZER_PASS_6 & ctx.optimization_level) {
+		zend_optimize_ssa(&ctx);
+	}
+#endif
+
+	foreach_op_array(&ctx, zend_optimize_pass_set_4);
+	foreach_op_array(&ctx, redo_pass_two_stub);
 
 #if HAVE_DFA_PASS
 	if (0 && (ZEND_OPTIMIZER_PASS_6 & optimization_level) &&

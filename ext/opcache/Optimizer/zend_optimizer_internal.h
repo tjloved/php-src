@@ -106,7 +106,7 @@ void zend_optimize_cloning(zend_call_graph *call_graph, zend_optimizer_ctx *ctx)
 int  zend_dfa_analyze_op_array(zend_op_array *op_array, zend_optimizer_ctx *ctx, zend_ssa *ssa, uint32_t *flags);
 void zend_dfa_optimize_op_array(zend_op_array *op_array, zend_optimizer_ctx *ctx, zend_ssa *ssa);
 void zend_optimize_temporary_variables(zend_op_array *op_array, zend_optimizer_ctx *ctx);
-void zend_optimize_ssa(zend_op_array *op_array, zend_optimizer_ctx *ctx);
+void zend_optimize_ssa(zend_optimizer_ctx *ctx);
 void zend_optimizer_nop_removal(zend_op_array *op_array);
 void zend_optimizer_compact_literals(zend_op_array *op_array, zend_optimizer_ctx *ctx);
 int zend_optimizer_is_disabled_func(const char *name, size_t len);
