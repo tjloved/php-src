@@ -261,6 +261,11 @@ static zend_bool can_inline_from(
 	return can_inline_opcodes(op_array, rt_constants, 1);
 }
 
+static zend_bool is_scope_sensitive(zend_op_array *op_array) {
+	/* For now treat anything non-trivial as scope-sensitive */
+	return op_array->last > 1;
+}
+
 static zend_bool can_inline_scope(zend_op_array *from, zend_op_array *into) {
 	if (!from->scope) {
 		/* Non-methods can always be inlined */
@@ -268,8 +273,7 @@ static zend_bool can_inline_scope(zend_op_array *from, zend_op_array *into) {
 	}
 
 	if (into->scope != from->scope) {
-		/* Different scopes, can't inline for now */
-		return 0;
+		return !is_scope_sensitive(from);
 	}
 
 	if (into->scope->ce_flags & ZEND_ACC_TRAIT) {
