@@ -420,7 +420,6 @@ fi
 	Optimizer/ssa/dce.c \
 	Optimizer/ssa/copy.c \
 	Optimizer/ssa/assign.c \
-	Optimizer/ssa/tmpvar.c \
 	Optimizer/ssa/type_specialization.c \
 	Optimizer/ssa/object_specialization.c \
     Optimizer/ssa/liveness.c \

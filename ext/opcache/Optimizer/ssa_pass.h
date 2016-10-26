@@ -22,7 +22,6 @@ void ssa_optimize_simplify_cfg(ssa_opt_ctx *ssa_ctx);
 void ssa_optimize_copy(ssa_opt_ctx *ctx);
 void ssa_optimize_assign(ssa_opt_ctx *ctx);
 void ssa_optimize_gvn(ssa_opt_ctx *ctx);
-void ssa_optimize_cv_to_tmp(ssa_opt_ctx *ctx);
 void ssa_optimize_type_specialization(ssa_opt_ctx *ctx);
 void ssa_optimize_object_specialization(ssa_opt_ctx *ctx);
 void ssa_optimize_compact_vars(ssa_opt_ctx *ctx);
