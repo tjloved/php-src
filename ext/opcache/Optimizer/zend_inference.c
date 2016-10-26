@@ -4122,6 +4122,10 @@ static int zend_infer_types(
 		&OPT_STAT(ti_dead_blocks_instrs),
 		&OPT_STAT(ti_dead_blocks_instrs));
 
+	if (ctx.combine_scp) {
+		scp_apply_results(&ctx.scp);
+	}
+
 	/* Narrowing integer initialization to doubles */
 	zend_type_narrowing(op_array, script, ssa, &scdf);
 

@@ -329,7 +329,12 @@ static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) 
 	ssa_ctx.assume_no_undef = (ctx->optimization_level & ZEND_OPTIMIZER_ASSUME_NO_UNDEF) != 0;
 
 	remove_trivial_phis(&info->ssa);
-	run_pass(&ssa_ctx, ssa_optimize_scp, "after SCP", SSA_PASS_SCP);
+
+	if ((ZCG(accel_directives).ssa_opt_level & SSA_PASS_COMBINE_SCP) == 0) {
+		/* Only run SCP here if it wasn't already run in parallel with inference. */
+		run_pass(&ssa_ctx, ssa_optimize_scp, "after SCP", SSA_PASS_SCP);
+	}
+
 	run_pass(&ssa_ctx, ssa_optimize_dce, "after DCE", SSA_PASS_DCE);
 	run_pass(&ssa_ctx,
 		ssa_optimize_simplify_cfg, "after CFG simplification", SSA_PASS_SIMPLIFY_CFG);

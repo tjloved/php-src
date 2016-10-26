@@ -55,7 +55,7 @@ typedef struct _zend_optimizer_statistics {
 	double type_quality;
 	uint32_t type_spec_elided;
 	uint32_t cloned_funcs;
-	uint32_t type_spec_rc_based;
+	uint32_t type_spec_send;
 	uint32_t ti_dead_blocks;
 	uint32_t ti_dead_blocks_instrs;
 	uint32_t ti_dead_blocks_phis;

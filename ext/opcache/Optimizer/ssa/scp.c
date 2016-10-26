@@ -1349,6 +1349,11 @@ void scp_context_free(scp_ctx *ctx) {
 	efree(ctx->values);
 }
 
+void scp_apply_results(scp_ctx *ctx) {
+	replace_constant_operands(ctx);
+	eliminate_dead_instructions(ctx);
+}
+
 void ssa_optimize_scp(ssa_opt_ctx *ssa_ctx) {
 	scdf_ctx scdf;
 	scp_ctx ctx;
@@ -1365,8 +1370,7 @@ void ssa_optimize_scp(ssa_opt_ctx *ssa_ctx) {
 	scdf_remove_unreachable_blocks(&scdf,
 		&OPT_STAT(scp_dead_blocks), &OPT_STAT(scp_dead_blocks_instrs),
 		&OPT_STAT(scp_dead_blocks_phis));
-	replace_constant_operands(&ctx);
-	eliminate_dead_instructions(&ctx);
+	scp_apply_results(&ctx);
 
 	scdf_free(&scdf);
 	scp_context_free(&ctx);

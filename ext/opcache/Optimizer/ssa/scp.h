@@ -16,6 +16,7 @@ typedef struct _scp_ctx {
 void scp_context_init(scp_ctx *ctx,
 		zend_ssa *ssa, zend_op_array *op_array, zend_call_info **call_map);
 void scp_context_free(scp_ctx *ctx);
+void scp_apply_results(scp_ctx *ctx);
 
 void scp_visit_instr(scdf_ctx *scdf, void *void_ctx, zend_op *opline, zend_ssa_op *ssa_op);
 void scp_visit_phi(scdf_ctx *scdf, void *void_ctx, zend_ssa_phi *phi);

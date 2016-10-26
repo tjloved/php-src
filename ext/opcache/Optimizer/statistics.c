@@ -70,7 +70,7 @@ void zend_optimizer_statistics_shutdown() {
 	PRINT_NORM_STAT(copy_propagated_tmp, instrs);
 	PRINT_NORM_STAT(type_spec_arithm, instrs);
 	PRINT_NORM_STAT(type_spec_elided, instrs);
-	PRINT_NORM_STAT(type_spec_rc_based, instrs);
+	PRINT_NORM_STAT(type_spec_send, instrs);
 	PRINT_STAT(ts_must_be_array);
 	PRINT_STAT(ts_not_must_be_array);
 	PRINT_STAT(ts_must_be_int_key);
