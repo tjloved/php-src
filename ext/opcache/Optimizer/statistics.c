@@ -45,6 +45,10 @@ void zend_optimizer_statistics_shutdown() {
 
 	PRINT_NORM_STAT(trivial_phis, phis);
 
+	PRINT_NORM_STAT(ti_dead_blocks, cfg_blocks);
+	PRINT_NORM_STAT(ti_dead_blocks_instrs, instrs);
+	PRINT_NORM_STAT(ti_dead_blocks_phis, phis);
+
 	PRINT_NORM_STAT(scp_const_vars, ssa_vars);
 	PRINT_STAT(scp_const_operands);
 	PRINT_NORM_STAT(scp_dead_instrs, instrs);
@@ -60,12 +64,13 @@ void zend_optimizer_statistics_shutdown() {
 	PRINT_STAT(dce_frees);
 	PRINT_NORM_STAT(cfg_merged_blocks, cfg_blocks);
 
-	PRINT_STAT(assign_contracted_assign);
-	PRINT_STAT(assign_qm_assign);
-	PRINT_STAT(copy_propagated_cv);
-	PRINT_STAT(copy_propagated_tmp);
-	PRINT_STAT(type_spec_arithm);
-	PRINT_STAT(type_spec_elided);
+	PRINT_NORM_STAT(assign_contracted_assign, instrs);
+	PRINT_NORM_STAT(assign_qm_assign, instrs);
+	PRINT_NORM_STAT(copy_propagated_cv, instrs);
+	PRINT_NORM_STAT(copy_propagated_tmp, instrs);
+	PRINT_NORM_STAT(type_spec_arithm, instrs);
+	PRINT_NORM_STAT(type_spec_elided, instrs);
+	PRINT_NORM_STAT(type_spec_rc_based, instrs);
 	PRINT_STAT(ts_must_be_array);
 	PRINT_STAT(ts_not_must_be_array);
 	PRINT_STAT(ts_must_be_int_key);

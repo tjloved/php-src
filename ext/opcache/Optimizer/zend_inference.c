@@ -28,6 +28,8 @@
 #include "ssa/scdf.h"
 #include "ssa/scp.h"
 #include "statistics.h"
+#include "zend_optimizer_internal.h"
+#include "ssa_pass.h"
 
 /* The used range inference algorithm is described in:
  *     V. Campos, R. Rodrigues, I. de Assis Costa and F. Pereira.
@@ -4094,13 +4096,7 @@ static int zend_infer_types(
 	scdf_ctx scdf;
 	ti_context ctx;
 	ctx.script = script;
-
-	ctx.combine_scp = 1; /* Toggle me! */
-	if (ZCG(accel_directives).opt_statistics == 3) {
-		/* In verify-inference mode do not use SCP,
-		 * as we want it to be usable with RC inference */
-		ctx.combine_scp = 0;
-	}
+	ctx.combine_scp = (ZCG(accel_directives).ssa_opt_level & SSA_PASS_COMBINE_SCP) != 0;
 
 	if (ctx.combine_scp) {
 		scp_context_init(&ctx.scp, ssa, (zend_op_array *) op_array, call_map);
@@ -4121,7 +4117,10 @@ static int zend_infer_types(
 	scdf_init(&scdf, op_array, ssa, &ctx);
 	scdf_solve(&scdf, "Type inference");
 
-	scdf_remove_unreachable_blocks(&scdf, &OPT_STAT(tmp), &OPT_STAT(tmp2), &OPT_STAT(tmp3));
+	scdf_remove_unreachable_blocks(&scdf,
+		&OPT_STAT(ti_dead_blocks),
+		&OPT_STAT(ti_dead_blocks_instrs),
+		&OPT_STAT(ti_dead_blocks_instrs));
 
 	/* Narrowing integer initialization to doubles */
 	zend_type_narrowing(op_array, script, ssa, &scdf);

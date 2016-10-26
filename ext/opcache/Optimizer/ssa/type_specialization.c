@@ -81,6 +81,7 @@ void ssa_optimize_type_specialization(ssa_opt_ctx *ctx) {
 				}
 				if (!(t1 & MAY_BE_UNDEF) && !CAN_BE(t1, MAY_BE_REFCOUNTED)) {
 					opline->opcode = ZEND_MOV_UNCOUNTED;
+					OPT_STAT(type_spec_rc_based)++;
 				}
 				break;
 			case ZEND_ASSIGN:
@@ -316,6 +317,7 @@ void ssa_optimize_type_specialization(ssa_opt_ctx *ctx) {
 					break;
 				}
 				opline->opcode = ZEND_SEND_VAR_FAST;
+				OPT_STAT(type_spec_rc_based)++;
 				break;
 			case ZEND_RECV_INIT:
 			{

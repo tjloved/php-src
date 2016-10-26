@@ -280,6 +280,11 @@ static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) 
 
 	call_map = compute_call_map(ctx, info, op_array);
 
+	if (verify_inference) {
+		/* Do not run SCP in verify-inference mode, as SCP does not support RC inference. */
+		ZCG(accel_directives).ssa_opt_level &= ~SSA_PASS_COMBINE_SCP;
+	}
+
 	if (zend_ssa_inference(&ctx->arena, op_array, ctx->script, &info->ssa, call_map) != SUCCESS) {
 		return;
 	}
@@ -324,17 +329,18 @@ static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) 
 	ssa_ctx.assume_no_undef = (ctx->optimization_level & ZEND_OPTIMIZER_ASSUME_NO_UNDEF) != 0;
 
 	remove_trivial_phis(&info->ssa);
-	run_pass(&ssa_ctx, ssa_optimize_scp, "after SCP", 4);
-	run_pass(&ssa_ctx, ssa_optimize_dce, "after DCE", 8);
-	run_pass(&ssa_ctx, ssa_optimize_simplify_cfg, "after CFG simplification", 16);
-	run_pass(&ssa_ctx, ssa_optimize_copy, "after copy propagation", 32);
+	run_pass(&ssa_ctx, ssa_optimize_scp, "after SCP", SSA_PASS_SCP);
+	run_pass(&ssa_ctx, ssa_optimize_dce, "after DCE", SSA_PASS_DCE);
+	run_pass(&ssa_ctx,
+		ssa_optimize_simplify_cfg, "after CFG simplification", SSA_PASS_SIMPLIFY_CFG);
+	run_pass(&ssa_ctx, ssa_optimize_copy, "after copy propagation", SSA_PASS_COPY_PROP);
 	/*run_pass(&ssa_ctx, ssa_optimize_gvn, "after GVN", 64);*/
-	run_pass(&ssa_ctx, ssa_optimize_dce, "after DCE 2", 128);
-	run_pass(&ssa_ctx, ssa_optimize_assign, "after assignment contraction", 256);
-
-	run_pass(&ssa_ctx, ssa_optimize_misc, "after misc", 512);
-	run_pass(&ssa_ctx, ssa_optimize_type_specialization, "after type specialization", 1024);
-	run_pass(&ssa_ctx, ssa_optimize_object_specialization, "after object spec", 2048);
+	run_pass(&ssa_ctx, ssa_optimize_dce, "after DCE 2", SSA_PASS_DCE_2);
+	run_pass(&ssa_ctx, ssa_optimize_assign, "after assignment contraction", SSA_PASS_ASSIGN_CONTR);
+	run_pass(&ssa_ctx, ssa_optimize_misc, "after misc", SSA_PASS_MISC);
+	run_pass(&ssa_ctx,
+		ssa_optimize_type_specialization, "after type specialization", SSA_PASS_TYPE_SPEC);
+	run_pass(&ssa_ctx, ssa_optimize_object_specialization, "after object spec", SSA_PASS_OBJ_SPEC);
 
 #if SSA_VERIFY_INTEGRITY
 	ssa_verify_integrity(&info->ssa, "after SSA pass");
