@@ -27,6 +27,7 @@ static void collect_ssa_stats(zend_op_array *op_array, zend_ssa *ssa) {
 		zend_ssa_var_info *info = &ssa->var_info[i];
 		zend_ssa_var *var = &ssa->vars[i];
 		zend_bool is_cv = var->var < op_array->last_var;
+
 		if (is_cv) {
 			OPT_STAT(cv_ssa_vars)++;
 			if (info->type & MAY_BE_UNDEF) {
@@ -57,7 +58,19 @@ static void collect_ssa_stats(zend_op_array *op_array, zend_ssa *ssa) {
 		}
 
 		if (info->type & MAY_BE_ANY) {
-			OPT_STAT(type_quality) += log2(__builtin_popcount(info->type & MAY_BE_ANY));
+			int num_types = __builtin_popcount(info->type & MAY_BE_ANY);
+			OPT_STAT(type_quality) += log2(num_types);
+			if (is_cv) {
+				if (num_types == 1) {
+					OPT_STAT(cv_ssa_one_type)++;
+				} else if (num_types == 2) {
+					OPT_STAT(cv_ssa_two_types)++;
+				} else if (num_types == 3 || num_types == 4) {
+					OPT_STAT(cv_ssa_34_types)++;
+				} else if (num_types < 9) {
+					OPT_STAT(cv_ssa_more_types)++;
+				}
+			}
 		} else {
 			OPT_STAT(ssa_may_be_nothing)++;
 		}

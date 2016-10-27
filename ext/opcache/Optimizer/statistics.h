@@ -59,6 +59,10 @@ typedef struct _zend_optimizer_statistics {
 	uint32_t ti_dead_blocks;
 	uint32_t ti_dead_blocks_instrs;
 	uint32_t ti_dead_blocks_phis;
+	uint32_t cv_ssa_one_type;
+	uint32_t cv_ssa_two_types;
+	uint32_t cv_ssa_34_types;
+	uint32_t cv_ssa_more_types;
 } zend_optimizer_statistics;
 
 extern zend_optimizer_statistics optimizer_statistics;

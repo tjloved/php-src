@@ -36,6 +36,10 @@ void zend_optimizer_statistics_shutdown() {
 	PRINT_NORM_STAT(cv_ssa_may_be_refcounted, cv_ssa_vars);
 	PRINT_NORM_STAT(cv_ssa_may_be_undef, cv_ssa_vars);
 	PRINT_NORM_STAT(cv_ssa_must_be_undef, cv_ssa_vars);
+	PRINT_NORM_STAT(cv_ssa_one_type, cv_ssa_vars);
+	PRINT_NORM_STAT(cv_ssa_two_types, cv_ssa_vars);
+	PRINT_NORM_STAT(cv_ssa_34_types, cv_ssa_vars);
+	PRINT_NORM_STAT(cv_ssa_more_types, cv_ssa_vars);
 
 	PRINT_STAT(inlining_funcs);
 	PRINT_NORM_STAT(inlining_instrs, instrs);
