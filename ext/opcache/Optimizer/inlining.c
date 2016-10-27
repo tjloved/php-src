@@ -21,6 +21,8 @@
 #include "Optimizer/zend_optimizer_internal.h"
 #include "Optimizer/statistics.h"
 
+#define AGGRESSIVE_INLINING 0
+
 /* This pass implements function inling. Currently only inlining of free functions that meet certain
  * relatively stringent requirements is possible.
  *
@@ -210,13 +212,21 @@ static inline zend_bool should_inline(
 		/* The DFA optimizations don't support op_arrays with try/catch, so don't inline them. */
 		return 0;
 	}
+
 	if (source == target && pass > 1) {
 		/* Inline recursive functions to two levels only */
 		return 0;
 	}
+
 	if (source->last > 500) {
+		/* Don't inline overly large functions */
 		return 0;
 	}
+
+#if AGGRESSIVE_INLINING
+	return 1;
+#endif
+
 	if (source->last_var > 1 + num_const_args) {
 		return 0;
 	}
@@ -932,7 +942,7 @@ static void inline_calls(zend_optimizer_ctx *ctx, zend_op_array *op_array, inlin
 void zend_optimize_inlining(zend_op_array *op_array, zend_optimizer_ctx *ctx) {
 	void *checkpoint;
 	inline_info *info;
-	int i;
+	int i, num_passes = 1;
 
 	/* Don't inline into main script -- $GLOBALS is too volatile */
 	if (op_array == &ctx->script->main_op_array) {
@@ -943,8 +953,12 @@ void zend_optimize_inlining(zend_op_array *op_array, zend_optimizer_ctx *ctx) {
 		return;
 	}
 
+#if AGGRESSIVE_INLINING
+	num_passes = 2;
+#endif
+
 	checkpoint = zend_arena_checkpoint(ctx->arena);
-	for (i = 0; i < 1; i++) {
+	for (i = 0; i < num_passes; i++) {
 		info = find_inlinable_calls(op_array, ctx, i);
 		if (info) {
 			inline_calls(ctx, op_array, info);
