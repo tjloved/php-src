@@ -59,16 +59,26 @@ static void collect_ssa_stats(zend_op_array *op_array, zend_ssa *ssa) {
 
 		if (info->type & MAY_BE_ANY) {
 			int num_types = __builtin_popcount(info->type & MAY_BE_ANY);
+			if ((info->type & MAY_BE_TRUE) && (info->type & MAY_BE_FALSE)) {
+				/* Count booleans as single type */
+				num_types--;
+			}
 			OPT_STAT(type_quality) += log2(num_types);
 			if (is_cv) {
 				if (num_types == 1) {
 					OPT_STAT(cv_ssa_one_type)++;
 				} else if (num_types == 2) {
 					OPT_STAT(cv_ssa_two_types)++;
-				} else if (num_types == 3 || num_types == 4) {
-					OPT_STAT(cv_ssa_34_types)++;
-				} else if (num_types < 9) {
-					OPT_STAT(cv_ssa_more_types)++;
+				} else if (num_types == 3) {
+					OPT_STAT(cv_ssa_3_types)++;
+				} else if (num_types == 4) {
+					OPT_STAT(cv_ssa_4_types)++;
+				} else if (num_types == 5 || num_types == 6) {
+					OPT_STAT(cv_ssa_56_types)++;
+				} else if (num_types == 7) {
+					OPT_STAT(cv_ssa_7_types)++;
+				} else if (num_types == 8) {
+					OPT_STAT(cv_ssa_8_types)++;
 				}
 			}
 		} else {
