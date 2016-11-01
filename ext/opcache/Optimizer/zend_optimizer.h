@@ -52,6 +52,10 @@
  * undefined variable notice will be duplicated (copy propagation) or elided (dead
  * code elimination). */
 #define ZEND_OPTIMIZER_ASSUME_NO_UNDEF (1 << 25)
+/* Use aggressive inlining heuristic, which will always inline functions, as long as
+ * they aren't excessively large. The default conservative heuristic will only inline
+ * small functions and favor calls with constant arguments. */
+#define ZEND_OPTIMIZER_AGGRESSIVE_INLINING (1 << 16)
 
 #define ZEND_OPTIMIZER_ALL_PASSES	0x7FFFFFFF
 

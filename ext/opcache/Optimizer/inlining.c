@@ -17,11 +17,10 @@
 */
 
 #include "php.h"
+#include "ZendAccelerator.h"
 #include "Optimizer/zend_optimizer.h"
 #include "Optimizer/zend_optimizer_internal.h"
 #include "Optimizer/statistics.h"
-
-#define AGGRESSIVE_INLINING 0
 
 /* This pass implements function inling. Currently only inlining of free functions that meet certain
  * relatively stringent requirements is possible.
@@ -223,9 +222,9 @@ static inline zend_bool should_inline(
 		return 0;
 	}
 
-#if AGGRESSIVE_INLINING
-	return 1;
-#endif
+	if (ZCG(accel_directives).optimization_level & ZEND_OPTIMIZER_AGGRESSIVE_INLINING) {
+		return 1;
+	}
 
 	if (source->last_var > 1 + num_const_args) {
 		return 0;
@@ -953,9 +952,9 @@ void zend_optimize_inlining(zend_op_array *op_array, zend_optimizer_ctx *ctx) {
 		return;
 	}
 
-#if AGGRESSIVE_INLINING
-	num_passes = 2;
-#endif
+	if (ZCG(accel_directives).optimization_level & ZEND_OPTIMIZER_AGGRESSIVE_INLINING) {
+		num_passes = 2;
+	}
 
 	checkpoint = zend_arena_checkpoint(ctx->arena);
 	for (i = 0; i < num_passes; i++) {
