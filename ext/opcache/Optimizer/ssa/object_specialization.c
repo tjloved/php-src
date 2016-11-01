@@ -60,39 +60,17 @@ static uint32_t get_property_offset(
 
 /* Checks if the property offsets of a class are finalized. This handles the case where a class
  * uses delayed binding but still has finalized offsets because it only implements interfaces. */
-static zend_bool has_finalized_property_offsets(zend_script *script, zend_string *lcname) {
-	zend_op_array *op_array = &script->main_op_array;
-	int i;
-	if (zend_hash_exists(&script->class_table, lcname)) {
+static zend_bool has_finalized_property_offsets(zend_script *script, zend_class_entry *ce) {
+	if (ce->ce_flags & ZEND_ACC_INHERITED) {
+		/* If the class is in the class table, it means it was early bound and thus finalized */
+		zend_string *lcname = zend_string_tolower(ce->name);
+		zend_bool result = zend_hash_exists(&script->class_table, lcname);
+		zend_string_release(lcname);
+		return result;
+	} else {
+		/* If inheritance isn't used, properties offsets are definitely final */
 		return 1;
 	}
-
-	// TODO Cache this, or solve it better altogether
-	// TODO Duplicate conditional classes?
-	for (i = 0; i < op_array->last; i++) {
-		zend_op *opline = &op_array->opcodes[i];
-		zval *op1;
-		switch (opline->opcode) {
-			case ZEND_DECLARE_CLASS:
-			case ZEND_DECLARE_ANON_CLASS:
-				op1 = CT_CONSTANT_EX(op_array, opline->op1.constant);
-				if (zend_string_equals_literal(Z_STR_P(op1), lcname)) {
-					return 1;
-				}
-				break;
-			case ZEND_DECLARE_INHERITED_CLASS:
-			case ZEND_DECLARE_INHERITED_CLASS_DELAYED:
-			case ZEND_DECLARE_ANON_INHERITED_CLASS:
-				op1 = CT_CONSTANT_EX(op_array, opline->op1.constant);
-				if (zend_string_equals_literal(Z_STR_P(op1), lcname)) {
-					return 0;
-				}
-				break;
-		}
-	}
-
-	/* Dynamic class, declared elsewhere */
-	return 0;
 }
 
 void ssa_optimize_object_specialization(ssa_opt_ctx *ctx) {
@@ -122,7 +100,6 @@ void ssa_optimize_object_specialization(ssa_opt_ctx *ctx) {
 					break;
 				}
 				if (opline->op1_type == IS_UNUSED) {
-					zend_string *lcname;
 					if (!op_array->scope) {
 						/* $this in changeable scope */
 						break;
@@ -134,12 +111,9 @@ void ssa_optimize_object_specialization(ssa_opt_ctx *ctx) {
 						break;
 					}
 
-					lcname = zend_string_tolower(ce->name);
-					if (!has_finalized_property_offsets(ctx->opt_ctx->script, lcname)) {
-						zend_string_release(lcname);
+					if (!has_finalized_property_offsets(ctx->opt_ctx->script, ce)) {
 						break;
 					}
-					zend_string_release(lcname);
 				} else {
 					zend_ssa_var_info *info = &ssa->var_info[ssa_op->op1_use];
 					if (!MUST_BE(t1, MAY_BE_OBJECT) || !info->ce) {
