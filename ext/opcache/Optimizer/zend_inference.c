@@ -4114,6 +4114,25 @@ static int zend_infer_types(
 		ssa_var_info[j].type = 0;
 	}
 
+	for (j = 0; j < op_array->last_var; j++) {
+		/* $php_errormsg and $http_response_header may be updated indirectly */
+		if (zend_string_equals_literal(op_array->vars[j], "php_errormsg")) {
+			int i;
+			for (i = 0; i < ssa_vars_count; i++) {
+				if (ssa->vars[i].var == j) {
+					ssa_var_info[i].type |= MAY_BE_ANY | MAY_BE_ARRAY_KEY_ANY | MAY_BE_ARRAY_OF_ANY | MAY_BE_ARRAY_OF_REF | MAY_BE_REF;
+				}
+			}
+		} else if (zend_string_equals_literal(op_array->vars[j], "http_response_header")) {
+			int i;
+			for (i = 0; i < ssa_vars_count; i++) {
+				if (ssa->vars[i].var == j) {
+					ssa_var_info[i].type |= MAY_BE_ANY | MAY_BE_ARRAY_KEY_ANY | MAY_BE_ARRAY_OF_ANY | MAY_BE_ARRAY_OF_REF | MAY_BE_REF;
+				}
+			}
+		}
+	}
+
 	scdf_init(&scdf, op_array, ssa, &ctx);
 	scdf_solve(&scdf, "Type inference");
 
@@ -4132,25 +4151,6 @@ static int zend_infer_types(
 	scdf_free(&scdf);
 	if (ctx.combine_scp) {
 		scp_context_free(&ctx.scp);
-	}
-
-	for (j = 0; j < op_array->last_var; j++) {
-		/* $php_errormsg and $http_response_header may be updated indirectly */
-		if (zend_string_equals_literal(op_array->vars[j], "php_errormsg")) {
-			int i;
-			for (i = 0; i < ssa_vars_count; i++) {
-				if (ssa->vars[i].var == j) {
-					ssa_var_info[i].type |= MAY_BE_ANY | MAY_BE_ARRAY_KEY_ANY | MAY_BE_ARRAY_OF_ANY | MAY_BE_ARRAY_OF_REF | MAY_BE_REF;
-				}
-			}
-		} else if (zend_string_equals_literal(op_array->vars[j], "http_response_header")) {
-			int i;
-			for (i = 0; i < ssa_vars_count; i++) {
-				if (ssa->vars[i].var == j) {
-					ssa_var_info[i].type |= MAY_BE_ANY | MAY_BE_ARRAY_KEY_ANY | MAY_BE_ARRAY_OF_ANY | MAY_BE_ARRAY_OF_REF | MAY_BE_REF;
-				}
-			}
-		}
 	}
 
 	if (ZEND_FUNC_INFO(op_array)) {
