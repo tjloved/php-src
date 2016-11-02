@@ -261,11 +261,6 @@ static inline zend_bool can_tmpvar_op2(zend_op *opline) {
 	return 1;
 }
 
-static inline zend_bool is_used_only_in(
-		zend_ssa *ssa, zend_ssa_var *var, zend_ssa_op *ssa_op, int i) {
-	return var->use_chain == i && ssa_op->op2_use_chain < 0 && !var->phi_use_chain;
-}
-
 /* Propagates assignments of type ASSIGN CV_i, TMP_j where CV_i is used (properly) only once in
  * the same basic block, the use supports TMPs and TMP_j has no dtor effect. */
 // TODO: This needs to update live-ranges for temporaries
@@ -280,7 +275,7 @@ void try_propagate_cv_tmp_assignment(
 	zend_basic_block *block;
 	zend_bool found_use = 0;
 
-	if (!is_used_only_in(ssa, rhs_var, ssa_op, op_num)) {
+	if (!is_used_only_in(ssa, rhs_var, ssa_op)) {
 		return;
 	}
 
@@ -379,7 +374,7 @@ void try_propagate_tmp_tmp_assignment(
 	zend_ssa_var *lhs_var = &ssa->vars[ssa_op->result_def];
 	int use;
 
-	if (lhs_var->phi_use_chain || !is_used_only_in(ssa, rhs_var, ssa_op, op_num)) {
+	if (lhs_var->phi_use_chain || !is_used_only_in(ssa, rhs_var, ssa_op)) {
 		return;
 	}
 
@@ -427,6 +422,30 @@ void try_propagate_tmp_tmp_assignment(
 	/* Remove assignment */
 	rename_var_uses(ssa, ssa_op->result_def, ssa_op->op1_use);
 	remove_result_def(ssa, ssa_op);
+	remove_instr(ssa, opline, ssa_op);
+
+	OPT_STAT(copy_propagated_tmp)++;
+}
+
+/* Removes a T1 = QM_ASSIGN T0 by replacing the def-point of T0 by T1, if T0 is only used in this
+ * QM_ASSIGN. This is something like a "reverse copy propagation". It is useful if T1 is used in a
+ * phi, because this is not handled by ordinarly copy propagation right now. */
+static void try_reverse_propagate_assignment(
+		zend_ssa *ssa, zend_op_array *op_array, zend_op *opline, zend_ssa_op *ssa_op) {
+	zend_ssa_var *var = &ssa->vars[ssa_op->op1_use];
+	zend_ssa_op *def_op;
+	if ((ssa->var_info[ssa_op->op1_use].type & MAY_BE_REF)
+			|| var->definition < 0
+			|| !is_used_only_in(ssa, var, ssa_op)) {
+		return;
+	}
+
+	def_op = &ssa->ops[var->definition];
+	if (def_op->result_def != ssa_op->op1_use || def_op->result_use > 0) {
+		return;
+	}
+
+	move_result_def(ssa, opline, ssa_op, &op_array->opcodes[var->definition], def_op);
 	remove_instr(ssa, opline, ssa_op);
 
 	OPT_STAT(copy_propagated_tmp)++;
@@ -713,6 +732,9 @@ void ssa_optimize_copy(ssa_opt_ctx *ctx) {
 				}
 			} else if (opline->op1_type & (IS_VAR|IS_TMP_VAR)) {
 				try_propagate_tmp_tmp_assignment(ctx, opline, ssa_op, i);
+				if (opline->opcode != ZEND_NOP) {
+					try_reverse_propagate_assignment(ssa, op_array, opline, ssa_op);
+				}
 			}
 		}
 	} FOREACH_INSTR_NUM_END();

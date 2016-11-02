@@ -89,6 +89,10 @@ void remove_uses_of_var(zend_ssa *ssa, int var_num);
 /* num_instr and num_phi are the number of removed instructions/phis, for statistical purposes */
 void remove_block(zend_ssa *ssa, int i, uint32_t *num_instr, uint32_t *num_phi);
 
+void move_result_def(
+		zend_ssa *ssa, zend_op *old_opline, zend_ssa_op *old_op,
+		zend_op *new_opline, zend_ssa_op *new_op);
+
 struct _cfg_info;
 zend_bool var_dominates(
 	const zend_ssa *ssa, const struct _cfg_info *info, zend_ssa_var *var_a, zend_ssa_var *var_b);
@@ -250,6 +254,24 @@ static inline uint32_t get_def_block(const zend_ssa *ssa, const zend_ssa_var *va
 static inline zend_bool has_improper_op1_use(zend_op *opline) {
 	return opline->opcode == ZEND_ASSIGN
 		|| (opline->opcode == ZEND_UNSET_VAR && opline->extended_value & ZEND_QUICK_SET);
+}
+
+static inline zend_bool is_used_only_in(
+		const zend_ssa *ssa, const zend_ssa_var *var, const zend_ssa_op *ssa_op) {
+	int var_num = var - ssa->vars;
+	if (var->phi_use_chain || var->use_chain != ssa_op - ssa->ops) {
+		return 0;
+	}
+	if (ssa_op->result_use == var_num) {
+		return ssa_op->res_use_chain < 0;
+	}
+	if (ssa_op->op1_use == var_num) {
+		return ssa_op->op1_use_chain < 0;
+	}
+	if (ssa_op->op2_use == var_num) {
+		return ssa_op->op2_use_chain < 0;
+	}
+	ZEND_ASSERT(0);
 }
 
 static inline int zend_bitset_pop_first(zend_bitset set, uint32_t len) {

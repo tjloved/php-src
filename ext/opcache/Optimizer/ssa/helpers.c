@@ -373,6 +373,20 @@ void remove_block(zend_ssa *ssa, int i, uint32_t *num_instr, uint32_t *num_phi) 
 	}
 }
 
+void move_result_def(
+		zend_ssa *ssa, zend_op *old_opline, zend_ssa_op *old_op,
+		zend_op *new_opline, zend_ssa_op *new_op) {
+	/* Remove existing result def of new instruction */
+	remove_uses_of_var(ssa, new_op->result_def);
+	remove_result_def(ssa, new_op);
+
+	/* Move def from old to new instruction */
+	COPY_NODE(new_opline->result, old_opline->result);
+	new_op->result_def = old_op->result_def;
+	old_op->result_def = -1;
+	ssa->vars[new_op->result_def].definition = new_op - ssa->ops;
+}
+
 zend_bool var_dominates(
 		const zend_ssa *ssa, const cfg_info *info,
 		zend_ssa_var *var_a, zend_ssa_var *var_b) {

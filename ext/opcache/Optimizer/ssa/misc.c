@@ -14,38 +14,6 @@ static inline zend_bool is_minus_one(zval *op) {
 	}
 }
 
-static inline zend_bool is_used_only_in(
-		const zend_ssa *ssa, const zend_ssa_var *var, const zend_ssa_op *ssa_op) {
-	int var_num = var - ssa->vars;
-	if (var->phi_use_chain || var->use_chain != ssa_op - ssa->ops) {
-		return 0;
-	}
-	if (ssa_op->result_use == var_num) {
-		return ssa_op->res_use_chain < 0;
-	}
-	if (ssa_op->op1_use == var_num) {
-		return ssa_op->op1_use_chain < 0;
-	}
-	if (ssa_op->op2_use == var_num) {
-		return ssa_op->op2_use_chain < 0;
-	}
-	ZEND_ASSERT(0);
-}
-
-static void move_result_def(
-		zend_ssa *ssa, zend_op *old_opline, zend_ssa_op *old_op,
-		zend_op *new_opline, zend_ssa_op *new_op) {
-	/* Remove existing result def of new instruction */
-	remove_uses_of_var(ssa, new_op->result_def);
-	remove_result_def(ssa, new_op);
-
-	/* Move def from old to new instruction */
-	COPY_NODE(new_opline->result, old_opline->result);
-	new_op->result_def = old_op->result_def;
-	old_op->result_def = -1;
-	ssa->vars[new_op->result_def].definition = new_op - ssa->ops;
-}
-
 /* Reassociates floating-point operation -(C/x) to (-C)/x, as well as variations with the constant
  * in the denominator and multiplication operations. This transformation is allowed, because PHP
  * uses the floating point round-to-nearest mode, with no way to change it. This transformation
@@ -84,28 +52,6 @@ static void reassociate_mul_minus_one(
 	}
 }
 
-/* Removes a T1 = QM_ASSIGN T0 by replacing the def-point of T0 by T1, if T0 is only used in this
- * QM_ASSIGN. This is something like a "reverse copy propagation". It is useful if T1 is used in a
- * phi, because this is not handled by ordinarly copy propagation right now. */
-static void reverse_propagate_assign(
-		zend_ssa *ssa, zend_op_array *op_array, zend_op *opline, zend_ssa_op *ssa_op) {
-	zend_ssa_var *var = &ssa->vars[ssa_op->op1_use];
-	zend_ssa_op *def_op;
-	if ((ssa->var_info[ssa_op->op1_use].type & MAY_BE_REF)
-			|| var->definition < 0
-			|| !is_used_only_in(ssa, var, ssa_op)) {
-		return;
-	}
-
-	def_op = &ssa->ops[var->definition];
-	if (def_op->result_def != ssa_op->op1_use || def_op->result_use > 0) {
-		return;
-	}
-
-	move_result_def(ssa, opline, ssa_op, &op_array->opcodes[var->definition], def_op);
-	remove_instr(ssa, opline, ssa_op);
-}
-
 void ssa_optimize_misc(ssa_opt_ctx *ctx) {
 	zend_op_array *op_array = ctx->op_array;
 	zend_ssa *ssa = ctx->ssa;
@@ -124,10 +70,6 @@ void ssa_optimize_misc(ssa_opt_ctx *ctx) {
 			if (opline->op2_type == IS_CONST && opline->op1_type == IS_TMP_VAR
 					&& is_minus_one(&ZEND_OP2_LITERAL(opline))) {
 				reassociate_mul_minus_one(ssa, op_array, opline, ssa_op, ssa_op->op1_use);
-			}
-		} else if (opline->opcode == ZEND_QM_ASSIGN) {
-			if (opline->result_type == IS_TMP_VAR && opline->op1_type == IS_TMP_VAR) {
-				reverse_propagate_assign(ssa, op_array, opline, ssa_op);
 			}
 		}
 	} FOREACH_INSTR_NUM_END();
