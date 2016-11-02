@@ -33,15 +33,15 @@ void ssa_verify_inference(zend_optimizer_ctx *opt_ctx, zend_op_array *op_array, 
 
 // 1: After SSA pass
 // 2: Before SSA pass
-#define SSA_PASS_SCP          (1 << 2) //    4
-#define SSA_PASS_DCE          (1 << 3) //    8
-#define SSA_PASS_SIMPLIFY_CFG (1 << 3) //   16
-#define SSA_PASS_COPY_PROP    (1 << 4) //   32
-#define SSA_PASS_DCE_2        (1 << 5) //   64
-#define SSA_PASS_ASSIGN_CONTR (1 << 6) //  128
-#define SSA_PASS_MISC         (1 << 7) //  256
-#define SSA_PASS_TYPE_SPEC    (1 << 8) //  512
-#define SSA_PASS_OBJ_SPEC     (1 << 9) // 1024
+#define SSA_PASS_SCP          (1 <<  2) //    4
+#define SSA_PASS_DCE          (1 <<  3) //    8
+#define SSA_PASS_SIMPLIFY_CFG (1 <<  4) //   16
+#define SSA_PASS_COPY_PROP    (1 <<  5) //   32
+#define SSA_PASS_DCE_2        (1 <<  6) //   64
+#define SSA_PASS_ASSIGN_CONTR (1 <<  7) //  128
+#define SSA_PASS_MISC         (1 <<  8) //  256
+#define SSA_PASS_TYPE_SPEC    (1 <<  9) //  512
+#define SSA_PASS_OBJ_SPEC     (1 << 10) // 1024
 
 // Combine type inference with SCP
 #define SSA_PASS_COMBINE_SCP  (1 << 16)
