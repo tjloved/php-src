@@ -747,10 +747,8 @@ optimize_const_unary_op:
 						zend_bool optimize = 1;
 
 						while (op < opline) {
-							if ((op->op1_type == opline->op1_type
-							  && op->op1.var == opline->op1.var)
-							 || (op->op2_type == opline->op1_type
-							  && op->op2.var == opline->op1.var)) {
+							if (op->opcode != ZEND_NOP) {
+								/* QM_ASSIGN operand might change */
 								optimize = 0;
 								break;
 							}
