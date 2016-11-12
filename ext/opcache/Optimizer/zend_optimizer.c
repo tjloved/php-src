@@ -166,38 +166,27 @@ int zend_optimizer_update_op1_const(zend_op_array *op_array,
                                     zval          *val)
 {
 	switch (opline->opcode) {
+		case ZEND_FREE:
+			MAKE_NOP(opline);
+			zval_dtor(val);
+			return 1;
+		case ZEND_SEPARATE:
+		case ZEND_SEND_VAR_EX:
+		case ZEND_SEND_VAR_NO_REF:
+		case ZEND_SEND_VAR_NO_REF_EX:
 		case ZEND_FETCH_DIM_W:
 		case ZEND_FETCH_DIM_RW:
 		case ZEND_FETCH_DIM_FUNC_ARG:
 		case ZEND_FETCH_DIM_UNSET:
 		case ZEND_ASSIGN_DIM:
-		case ZEND_SEPARATE:
 		case ZEND_RETURN_BY_REF:
-			zval_dtor(val);
+			zval_ptr_dtor(val);
 			return 0;
-		case ZEND_SEND_VAR:
-			opline->extended_value = 0;
-			opline->opcode = ZEND_SEND_VAL;
-			break;
-		case ZEND_SEND_VAR_EX:
-			opline->extended_value = 0;
-			opline->opcode = ZEND_SEND_VAL_EX;
-			break;
-		case ZEND_SEND_VAR_NO_REF:
-			zval_dtor(val);
+		case ZEND_VERIFY_RETURN_TYPE:
+			/* This would require a non-local change.
+			 * zend_optimizer_replace_by_const() supports this. */
+			zval_ptr_dtor(val);
 			return 0;
-		case ZEND_SEND_VAR_NO_REF_EX:
-			opline->opcode = ZEND_SEND_VAL;
-			break;
-		case ZEND_SEND_USER:
-			opline->opcode = ZEND_SEND_VAL_EX;
-			break;
-	}
-	switch (opline->opcode) {
-		case ZEND_FREE:
-			MAKE_NOP(opline);
-			zval_dtor(val);
-			return 1;
 		case ZEND_INIT_STATIC_METHOD_CALL:
 		case ZEND_CATCH:
 		case ZEND_FETCH_CONSTANT:
@@ -224,16 +213,6 @@ int zend_optimizer_update_op1_const(zend_op_array *op_array,
 			opline->opcode = ZEND_SEND_VAL;
 			opline->op1.constant = zend_optimizer_add_literal(op_array, val);
 			break;
-		case ZEND_SEPARATE:
-		case ZEND_SEND_VAR_NO_REF:
-		case ZEND_SEND_VAR_NO_REF_EX:
-			zval_ptr_dtor(val);
-			return 0;
-		case ZEND_VERIFY_RETURN_TYPE:
-			/* This would require a non-local change.
-			 * zend_optimizer_replace_by_const() supports this. */
-			zval_ptr_dtor(val);
-			return 0;
 		case ZEND_CONCAT:
 		case ZEND_FAST_CONCAT:
 		case ZEND_FETCH_R:
