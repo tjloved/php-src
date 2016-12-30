@@ -212,15 +212,13 @@ void ssa_optimize_type_specialization(ssa_opt_ctx *ctx) {
 				if (MUST_BE(t1, MAY_BE_LONG)) {
 					if (opline->opcode == ZEND_PRE_INC) {
 						if (MUST_BE(ssa->var_info[ssa_op->op1_def].type, MAY_BE_LONG)) {
-							opline->opcode = ZEND_ADD_INT_NO_OVERFLOW;
+							opline->opcode = ZEND_PRE_INC_INT_NO_OVERFLOW;
 						} else {
-							opline->opcode = ZEND_ADD_INT;
+							opline->opcode = ZEND_PRE_INC_INT;
 						}
 					} else {
-						opline->opcode = ZEND_SUB_INT;
+						opline->opcode = ZEND_PRE_DEC_INT;
 					}
-					opline->op2_type = IS_CONST;
-					LITERAL_LONG(opline->op2, 1);
 				} else if (MUST_BE(t1, MAY_BE_DOUBLE)) {
 					zval zv;
 					ZVAL_DOUBLE(&zv, 1.0);
@@ -228,10 +226,10 @@ void ssa_optimize_type_specialization(ssa_opt_ctx *ctx) {
 						? ZEND_ADD_FLOAT : ZEND_SUB_FLOAT;
 					opline->op2_type = IS_CONST;
 					opline->op2.constant = zend_optimizer_add_literal(op_array, &zv);
+					COPY_NODE(opline->result, opline->op1);
+					ssa_op->result_def = ssa_op->op1_def;
+					ssa_op->op1_def = -1;
 				}
-				COPY_NODE(opline->result, opline->op1);
-				ssa_op->result_def = ssa_op->op1_def;
-				ssa_op->op1_def = -1;
 				OPT_STAT(type_spec_arithm)++;
 				break;
 			case ZEND_POST_INC:
