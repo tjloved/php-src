@@ -212,8 +212,8 @@ static inline zend_bool should_inline(
 		return 0;
 	}
 
-	if (source == target && pass > 1) {
-		/* Inline recursive functions to two levels only */
+	if (source == target) {
+		/* Inline recursive functions to one level only */
 		return 0;
 	}
 
