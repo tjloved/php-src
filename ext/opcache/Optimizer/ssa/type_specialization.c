@@ -47,11 +47,11 @@ static inline zend_bool can_elide_return_type_check(
 		return 0;
 	}
 
-	if (info->type_hint == IS_CALLABLE) {
+	if (ZEND_TYPE_CODE(info->type) == IS_CALLABLE) {
 		return 0;
 	}
 
-	if (info->class_name) {
+	if (ZEND_TYPE_IS_CLASS(info->type)) {
 		if (!use_info->ce || !def_info->ce || !instanceof_function(use_info->ce, def_info->ce)) {
 			return 0;
 		}
@@ -327,7 +327,7 @@ void ssa_optimize_type_specialization(ssa_opt_ctx *ctx) {
 				if (Z_CONSTANT_P(CT_CONSTANT_EX(op_array, opline->op2.constant))) {
 					break;
 				}
-				if (arg_info->type_hint) {
+				if (ZEND_TYPE_IS_SET(arg_info->type)) {
 					break;
 				}
 				

@@ -523,13 +523,7 @@ static inline int ct_eval_func_call(
 		}
 
 		c = Z_LVAL_P(args[0]) & 0xff;
-		if (CG(one_char_string)[c]) {
-			ZVAL_INTERNED_STR(result, CG(one_char_string)[c]);
-		} else {
-			ZVAL_NEW_STR(result, zend_string_alloc(1, 0));
-			Z_STRVAL_P(result)[0] = (char)c;
-			Z_STRVAL_P(result)[1] = '\0';
-		}
+		ZVAL_INTERNED_STR(result, ZSTR_CHAR(c));
 		return SUCCESS;
 	} else if (zend_string_equals_literal(name, "in_array")) {
 		zval *val;

@@ -271,8 +271,8 @@ static void copy_arg_info(zend_arg_info *target, const zend_arg_info *source) {
 	if (target->name) {
 		zend_string_addref(target->name);
 	}
-	if (target->class_name) {
-		zend_string_addref(target->class_name);
+	if (ZEND_TYPE_IS_CLASS(target->type)) {
+		zend_string_addref(ZEND_TYPE_NAME(target->type));
 	}
 }
 
