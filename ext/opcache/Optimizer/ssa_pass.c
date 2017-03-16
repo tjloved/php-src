@@ -170,30 +170,6 @@ static void remove_trivial_phis(zend_ssa *ssa) {
 	} FOREACH_PHI_END();
 }
 
-typedef struct _call_info {
-	int16_t start;
-	int16_t next;
-} call_info;
-
-static zend_call_info **compute_call_map(
-		zend_optimizer_ctx *opt_ctx, zend_func_info *info, zend_op_array *op_array) {
-	zend_call_info **map = zend_arena_calloc(
-		&opt_ctx->arena, sizeof(zend_call_info *), op_array->last);
-	zend_op *start = op_array->opcodes;
-	zend_call_info *call;
-	for (call = info->callee_info; call; call = call->next_callee) {
-		int i;
-		map[call->caller_init_opline - start] = call;
-		map[call->caller_call_opline - start] = call;
-		for (i = 0; i < call->num_args; i++) {
-			if (call->arg_info[i].opline) {
-				map[call->arg_info[i].opline - start] = call;
-			}
-		}
-	}
-	return map;
-}
-
 static inline zend_bool should_dump(const zend_op_array *op_array, int debug_level) {
 	if (ZCG(accel_directives).ssa_debug_level & debug_level) {
 		const char *func = ZCG(accel_directives).ssa_debug_func;
@@ -249,7 +225,6 @@ static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) 
 	cfg_info cfg_info;
 	ssa_liveness liveness;
 	ssa_opt_ctx ssa_ctx;
-	zend_call_info **call_map;
 	zend_bool verify_inference = ZCG(accel_directives).opt_statistics == 3;
 
 	/* We can't currently perform data-flow analysis for code using try/catch */
@@ -298,17 +273,17 @@ static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) 
 		return;
 	}
 
+	info->call_map = zend_build_call_map(&ctx->arena, info, op_array);
+
 	/* Should happen before inference */
 	remove_unreachable_blocks(&info->ssa);
-
-	call_map = compute_call_map(ctx, info, op_array);
 
 	if (verify_inference) {
 		/* Do not run SCP in verify-inference mode, as SCP does not support RC inference. */
 		ZCG(accel_directives).ssa_opt_level &= ~SSA_PASS_COMBINE_SCP;
 	}
 
-	if (zend_ssa_inference(&ctx->arena, op_array, ctx->script, &info->ssa, call_map) != SUCCESS) {
+	if (zend_ssa_inference(&ctx->arena, op_array, ctx->script, &info->ssa) != SUCCESS) {
 		return;
 	}
 
@@ -346,7 +321,6 @@ static void optimize_ssa_impl(zend_optimizer_ctx *ctx, zend_op_array *op_array) 
 	ssa_ctx.func_info = info;
 	ssa_ctx.cfg_info = &cfg_info;
 	ssa_ctx.liveness = &liveness;
-	ssa_ctx.call_map = call_map;
 	ssa_ctx.reorder_dtor_effects =
 		(ctx->optimization_level & ZEND_OPTIMIZER_REORDER_DTOR_EFFECTS) != 0;
 	ssa_ctx.assume_no_undef = (ctx->optimization_level & ZEND_OPTIMIZER_ASSUME_NO_UNDEF) != 0;
