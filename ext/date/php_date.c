@@ -345,7 +345,7 @@ ZEND_BEGIN_ARG_INFO_EX(arginfo_timezone_transitions_get, 0, 0, 1)
 	ZEND_ARG_INFO(0, timestamp_end)
 ZEND_END_ARG_INFO()
 
-ZEND_BEGIN_ARG_INFO(arginfo_timezone_method_transitions_get, 0)
+ZEND_BEGIN_ARG_INFO_EX(arginfo_timezone_method_transitions_get, 0, 0, 0)
 	ZEND_ARG_INFO(0, timestamp_begin)
 	ZEND_ARG_INFO(0, timestamp_end)
 ZEND_END_ARG_INFO()
@@ -2566,7 +2566,7 @@ static void update_errors_warnings(timelib_error_container *last_errors) /* {{{ 
 
 static void php_date_set_time_fraction(timelib_time *time, int microseconds)
 {
-	time->f = microseconds / 1000000;
+	time->f = (double) microseconds / 1000000;
 }
 
 static void php_date_get_current_time_with_fraction(time_t *sec, suseconds_t *usec)

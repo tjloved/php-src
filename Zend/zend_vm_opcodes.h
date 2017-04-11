@@ -252,6 +252,8 @@ END_EXTERN_C()
 #define ZEND_BIND_STATIC                     183
 #define ZEND_FETCH_THIS                      184
 #define ZEND_ISSET_ISEMPTY_THIS              186
+#define ZEND_SWITCH_LONG                     187
+#define ZEND_SWITCH_STRING                   188
 #define ZEND_PHI_ASSIGN                      190
 #define ZEND_IS_SMALLER_FLOAT                191
 #define ZEND_IS_SMALLER_INT                  192
