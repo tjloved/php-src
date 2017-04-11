@@ -12,6 +12,8 @@ typedef struct _scdf_ctx {
 	zend_bitset executable_blocks;
 	/* Edge encoding: 2 bits per block, one for each successor */
 	zend_bitset feasible_edges;
+	/* If there are more than two successors, an HT is used instead */
+	HashTable *feasible_edges_ht;
 	uint32_t instr_worklist_len;
 	uint32_t phi_var_worklist_len;
 	uint32_t block_worklist_len;
@@ -61,15 +63,19 @@ static inline void scdf_add_def_to_worklist(scdf_ctx *scdf, int var_num) {
 
 static inline zend_bool scdf_is_edge_feasible(scdf_ctx *scdf, int from, int to) {
 	zend_basic_block *block = &scdf->ssa->cfg.blocks[from];
-	int suc;
-	if (block->successors[0] == to) {
-		suc = 0;
-	} else if (block->successors[1] == to) {
-		suc = 1;
-	} else {
-		ZEND_ASSERT(0);
+	int s;
+	for (s = 0; s < block->successors_count; s++) {
+		if (block->successors[s] == to) {
+			if (s < 2) {
+				return zend_bitset_in(scdf->feasible_edges, 2 * from + s);
+			} else {
+				return scdf->feasible_edges_ht
+					&& zend_hash_index_exists(scdf->feasible_edges_ht,
+							(zend_long) (intptr_t) &block->successors[s]);
+			}
+		}
 	}
-	return zend_bitset_in(scdf->feasible_edges, 2 * from + suc);
+	ZEND_ASSERT(0);
 }
 
 #endif

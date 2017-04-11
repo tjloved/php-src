@@ -323,41 +323,39 @@ void remove_block(zend_ssa *ssa, int i, uint32_t *num_instr, uint32_t *num_phi) 
 		}
 	}
 
-	for (s = 0; s < 2; s++) {
-		if (block->successors[s] >= 0) {
-			zend_basic_block *next_block = &ssa->cfg.blocks[block->successors[s]];
-			zend_ssa_block *next_ssa_block = &ssa->blocks[block->successors[s]];
-			zend_ssa_phi *phi;
+	for (s = 0; s < block->successors_count; s++) {
+		zend_basic_block *next_block = &ssa->cfg.blocks[block->successors[s]];
+		zend_ssa_block *next_ssa_block = &ssa->blocks[block->successors[s]];
+		zend_ssa_phi *phi;
 
-			/* Find at which predecessor offset this block is referenced */
-			int pred_offset = -1;
-			predecessors = &ssa->cfg.predecessors[next_block->predecessor_offset];
-			for (j = 0; j < next_block->predecessors_count; j++) {
-				if (predecessors[j] == i) {
-					pred_offset = j;
-					break;
-				}
+		/* Find at which predecessor offset this block is referenced */
+		int pred_offset = -1;
+		predecessors = &ssa->cfg.predecessors[next_block->predecessor_offset];
+		for (j = 0; j < next_block->predecessors_count; j++) {
+			if (predecessors[j] == i) {
+				pred_offset = j;
+				break;
 			}
-			ZEND_ASSERT(pred_offset != -1);
-
-			/* For phis in successor blocks, remove the operands associated with this block */
-			for (phi = next_ssa_block->phis; phi; phi = phi->next) {
-				if (phi->pi >= 0) {
-					if (phi->pi == i) {
-						remove_uses_of_var(ssa, phi->ssa_var);
-						remove_phi(ssa, phi);
-						(*num_phi)++;
-					}
-				} else {
-					if (phi->sources[pred_offset] >= 0) {
-						remove_phi_source(ssa, phi, pred_offset);
-					}
-				}
-			}
-
-			/* Remove this predecessor */
-			predecessors[pred_offset] = -1;
 		}
+		ZEND_ASSERT(pred_offset != -1);
+
+		/* For phis in successor blocks, remove the operands associated with this block */
+		for (phi = next_ssa_block->phis; phi; phi = phi->next) {
+			if (phi->pi >= 0) {
+				if (phi->pi == i) {
+					remove_uses_of_var(ssa, phi->ssa_var);
+					remove_phi(ssa, phi);
+					(*num_phi)++;
+				}
+			} else {
+				if (phi->sources[pred_offset] >= 0) {
+					remove_phi_source(ssa, phi, pred_offset);
+				}
+			}
+		}
+
+		/* Remove this predecessor */
+		predecessors[pred_offset] = -1;
 	}
 
 	/* Remove successors of predecessors */
@@ -365,10 +363,15 @@ void remove_block(zend_ssa *ssa, int i, uint32_t *num_instr, uint32_t *num_phi) 
 	for (j = 0; j < block->predecessors_count; j++) {
 		if (predecessors[j] >= 0) {
 			zend_basic_block *prev_block = &ssa->cfg.blocks[predecessors[j]];
-			if (prev_block->successors[0] == i) {
-				prev_block->successors[0] = prev_block->successors[1];
+			for (s = 0; s < prev_block->successors_count; s++) {
+				if (prev_block->successors[s] == i) {
+					memmove(prev_block->successors + s,
+							prev_block->successors + s + 1,
+							sizeof(int) * (prev_block->successors_count - s - 1));
+					prev_block->successors_count--;
+					s--;
+				}
 			}
-			prev_block->successors[1] = -1;
 		}
 	}
 }

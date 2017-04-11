@@ -35,15 +35,29 @@
 #define DEBUG_PRINT(...)
 #endif
 
-static void mark_edge_feasible(scdf_ctx *ctx, int from, int to, int suc_num) {
-	int edge = from * 2 + suc_num;
-	if (zend_bitset_in(ctx->feasible_edges, edge)) {
-		/* We already handled this edge */
-		return;
-	}
+static void mark_edge_feasible(scdf_ctx *ctx, int from, const int *to_ptr, int suc_num) {
+	int to = *to_ptr;
+	if (suc_num < 2) {
+		int edge = from * 2 + suc_num;
+		if (zend_bitset_in(ctx->feasible_edges, edge)) {
+			/* We already handled this edge */
+			return;
+		}
 
-	DEBUG_PRINT("Marking edge %d->%d (successor %d) feasible\n", from, to, suc_num);
-	zend_bitset_incl(ctx->feasible_edges, edge);
+		DEBUG_PRINT("Marking edge %d->%d (successor %d) feasible\n", from, to, suc_num);
+		zend_bitset_incl(ctx->feasible_edges, edge);
+	} else {
+		if (!ctx->feasible_edges_ht) {
+			ALLOC_HASHTABLE(ctx->feasible_edges_ht);
+			zend_hash_init(ctx->feasible_edges_ht, 0, NULL, NULL, 0);
+		}
+		if (!zend_hash_index_add_empty_element(
+				ctx->feasible_edges_ht, (zend_long) (intptr_t) to_ptr)) {
+			/* We already handled this edge */
+			return;
+		}
+		DEBUG_PRINT("Marking edge %d->%d (successor %d) feasible\n", from, to, suc_num);
+	}
 
 	if (!zend_bitset_in(ctx->executable_blocks, to)) {
 		if (!zend_bitset_in(ctx->block_worklist, to)) {
@@ -66,12 +80,12 @@ static inline zend_bool get_feasible_successors(
 		scdf_ctx *ctx, zend_basic_block *block,
 		zend_op *opline, zend_ssa_op *ssa_op, zend_bool *suc) {
 	/* Terminal block without successors */
-	if (block->successors[0] < 0) {
+	if (block->successors_count == 0) {
 		return 0;
 	}
 
 	/* Unconditional jump */
-	if (block->successors[1] < 0) {
+	if (block->successors_count == 1) {
 		suc[0] = 1;
 		return 1;
 	}
@@ -84,13 +98,21 @@ static void handle_instr(scdf_ctx *ctx, int block_num, zend_op *opline, zend_ssa
 	ctx->handlers.visit_instr(ctx, ctx->ctx, opline, ssa_op);
 
 	if (opline - ctx->op_array->opcodes == block->start + block->len - 1) {
-		zend_bool suc[2] = {0};
-		if (get_feasible_successors(ctx, block, opline, ssa_op, suc)) {
-			if (suc[0]) {
-				mark_edge_feasible(ctx, block_num, block->successors[0], 0);
+		if (opline->opcode == ZEND_SWITCH_LONG || opline->opcode == ZEND_SWITCH_STRING) {
+			// TODO For now consider all edges feasible
+			int s;
+			for (s = 0; s < block->successors_count; s++) {
+				mark_edge_feasible(ctx, block_num, &block->successors[s], s);
 			}
-			if (suc[1]) {
-				mark_edge_feasible(ctx, block_num, block->successors[1], 1);
+		} else {
+			zend_bool suc[2] = {0};
+			if (get_feasible_successors(ctx, block, opline, ssa_op, suc)) {
+				if (suc[0]) {
+					mark_edge_feasible(ctx, block_num, &block->successors[0], 0);
+				}
+				if (suc[1]) {
+					mark_edge_feasible(ctx, block_num, &block->successors[1], 1);
+				}
 			}
 		}
 	}
@@ -116,6 +138,7 @@ void scdf_init(scdf_ctx *ctx, const zend_op_array *op_array, zend_ssa *ssa, void
 	ctx->block_worklist = ctx->phi_var_worklist + ctx->phi_var_worklist_len;
 	ctx->executable_blocks = ctx->block_worklist + ctx->block_worklist_len;
 	ctx->feasible_edges = ctx->executable_blocks + ctx->block_worklist_len;
+	ctx->feasible_edges_ht = NULL;
 
 	zend_bitset_clear(ctx->instr_worklist, ctx->instr_worklist_len);
 	zend_bitset_clear(ctx->phi_var_worklist, ctx->phi_var_worklist_len);
@@ -128,6 +151,10 @@ void scdf_init(scdf_ctx *ctx, const zend_op_array *op_array, zend_ssa *ssa, void
 }
 
 void scdf_free(scdf_ctx *ctx) {
+	if (ctx->feasible_edges_ht) {
+		zend_hash_destroy(ctx->feasible_edges_ht);
+		efree(ctx->feasible_edges_ht);
+	}
 	efree(ctx->instr_worklist);
 }
 
@@ -180,7 +207,7 @@ void scdf_solve(scdf_ctx *ctx, const char *name) {
 
 			if (block->len == 0) {
 				/* Zero length blocks don't have a last instruction that would normally do this */
-				mark_edge_feasible(ctx, i, block->successors[0], 0);
+				mark_edge_feasible(ctx, i, &block->successors[0], 0);
 			}
 		}
 	}

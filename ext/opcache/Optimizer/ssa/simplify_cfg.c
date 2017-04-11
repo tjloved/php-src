@@ -81,19 +81,25 @@ static void merge_blocks(zend_cfg *cfg, int block1_num, int block2_num) {
 	zend_basic_block *block2 = &cfg->blocks[block2_num];
 	int s;
 
+	ZEND_ASSERT(block1->successors_count == 1);
 	ZEND_ASSERT(block1->successors[0] == block2_num);
-	ZEND_ASSERT(block1->successors[1] < 0);
-
-	/* Move successors to first block */
-	block1->successors[0] = block2->successors[0];
-	block1->successors[1] = block2->successors[1];
 
 	/* Update predecessors of successors of second block */
-	for (s = 0; s < 2; s++) {
+	for (s = 0; s < block2->successors_count; s++) {
 		if (block2->successors[s] >= 0) {
 			replace_predecessor(
 				cfg, &cfg->blocks[block2->successors[s]], block2_num, block1_num);
 		}
+	}
+
+	/* Move successors to first block */
+	block1->successors_count = block2->successors_count;
+	block2->successors_count = 0;
+	if (block2->successors == block2->successors_storage) {
+		memcpy(block1->successors, block2->successors, sizeof(int) * block1->successors_count);
+	} else {
+		block1->successors = block2->successors;
+		block2->successors = block2->successors_storage;
 	}
 
 	/* First block now contains instructions of second block and
@@ -127,13 +133,13 @@ void ssa_optimize_simplify_cfg(ssa_opt_ctx *ssa_ctx) {
 		}
 
 		/* Terminal block -- we're not interested */
-		if (block->successors[0] < 0) {
+		if (block->successors_count == 0) {
 			continue;
 		}
 
 		/* Merge two blocks that have only one successor / predecessor respectively and are only
 		 * separated by unreachable blocks. */
-		if (block->successors[0] > i && block->successors[1] < 0) {
+		if (block->successors_count == 1 && block->successors[0] > i) {
 			zend_basic_block *next = &cfg->blocks[block->successors[0]];
 			zend_ssa_block *next_ssa = &ssa->blocks[block->successors[0]];
 			if (block->len != 0 && num_predecessors(cfg, next) == 1

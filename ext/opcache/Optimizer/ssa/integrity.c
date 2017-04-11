@@ -59,6 +59,16 @@ static inline zend_bool is_in_predecessors(zend_cfg *cfg, zend_basic_block *bloc
 	return 0;
 }
 
+static inline zend_bool is_in_successors(zend_basic_block *block, int check) {
+	int s;
+	for (s = 0; s < block->successors_count; s++) {
+		if (block->successors[s] == check) {
+			return 1;
+		}
+	}
+	return 0;
+}
+
 static inline zend_bool is_var_type(zend_uchar type) {
 	return type == IS_CV || type == IS_VAR || type == IS_TMP_VAR;
 }
@@ -303,15 +313,17 @@ int ssa_verify_integrity(zend_ssa *ssa, const char *extra) {
 			continue;
 		}
 
-		for (s = 0; s < 2; s++) {
-			if (block->successors[s] >= 0) {
-				zend_basic_block *next_block = &cfg->blocks[block->successors[s]];
-				if (!(next_block->flags & ZEND_BB_REACHABLE)) {
-					FAIL("Successor %d of %d not reachable\n", block->successors[s], i);
-				}
-				if (!is_in_predecessors(cfg, next_block, i)) {
-					FAIL("Block %d predecessors missing %d\n", block->successors[s], i);
-				}
+		for (s = 0; s < block->successors_count; s++) {
+			zend_basic_block *next_block;
+			if (block->successors[s] < 0) {
+				FAIL("Successor number %d of %d negative", s, i);
+			}
+			next_block = &cfg->blocks[block->successors[s]];
+			if (!(next_block->flags & ZEND_BB_REACHABLE)) {
+				FAIL("Successor %d of %d not reachable\n", block->successors[s], i);
+			}
+			if (!is_in_predecessors(cfg, next_block, i)) {
+				FAIL("Block %d predecessors missing %d\n", block->successors[s], i);
 			}
 		}
 
@@ -322,7 +334,7 @@ int ssa_verify_integrity(zend_ssa *ssa, const char *extra) {
 				if (!(prev_block->flags & ZEND_BB_REACHABLE)) {
 					FAIL("Predecessor %d of %d not reachable\n", predecessors[j], i);
 				}
-				if (prev_block->successors[0] != i && prev_block->successors[1] != i) {
+				if (!is_in_successors(prev_block, i)) {
 					FAIL("Block %d successors missing %d\n", predecessors[j], i);
 				}
 				for (k = 0; k < block->predecessors_count; k++) {
