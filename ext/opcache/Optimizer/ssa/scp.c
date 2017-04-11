@@ -1352,7 +1352,7 @@ void ssa_optimize_scp(ssa_opt_ctx *ssa_ctx) {
 	scdf_ctx scdf;
 	scp_ctx ctx;
 
-	scp_context_init(&ctx, ssa_ctx->ssa, ssa_ctx->op_array, ssa_ctx->call_map);
+	scp_context_init(&ctx, ssa_ctx->ssa, ssa_ctx->op_array, ssa_ctx->func_info->call_map);
 
 	scdf.handlers.visit_instr = scp_visit_instr;
 	scdf.handlers.visit_phi = scp_visit_phi;
