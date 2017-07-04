@@ -2,36 +2,41 @@
 Try catch finally (with multi-returns)
 --FILE--
 <?php
-function dummy($msg) {
-   var_dump($msg);
-}
 
-function foo ($a) {
-   try {
-       dummy("try");
-       return $a;
-   } catch (Exception $e) {
-       throw $e;
-   } finally {
-       dummy("finally");
-       return "finally";
-   }
-   return "end";
+function dummy($msg)
+{
+    var_dump($msg);
 }
-
-function &bar($a) {
-   try {
-     echo "try\n";
-     throw new Exception("ex");
-   } catch (Exception $e) {
-   } finally {
-     return $a;
-   }
-   return ($c = "end");
+function foo($a)
+{
+    try {
+        dummy("try");
+        return $a;
+    } catch (Exception $e) {
+        throw $e;
+    } finally {
+        dummy("finally");
+        return "finally";
+    }
+    return "end";
 }
-var_dump(foo("para"));
-var_dump(bar("para"));
-?>
+function &bar($a)
+{
+    try {
+        echo "try\n";
+        throw new Exception("ex");
+    } catch (Exception $e) {
+    } finally {
+        return $a;
+    }
+    return $c = "end";
+}
+function fn165421908()
+{
+    var_dump(foo("para"));
+    var_dump(bar("para"));
+}
+fn165421908();
 --EXPECTF--
 string(3) "try"
 string(7) "finally"

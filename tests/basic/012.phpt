@@ -8,15 +8,17 @@ variables_order=GPS
 --ARGS--
 ab cd ef 123 test
 --FILE--
-<?php 
-$argc = $_SERVER['argc'];
-$argv = $_SERVER['argv'];
+<?php
 
-for ($i=1; $i<$argc; $i++) {
-	echo ($i-1).": ".$argv[$i]."\n";
+function fn83502731()
+{
+    $argc = $_SERVER['argc'];
+    $argv = $_SERVER['argv'];
+    for ($i = 1; $i < $argc; $i++) {
+        echo $i - 1 . ": " . $argv[$i] . "\n";
+    }
 }
-
-?>
+fn83502731();
 --EXPECT--
 0: ab
 1: cd

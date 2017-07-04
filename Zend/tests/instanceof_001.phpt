@@ -1,24 +1,21 @@
 --TEST--
 Testing instanceof operator with several operators
 --FILE--
-<?php 
+<?php
 
-$a = new stdClass;
-var_dump($a instanceof stdClass);
-
-var_dump(new stdCLass instanceof stdClass);
-
-$b = create_function('', 'return new stdClass;');
-var_dump($b() instanceof stdClass);
-
-$c = array(new stdClass);
-var_dump($c[0] instanceof stdClass);
-
-var_dump(@$inexistent instanceof stdClass);
-
-var_dump("$a" instanceof stdClass);
-
-?>
+function fn1597921744()
+{
+    $a = new stdClass();
+    var_dump($a instanceof stdClass);
+    var_dump(new stdCLass() instanceof stdClass);
+    $b = create_function('', 'return new stdClass;');
+    var_dump($b() instanceof stdClass);
+    $c = array(new stdClass());
+    var_dump($c[0] instanceof stdClass);
+    var_dump(@$inexistent instanceof stdClass);
+    var_dump("{$a}" instanceof stdClass);
+}
+fn1597921744();
 --EXPECTF--
 bool(true)
 bool(true)

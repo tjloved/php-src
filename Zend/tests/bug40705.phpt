@@ -2,21 +2,25 @@
 Bug #40705 (Iterating within function moves original array pointer)
 --FILE--
 <?php
+
 function doForeach($array)
 {
     foreach ($array as $k => $v) {
         // do stuff
     }
 }
-
-$foo = array('foo', 'bar', 'baz');
-var_dump(key($foo));
-doForeach($foo);
-var_dump(key($foo));
-foreach ($foo as $k => $v) {
-	var_dump($k);
+function fn1802312305()
+{
+    $foo = array('foo', 'bar', 'baz');
+    var_dump(key($foo));
+    doForeach($foo);
+    var_dump(key($foo));
+    foreach ($foo as $k => $v) {
+        var_dump($k);
+    }
+    var_dump(key($foo));
 }
-var_dump(key($foo));
+fn1802312305();
 --EXPECT--
 int(0)
 int(0)

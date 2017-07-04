@@ -3,23 +3,26 @@ self etc. can be used in eval() in a class scope
 --FILE--
 <?php
 
-class C {
+class C
+{
     const FOO = 1;
     private static $bar = 2;
-    public static function f() {
+    public static function f()
+    {
         eval(<<<'PHP'
 var_dump(self::FOO);
 var_dump(self::$bar);
 var_dump(self::class);
 var_dump(static::class);
 PHP
-        );
+);
     }
 }
-
-C::f();
-
-?>
+function fn1844884055()
+{
+    C::f();
+}
+fn1844884055();
 --EXPECT--
 int(1)
 int(2)

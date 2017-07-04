@@ -5,16 +5,19 @@ func_get_arg test
 
 function foo($a)
 {
-   $a=5;
-   echo func_get_arg();
-   echo func_get_arg(2,2);
-   echo func_get_arg("hello");
-   echo func_get_arg(-1);
-   echo func_get_arg(2);
+    $a = 5;
+    echo func_get_arg();
+    echo func_get_arg(2, 2);
+    echo func_get_arg("hello");
+    echo func_get_arg(-1);
+    echo func_get_arg(2);
 }
-foo(2);
-echo "\n";
-?>
+function fn1398835238()
+{
+    foo(2);
+    echo "\n";
+}
+fn1398835238();
 --EXPECTF--
 Warning: func_get_arg() expects exactly 1 parameter, 0 given in %s on line %d
 

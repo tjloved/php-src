@@ -2,26 +2,38 @@
 Bug #60536 (Traits Segfault)
 --FILE--
 <?php
-trait T { private $x = 0; }
-class X {
-	use T;
+
+trait T
+{
+    private $x = 0;
 }
-class Y extends X {
-	  use T;
-	  function __construct() {
-	      return ++$this->x;
-      }
+class X
+{
+    use T;
 }
-class Z extends Y {
-	  function __construct() {
-		  return ++$this->x;
-      }
+class Y extends X
+{
+    use T;
+    function __construct()
+    {
+        return ++$this->x;
+    }
 }
-$a = new Z();
-$a->__construct();
-echo "DONE";
-?>
+class Z extends Y
+{
+    function __construct()
+    {
+        return ++$this->x;
+    }
+}
+function fn1201570169()
+{
+    $a = new Z();
+    $a->__construct();
+    echo "DONE";
+}
+fn1201570169();
 --EXPECTF--
 
-Notice: Undefined property: Z::$x in %s on line 14
+Notice: Undefined property: Z::$x in %s on line %d
 DONE

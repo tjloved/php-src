@@ -2,20 +2,24 @@
 Try catch finally (with multi-returns and exception)
 --FILE--
 <?php
-function foo ($a) {
-   try {
-     throw new Exception("ex");
-   } catch (PdoException $e) {
-     die("error");
-   } catch (Exception $e) {
-     return 2;
-   } finally {
-     return 3;
-   }
-   return 1;
-}
 
-var_dump(foo("para"));
-?>
+function foo($a)
+{
+    try {
+        throw new Exception("ex");
+    } catch (PdoException $e) {
+        die("error");
+    } catch (Exception $e) {
+        return 2;
+    } finally {
+        return 3;
+    }
+    return 1;
+}
+function fn2069848152()
+{
+    var_dump(foo("para"));
+}
+fn2069848152();
 --EXPECTF--
 int(3)

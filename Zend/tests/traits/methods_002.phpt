@@ -3,26 +3,30 @@ Testing collision with magic methods
 --FILE--
 <?php
 
-trait foo {	
-	public function __clone() {
-		var_dump(__FUNCTION__);
-	}
+trait foo
+{
+    public function __clone()
+    {
+        var_dump(__FUNCTION__);
+    }
 }
-
-trait baz {
-	public function __clone() {
-		var_dump(__FUNCTION__);
-	}
+trait baz
+{
+    public function __clone()
+    {
+        var_dump(__FUNCTION__);
+    }
 }
-
-class bar {
-	use foo;
-	use baz;
+class bar
+{
+    use foo;
+    use baz;
 }
-
-$o = new bar;
-var_dump(clone $o);
-
-?>
+function fn501336419()
+{
+    $o = new bar();
+    var_dump(clone $o);
+}
+fn501336419();
 --EXPECTF--
 Fatal error: Trait method __clone has not been applied, because there are collisions with other trait methods on bar in %s on line %d

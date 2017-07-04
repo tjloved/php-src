@@ -2,30 +2,36 @@
 When __call() is invoked via ::, ensure current scope's __call() is favoured over the specified class's  __call().
 --FILE--
 <?php
-class A {
-	function __call($strMethod, $arrArgs) {
-		echo "In " . __METHOD__ . "($strMethod, array(" . implode(',',$arrArgs) . "))\n";
-		var_dump($this);
-	}
-}
 
-class B extends A {
-	function __call($strMethod, $arrArgs) {
-		echo "In " . __METHOD__ . "($strMethod, array(" . implode(',',$arrArgs) . "))\n";
-		var_dump($this);
-	}
-	
-	function test() {
-		A::test1(1,'a');
-		B::test2(1,'a');
-		self::test3(1,'a');
-		parent::test4(1,'a');
-	}
+class A
+{
+    function __call($strMethod, $arrArgs)
+    {
+        echo "In " . __METHOD__ . "({$strMethod}, array(" . implode(',', $arrArgs) . "))\n";
+        var_dump($this);
+    }
 }
-
-$b = new B();
-$b->test();
-?>
+class B extends A
+{
+    function __call($strMethod, $arrArgs)
+    {
+        echo "In " . __METHOD__ . "({$strMethod}, array(" . implode(',', $arrArgs) . "))\n";
+        var_dump($this);
+    }
+    function test()
+    {
+        A::test1(1, 'a');
+        B::test2(1, 'a');
+        self::test3(1, 'a');
+        parent::test4(1, 'a');
+    }
+}
+function fn1765230121()
+{
+    $b = new B();
+    $b->test();
+}
+fn1765230121();
 --EXPECTF--
 In B::__call(test1, array(1,a))
 object(B)#1 (0) {

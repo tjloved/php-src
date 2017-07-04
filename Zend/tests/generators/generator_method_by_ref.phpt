@@ -3,32 +3,33 @@ Generator methods can yield by reference
 --FILE--
 <?php
 
-class Test implements IteratorAggregate {
+class Test implements IteratorAggregate
+{
     protected $data;
-
-    public function __construct(array $data) {
+    public function __construct(array $data)
+    {
         $this->data = $data;
     }
-
-    public function getData() {
+    public function getData()
+    {
         return $this->data;
     }
-
-    public function &getIterator() {
+    public function &getIterator()
+    {
         foreach ($this->data as $key => &$value) {
-            yield $key => $value;
+            (yield $key => $value);
         }
     }
 }
-
-$test = new Test([1, 2, 3, 4, 5]);
-foreach ($test as &$value) {
-    $value *= -1;
+function fn174205722()
+{
+    $test = new Test([1, 2, 3, 4, 5]);
+    foreach ($test as &$value) {
+        $value *= -1;
+    }
+    var_dump($test->getData());
 }
-
-var_dump($test->getData());
-
-?>
+fn174205722();
 --EXPECT--
 array(5) {
   [0]=>

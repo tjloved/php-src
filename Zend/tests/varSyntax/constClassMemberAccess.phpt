@@ -3,15 +3,17 @@ Const class member access with deference
 --FILE--
 <?php
 
-class A {
+class A
+{
     const A = ['a' => ['b' => 'c']];
 }
-
-var_dump(A::A);
-var_dump(A::A['a']);
-var_dump(A::A['a']['b']);
-
-?>
+function fn1248355383()
+{
+    var_dump(A::A);
+    var_dump(A::A['a']);
+    var_dump(A::A['a']['b']);
+}
+fn1248355383();
 --EXPECT--
 array(1) {
   ["a"]=>

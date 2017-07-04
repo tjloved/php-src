@@ -6,21 +6,27 @@ opcache.enable_cli=1
 
 --FILE--
 <?php
-class Foo {
-    public static function test() : Traversable {
+
+class Foo
+{
+    public static function test() : Traversable
+    {
         return new ArrayIterator([1, 2]);
     }
 }
-
-class Bar extends Foo {
-    public static function test() : Traversable {
+class Bar extends Foo
+{
+    public static function test() : Traversable
+    {
         return new ArrayObject([1, 2]);
     }
 }
-
-var_dump(Bar::test());
-var_dump(Foo::test());
-
+function fn844996005()
+{
+    var_dump(Bar::test());
+    var_dump(Foo::test());
+}
+fn844996005();
 --EXPECTF--
 object(ArrayObject)#%d (1) {
   ["storage":"ArrayObject":private]=>

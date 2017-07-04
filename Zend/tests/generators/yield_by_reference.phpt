@@ -3,26 +3,27 @@ Generators can yield by-reference
 --FILE--
 <?php
 
-function &iter(array &$array) {
+function &iter(array &$array)
+{
     foreach ($array as $key => &$value) {
-        yield $key => $value;
+        (yield $key => $value);
     }
 }
-
-$array = [1, 2, 3];
-$iter = iter($array);
-foreach ($iter as &$value) {
-    $value *= -1;
+function fn629509080()
+{
+    $array = [1, 2, 3];
+    $iter = iter($array);
+    foreach ($iter as &$value) {
+        $value *= -1;
+    }
+    var_dump($array);
+    $array = [1, 2, 3];
+    foreach (iter($array) as &$value) {
+        $value *= -1;
+    }
+    var_dump($array);
 }
-var_dump($array);
-
-$array = [1, 2, 3];
-foreach (iter($array) as &$value) {
-    $value *= -1;
-}
-var_dump($array);
-
-?>
+fn629509080();
 --EXPECT--
 array(3) {
   [0]=>

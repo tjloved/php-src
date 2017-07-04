@@ -3,25 +3,29 @@ Bug #67938: Segfault when extending interface method with variadic
 --FILE--
 <?php
 
-interface TestInterface {
+interface TestInterface
+{
     public function foo();
     public function bar(array $bar);
 }
-
-class Test implements TestInterface {
-    public function foo(...$args) {
+class Test implements TestInterface
+{
+    public function foo(...$args)
+    {
         echo __METHOD__, "\n";
     }
-    public function bar(array $bar, ...$args) {
+    public function bar(array $bar, ...$args)
+    {
         echo __METHOD__, "\n";
     }
 }
-
-$obj = new Test;
-$obj->foo();
-$obj->bar([]);
-
-?>
+function fn460897928()
+{
+    $obj = new Test();
+    $obj->foo();
+    $obj->bar([]);
+}
+fn460897928();
 --EXPECT--
 Test::foo
 Test::bar

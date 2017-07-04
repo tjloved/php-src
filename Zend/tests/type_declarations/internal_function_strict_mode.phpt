@@ -2,30 +2,30 @@
 Scalar type - internal function strict mode
 --FILE--
 <?php
-declare(strict_types=1);
 
-echo "*** Trying Ord With Integer" . PHP_EOL;
-try {
-	var_dump(ord(1));
-} catch (TypeError $e) {
-	echo "*** Caught " . $e->getMessage() . PHP_EOL;
+declare (strict_types=1);
+function fn2062007182()
+{
+    echo "*** Trying Ord With Integer" . PHP_EOL;
+    try {
+        var_dump(ord(1));
+    } catch (TypeError $e) {
+        echo "*** Caught " . $e->getMessage() . PHP_EOL;
+    }
+    echo "*** Trying Array Map With Invalid Callback" . PHP_EOL;
+    try {
+        array_map([null, "bar"], []);
+    } catch (TypeError $e) {
+        echo "*** Caught " . $e->getMessage() . PHP_EOL;
+    }
+    echo "*** Trying Strlen With Float" . PHP_EOL;
+    try {
+        var_dump(strlen(1.5));
+    } catch (TypeError $e) {
+        echo "*** Caught " . $e->getMessage() . PHP_EOL;
+    }
 }
-
-echo "*** Trying Array Map With Invalid Callback" . PHP_EOL;
-try {
-	array_map([null, "bar"], []);
-} catch (TypeError $e) {
-	echo "*** Caught " . $e->getMessage() . PHP_EOL;
-}
-
-echo "*** Trying Strlen With Float" . PHP_EOL;
-try {
-	var_dump(strlen(1.5));
-} catch (TypeError $e) {
-	echo "*** Caught " . $e->getMessage() . PHP_EOL;
-}
-
-?>
+fn2062007182();
 --EXPECTF--
 *** Trying Ord With Integer
 *** Caught ord() expects parameter 1 to be string, integer given

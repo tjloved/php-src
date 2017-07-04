@@ -2,7 +2,11 @@
 $this in unset
 --FILE--
 <?php
-unset($this);
-?>
+
+function fn663028071()
+{
+    unset($this);
+}
+fn663028071();
 --EXPECTF--
-Fatal error: Cannot unset $this in %sthis_in_unset.php on line 2
+Fatal error: Cannot unset $this in %sthis_in_unset.php on line %d

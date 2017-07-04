@@ -2,8 +2,12 @@
 output buffering - ob_start
 --FILE--
 <?php
-ob_start();
-echo "foo\n";
-?>
+
+function fn1313494023()
+{
+    ob_start();
+    echo "foo\n";
+}
+fn1313494023();
 --EXPECT--
 foo

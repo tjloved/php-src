@@ -9,11 +9,15 @@ session.save_handler=files
 session.save_path=./tests/basic/
 --FILE--
 <?php
-	print "good :)\n";
-	$filename = __DIR__ . '/sess_' . session_id();
-	var_dump(file_exists($filename));
-	@unlink($filename);
-?>
+
+function fn812847077()
+{
+    print "good :)\n";
+    $filename = __DIR__ . '/sess_' . session_id();
+    var_dump(file_exists($filename));
+    @unlink($filename);
+}
+fn812847077();
 --EXPECT--
 good :)
 bool(true)

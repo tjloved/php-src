@@ -3,10 +3,14 @@ Try catch finally (multi catch blocks with return)
 --FILE--
 <?php
 
-class AE extends Exception {};
-class BE extends Exception {};
-
-function foo () {
+class AE extends Exception
+{
+}
+class BE extends Exception
+{
+}
+function foo()
+{
     try {
         try {
             try {
@@ -14,23 +18,25 @@ function foo () {
             } catch (AE $e) {
                 die("error");
             } finally {
-               echo "1";
+                echo "1";
             }
         } finally {
-           echo "2";
+            echo "2";
         }
     } catch (BE $e) {
-      die("error");
+        die("error");
     } catch (Exception $e) {
         echo "3";
     } finally {
         echo "4";
         return 4;
     }
-   return 5;
+    return 5;
 }
-
-var_dump(foo());
-?>
+function fn182257725()
+{
+    var_dump(foo());
+}
+fn182257725();
 --EXPECTF--
 1234int(4)

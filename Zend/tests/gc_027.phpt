@@ -4,11 +4,16 @@ GC 027: GC and properties of internal classes
 zend.enable_gc=1
 --FILE--
 <?php
-try {
-	throw new Exception();
-} catch (Exception $e) {
-	gc_collect_cycles();
+
+function fn2146076285()
+{
+    try {
+        throw new Exception();
+    } catch (Exception $e) {
+        gc_collect_cycles();
+    }
+    echo "ok\n";
 }
-echo "ok\n";
+fn2146076285();
 --EXPECT--
 ok

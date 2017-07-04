@@ -12,10 +12,15 @@ Content-Type: text/plain-file
 -----------------------------20896060251896012921717172737--
 --FILE--
 <?php
-var_dump($_FILES);
-var_dump($_POST);
-var_dump(file_get_contents("php://input"));
-var_dump(file_get_contents("php://input"));
+
+function fn881926820()
+{
+    var_dump($_FILES);
+    var_dump($_POST);
+    var_dump(file_get_contents("php://input"));
+    var_dump(file_get_contents("php://input"));
+}
+fn881926820();
 --EXPECTF--
 array(0) {
 }

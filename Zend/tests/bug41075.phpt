@@ -5,27 +5,28 @@ Bug #41075 (memleak when creating default object caused exception)
 
 function err($errno, $errstr, $errfile, $errline)
 {
-	    throw new Exception($errstr);
+    throw new Exception($errstr);
 }
-
-set_error_handler("err");
-
-class test {
-    function foo() {
+class test
+{
+    function foo()
+    {
         $var = $this->blah->prop = "string";
         var_dump($this->blah);
     }
 }
-
-$t = new test;
-try {
-    $t->foo();
-} catch (Exception $e) {
-    var_dump($e->getMessage());
+function fn1924451049()
+{
+    set_error_handler("err");
+    $t = new test();
+    try {
+        $t->foo();
+    } catch (Exception $e) {
+        var_dump($e->getMessage());
+    }
+    echo "Done\n";
 }
-
-echo "Done\n";
-?>
+fn1924451049();
 --EXPECTF--	
 string(40) "Creating default object from empty value"
 Done

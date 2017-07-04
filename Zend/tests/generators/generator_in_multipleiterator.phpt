@@ -3,25 +3,26 @@ Generators work properly in MultipleIterator
 --FILE--
 <?php
 
-function gen1() {
-    yield 'a';
-    yield 'aa';
+function gen1()
+{
+    (yield 'a');
+    (yield 'aa');
 }
-
-function gen2() {
-    yield 'b';
-    yield 'bb';
+function gen2()
+{
+    (yield 'b');
+    (yield 'bb');
 }
-
-$it = new MultipleIterator;
-$it->attachIterator(gen1());
-$it->attachIterator(gen2());
-
-foreach ($it as $values) {
-    var_dump($values);
+function fn620532715()
+{
+    $it = new MultipleIterator();
+    $it->attachIterator(gen1());
+    $it->attachIterator(gen2());
+    foreach ($it as $values) {
+        var_dump($values);
+    }
 }
-
-?>
+fn620532715();
 --EXPECT--
 array(2) {
   [0]=>

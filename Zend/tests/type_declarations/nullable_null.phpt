@@ -2,10 +2,15 @@
 nullable class
 --FILE--
 <?php
-function test(Foo $a = null) {
-	echo "ok\n";
+
+function test(Foo $a = null)
+{
+    echo "ok\n";
 }
-test(null);
-?>
+function fn445726169()
+{
+    test(null);
+}
+fn445726169();
 --EXPECT--
 ok

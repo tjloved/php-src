@@ -1,28 +1,31 @@
 --TEST--
 Testing 'new static;' calling parent method
 --FILE--
-<?php 
+<?php
 
-class bar {
-	public function show() {
-		var_dump(new static);
-	}
+class bar
+{
+    public function show()
+    {
+        var_dump(new static());
+    }
 }
- 
-class foo extends bar {
-	public function test() {
-		parent::show();
-	}
+class foo extends bar
+{
+    public function test()
+    {
+        parent::show();
+    }
 }
- 
-$foo = new foo;
-$foo->test();
-$foo::test();
-
-call_user_func(array($foo, 'test'));
-call_user_func(array('foo', 'test'));
-
-?>
+function fn255725498()
+{
+    $foo = new foo();
+    $foo->test();
+    $foo::test();
+    call_user_func(array($foo, 'test'));
+    call_user_func(array('foo', 'test'));
+}
+fn255725498();
 --EXPECTF--
 object(foo)#%d (0) {
 }

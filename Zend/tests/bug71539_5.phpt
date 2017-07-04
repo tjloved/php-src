@@ -2,11 +2,15 @@
 Bug #71539.5 (Memory error on $arr[$a] =& $arr[$b] if RHS rehashes)
 --FILE--
 <?php
-$array = [];
-$array['']->prop =& $array[0];
-$array[0] = 42;
-var_dump($array);
-?>
+
+function fn1162702640()
+{
+    $array = [];
+    $array['']->prop =& $array[0];
+    $array[0] = 42;
+    var_dump($array);
+}
+fn1162702640();
 --EXPECT--
 array(2) {
   [0]=>

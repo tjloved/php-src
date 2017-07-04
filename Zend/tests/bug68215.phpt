@@ -2,58 +2,33 @@
 Bug #68215 (Behavior of foreach has changed)
 --FILE--
 <?php
-$arr = array(
-	'a' => array(
-		'a' => 'apple',
-		'b' => 'banana',
-		'c' => 'cranberry',
-		'd' => 'mango',
-		'e' => 'pineapple'
-	),
-	'b' => array(
-		'a' => 'apple',
-		'b' => 'banana',
-		'c' => 'cranberry',
-		'd' => 'mango',
-		'e' => 'pineapple'
-	),
-	'c' => 'cranberry',
-	'd' => 'mango',
-	'e' => 'pineapple'
-);
 
 function test(&$child, $entry)
 {
-	$i = 1;
-
-	foreach ($child AS $key => $fruit)
-	{
-		if (!is_numeric($key))
-		{
-			$child[$i] = $fruit;
-			unset($child[$key]);
-			$i++;
-		}
-	}
+    $i = 1;
+    foreach ($child as $key => $fruit) {
+        if (!is_numeric($key)) {
+            $child[$i] = $fruit;
+            unset($child[$key]);
+            $i++;
+        }
+    }
 }
-
-$i = 1;
-
-foreach ($arr AS $key => $fruit)
+function fn118719569()
 {
-	$arr[$i] = $fruit;
-
-	if (is_array($fruit))
-	{
-		test($arr[$i], $fruit);
-	}
-
-	unset($arr[$key]);
-	$i++;
+    $arr = array('a' => array('a' => 'apple', 'b' => 'banana', 'c' => 'cranberry', 'd' => 'mango', 'e' => 'pineapple'), 'b' => array('a' => 'apple', 'b' => 'banana', 'c' => 'cranberry', 'd' => 'mango', 'e' => 'pineapple'), 'c' => 'cranberry', 'd' => 'mango', 'e' => 'pineapple');
+    $i = 1;
+    foreach ($arr as $key => $fruit) {
+        $arr[$i] = $fruit;
+        if (is_array($fruit)) {
+            test($arr[$i], $fruit);
+        }
+        unset($arr[$key]);
+        $i++;
+    }
+    var_dump($arr);
 }
-
-var_dump($arr);
-?>
+fn118719569();
 --EXPECT--
 array(5) {
   [1]=>

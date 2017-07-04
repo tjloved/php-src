@@ -6,35 +6,32 @@ Bug #65372 (Segfault in gc_zval_possible_root when return reference fails)
 class ParentClass
 {
     private static $_OBJECTS;
-
     public static function Get()
     {
         self::$_OBJECTS[1] = new ChildClass();
-        return self::$_OBJECTS[1];    
+        return self::$_OBJECTS[1];
     }
 }
-
 class ChildClass extends ParentClass
 {
     public $Manager;
-
     function __construct()
     {
         $this->Manager = $this;
     }
-
     public static function &GetCurrent()
     {
         return ChildClass::Get();
     }
-
     public static function &Get()
     {
         return parent::Get();
     }
 }
-
-$staff = ChildClass::GetCurrent();
-?>
+function fn199652705()
+{
+    $staff = ChildClass::GetCurrent();
+}
+fn199652705();
 --EXPECTF--
-Notice: Only variable references should be returned by reference in %sbug65372.php on line 30
+Notice: Only variable references should be returned by reference in %sbug65372.php on line %d

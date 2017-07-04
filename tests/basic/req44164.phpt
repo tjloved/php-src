@@ -11,7 +11,12 @@ zlib.output_compression=On
 HTTP_ACCEPT_ENCODING=gzip
 --FILE--
 <?php
-header("Content-length: 200");
-echo str_repeat("a", 200);
+
+function fn1009656951()
+{
+    header("Content-length: 200");
+    echo str_repeat("a", 200);
+}
+fn1009656951();
 --EXPECT--
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa

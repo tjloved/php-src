@@ -2,25 +2,27 @@
 Bug #74340: Magic function __get has different behavior in php 7.1.x
 --FILE--
 <?php
+
 class Test
 {
     public function __get($var)
     {
         static $first = true;
-        echo '__get '.$var.PHP_EOL;
+        echo '__get ' . $var . PHP_EOL;
         if ($first) {
             $first = false;
-            $this->$var;
-            $this->{$var.'2'};
-            $this->$var;
+            $this->{$var};
+            $this->{$var . '2'};
+            $this->{$var};
         }
     }
 }
-
-$test = new Test;
-$test->test;
-
-?>
+function fn7429403()
+{
+    $test = new Test();
+    $test->test;
+}
+fn7429403();
 --EXPECTF--
 __get test
 

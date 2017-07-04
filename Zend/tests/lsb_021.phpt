@@ -2,14 +2,18 @@
 ZE2 Late Static Binding parent::/self:: forwarding while classname doesn't
 --FILE--
 <?php
-class A {
-    public static function test() {
-        echo get_called_class()."\n";
+
+class A
+{
+    public static function test()
+    {
+        echo get_called_class() . "\n";
     }
 }
-
-class B extends A {
-    public static function testForward() {
+class B extends A
+{
+    public static function testForward()
+    {
         parent::test();
         call_user_func("parent::test");
         call_user_func(array("parent", "test"));
@@ -17,7 +21,8 @@ class B extends A {
         call_user_func("self::test");
         call_user_func(array("self", "test"));
     }
-    public static function testNoForward() {
+    public static function testNoForward()
+    {
         A::test();
         call_user_func("A::test");
         call_user_func(array("A", "test"));
@@ -26,15 +31,15 @@ class B extends A {
         call_user_func(array("B", "test"));
     }
 }
-
-class C extends B {
-
+class C extends B
+{
 }
-
-C::testForward();
-C::testNoForward();
-
-?>
+function fn888708236()
+{
+    C::testForward();
+    C::testNoForward();
+}
+fn888708236();
 --EXPECTF--
 C
 C

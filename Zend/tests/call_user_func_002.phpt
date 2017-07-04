@@ -3,16 +3,17 @@ Testing call_user_func() with autoload and passing invalid params
 --FILE--
 <?php
 
-spl_autoload_register(function ($class) {
-	var_dump($class);
-});
-
-call_user_func(array('foo', 'bar'));
-call_user_func(array('', 'bar'));
-call_user_func(array($foo, 'bar'));
-call_user_func(array($foo, ''));
-
-?>
+function fn957365191()
+{
+    spl_autoload_register(function ($class) {
+        var_dump($class);
+    });
+    call_user_func(array('foo', 'bar'));
+    call_user_func(array('', 'bar'));
+    call_user_func(array($foo, 'bar'));
+    call_user_func(array($foo, ''));
+}
+fn957365191();
 --EXPECTF--
 string(3) "foo"
 

@@ -3,18 +3,21 @@ void return type: acceptable cases
 --FILE--
 <?php
 
-function foo(): void {
+function foo() : void
+{
     // okay
 }
-
-foo();
-
-function bar(): void {
-    return; // okay
+function bar() : void
+{
+    return;
+    // okay
 }
-
-bar();
-
-echo "OK!", PHP_EOL;
+function fn1951803797()
+{
+    foo();
+    bar();
+    echo "OK!", PHP_EOL;
+}
+fn1951803797();
 --EXPECT--
 OK!

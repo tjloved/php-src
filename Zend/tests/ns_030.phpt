@@ -2,11 +2,15 @@
 030: Name ambiguity (import name & class name)
 --FILE--
 <?php
-class Foo {
+
+class Foo
+{
 }
-
 use A\B as Foo;
-
-new Foo();
+function fn1226904998()
+{
+    new Foo();
+}
+fn1226904998();
 --EXPECTF--
-Fatal error: Cannot use A\B as Foo because the name is already in use in %sns_030.php on line 5
+Fatal error: Cannot use A\B as Foo because the name is already in use in %sns_030.php on line %d

@@ -2,8 +2,13 @@
 Call internal function with incorrect number of arguments
 --FILE--
 <?php
-substr("foo");
-array_diff([]);
+
+function fn48518724()
+{
+    substr("foo");
+    array_diff([]);
+}
+fn48518724();
 --EXPECTF--
 Warning: substr() expects at least 2 parameters, 1 given in %s
 

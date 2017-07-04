@@ -5,16 +5,19 @@ track_errors=1
 --FILE--
 <?php
 
-function test() {
+function test()
+{
     $php_errormsg = 1;
     echo $undef;
     var_dump($php_errormsg + 1);
 }
-test();
-
-?>
+function fn871267885()
+{
+    test();
+}
+fn871267885();
 --EXPECTF--
-Deprecated: Directive 'track_errors' is deprecated in Unknown on line 0
+Deprecated: Directive 'track_errors' is deprecated in Unknown on line %d
 
 Notice: Undefined variable: undef in %s on line %d
 

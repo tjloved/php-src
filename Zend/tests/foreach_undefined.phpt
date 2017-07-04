@@ -3,10 +3,13 @@ foreach() & undefined var
 --FILE--
 <?php
 
-foreach($a as $val);
-
-echo "Done\n";
-?>
+function fn147440012()
+{
+    foreach ($a as $val) {
+    }
+    echo "Done\n";
+}
+fn147440012();
 --EXPECTF--	
 Notice: Undefined variable: a in %s on line %d
 

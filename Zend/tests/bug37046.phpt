@@ -2,20 +2,24 @@
 Bug #37046 (foreach breaks static scope)
 --FILE--
 <?php
-function s() {
-  static $storage = array(array('x', 'y'));
-  return $storage[0];
-}
 
-foreach (s() as $k => $function) {
-  echo "op1 $k\n";
-  if ($k == 0) {
-    foreach (s() as $k => $function) {
-      echo "op2 $k\n";
-    }
-  }
+function s()
+{
+    static $storage = array(array('x', 'y'));
+    return $storage[0];
 }
-?>
+function fn806739058()
+{
+    foreach (s() as $k => $function) {
+        echo "op1 {$k}\n";
+        if ($k == 0) {
+            foreach (s() as $k => $function) {
+                echo "op2 {$k}\n";
+            }
+        }
+    }
+}
+fn806739058();
 --EXPECT--
 op1 0
 op2 0

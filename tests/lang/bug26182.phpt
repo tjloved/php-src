@@ -5,20 +5,21 @@ error_reporting=4095
 --FILE--
 <?php
 
-class A {
-    function NotAConstructor ()
+class A
+{
+    function NotAConstructor()
     {
         if (isset($this->x)) {
             //just for demo
         }
     }
 }
-
-$t = new A ();
-
-print_r($t);
-
-?>
+function fn693402096()
+{
+    $t = new A();
+    print_r($t);
+}
+fn693402096();
 --EXPECT--
 A Object
 (

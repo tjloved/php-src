@@ -5,20 +5,22 @@ Implementating abstracting methods and optional parameters
 
 abstract class Base
 {
-	abstract function someMethod($param);
+    abstract function someMethod($param);
 }
-
 class Ext extends Base
 {
-	function someMethod($param = "default")
-	{
-		echo $param, "\n";
-	}
+    function someMethod($param = "default")
+    {
+        echo $param, "\n";
+    }
 }
-
-$a = new Ext();
-$a->someMethod("foo");
-$a->someMethod();
+function fn584476222()
+{
+    $a = new Ext();
+    $a->someMethod("foo");
+    $a->someMethod();
+}
+fn584476222();
 --EXPECT--
 foo
 default

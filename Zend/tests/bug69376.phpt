@@ -2,20 +2,22 @@
 Bug #69376 (Wrong ref counting)
 --FILE--
 <?php
-function &test() {
+
+function &test()
+{
     $var = array();
     $var[] =& $var;
-
     return $var;
-};
-
-$a = test();
-$b = $a;
-$b[0] = 123;
-
-print_r($a);
-print_r($b);
-?>
+}
+function fn398016538()
+{
+    $a = test();
+    $b = $a;
+    $b[0] = 123;
+    print_r($a);
+    print_r($b);
+}
+fn398016538();
 --EXPECT--
 Array
 (

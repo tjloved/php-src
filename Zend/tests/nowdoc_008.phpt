@@ -3,15 +3,14 @@ empty doc test (nowdoc)
 --FILE--
 <?php
 
-require_once 'nowdoc.inc';
-
-print <<<'ENDOFNOWDOC'
+function fn1533187142()
+{
+    require_once 'nowdoc.inc';
+    print <<<'ENDOFNOWDOC'
 ENDOFNOWDOC;
-
-$x = <<<'ENDOFNOWDOC'
+    $x = <<<'ENDOFNOWDOC'
 ENDOFNOWDOC;
-
-print "{$x}";
-
-?>
+    print "{$x}";
+}
+fn1533187142();
 --EXPECT--

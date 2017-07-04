@@ -3,21 +3,24 @@ Creating an infinite fibonacci list using a generator
 --FILE--
 <?php
 
-function fib() {
+function fib()
+{
     list($a, $b) = [1, 1];
     while (true) {
-        yield $b;
+        (yield $b);
         list($a, $b) = [$b, $a + $b];
     }
 }
-
-foreach (fib() as $n) {
-    if ($n > 1000) break;
-
-    var_dump($n);
+function fn1433177140()
+{
+    foreach (fib() as $n) {
+        if ($n > 1000) {
+            break;
+        }
+        var_dump($n);
+    }
 }
-
-?>
+fn1433177140();
 --EXPECT--
 int(1)
 int(2)

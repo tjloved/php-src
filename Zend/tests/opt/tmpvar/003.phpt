@@ -3,15 +3,18 @@ Tmpvar 003
 --FILE--
 <?php
 
-function test() {
+function test()
+{
     $l = 5;
     for ($i = 0; $i < $l; $i++) {
-        echo "$i\n";
+        echo "{$i}\n";
     }
 }
-test();
-
-?>
+function fn928633026()
+{
+    test();
+}
+fn928633026();
 --EXPECT--
 0
 1

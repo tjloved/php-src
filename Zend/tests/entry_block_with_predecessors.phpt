@@ -3,7 +3,8 @@ For SSA form the entry block should have no predecessors
 --FILE--
 <?php
 
-function test() {
+function test()
+{
     while (true) {
         var_dump($a + 1);
         $a = 1;
@@ -12,21 +13,22 @@ function test() {
         }
     }
 }
-
-function test2() {
+function test2()
+{
     while (true) {
         $a = 42;
         if (@$i++ > 1) {
             break;
         }
-        $a = new stdClass;
+        $a = new stdClass();
     }
 }
-
-test();
-test2();
-
-?>
+function fn1540768519()
+{
+    test();
+    test2();
+}
+fn1540768519();
 --EXPECTF--
 Notice: Undefined variable: a in %s on line %d
 int(1)

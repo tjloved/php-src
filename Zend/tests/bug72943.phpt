@@ -2,15 +2,18 @@
 Bug #72943 (assign_dim on string doesn't reset hval)
 --FILE--
 <?php
-$array = array("test" => 1);
 
-$a = "lest";
-var_dump($array[$a]);
-$a[0] = "f";
-var_dump($array[$a]);
-$a[0] = "t";
-var_dump($array[$a]);
-?>
+function fn900600685()
+{
+    $array = array("test" => 1);
+    $a = "lest";
+    var_dump($array[$a]);
+    $a[0] = "f";
+    var_dump($array[$a]);
+    $a[0] = "t";
+    var_dump($array[$a]);
+}
+fn900600685();
 --EXPECTF--
 Notice: Undefined index: lest in %sbug72943.php on line %d
 NULL

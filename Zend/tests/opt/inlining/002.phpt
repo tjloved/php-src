@@ -3,29 +3,31 @@ Inlining 002
 --FILE--
 <?php
 
-function returnVal() {
+function returnVal()
+{
     return 42;
 }
-
-function &returnRef2() {
+function &returnRef2()
+{
     $a = 42;
     return $a;
 }
-
-function &returnRef() {
+function &returnRef()
+{
     $x = returnRef2();
     return returnVal();
 }
-
-function assignRef() {
+function assignRef()
+{
     $x = returnRef2();
     $var =& returnVal();
 }
-
-returnRef();
-assignRef();
-
-?>
+function fn45838722()
+{
+    returnRef();
+    assignRef();
+}
+fn45838722();
 --EXPECTF--
 Notice: Only variable references should be returned by reference in %s on line %d
 

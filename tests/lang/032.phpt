@@ -2,35 +2,46 @@
 Class method registration
 --FILE--
 <?php
-class A {
-	function foo() {}
-}
 
-class B extends A {
-	function foo() {}
+class A
+{
+    function foo()
+    {
+    }
 }
-
-class C extends B {
-	function foo() {}
+class B extends A
+{
+    function foo()
+    {
+    }
 }
-
-class D extends A {
+class C extends B
+{
+    function foo()
+    {
+    }
 }
-
-class F extends D {
-	function foo() {}
+class D extends A
+{
 }
-
-// Following class definition should fail, but cannot test
-/*
-class X {
-	function foo() {}
-	function foo() {}
+class F extends D
+{
+    function foo()
+    {
+    }
 }
-*/
-
-echo "OK\n";
-?>
+function fn1052530635()
+{
+    // Following class definition should fail, but cannot test
+    /*
+    class X {
+    	function foo() {}
+    	function foo() {}
+    }
+    */
+    echo "OK\n";
+}
+fn1052530635();
 --EXPECT--
 OK
 

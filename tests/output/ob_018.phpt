@@ -11,7 +11,11 @@ display_errors=1
 zlib.output_compression=1
 --FILE--
 <?php
-ob_start('ob_gzhandler');
-?>
+
+function fn1797170429()
+{
+    ob_start('ob_gzhandler');
+}
+fn1797170429();
 --EXPECTF--
 ‹%a

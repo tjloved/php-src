@@ -3,14 +3,12 @@ Argument unpacking with internal functions
 --FILE--
 <?php
 
-$arrays = [
-    [1, 2, 3],
-    [4, 5, 6],
-    [7, 8, 9],
-];
-var_dump(array_map(null, ...$arrays));
-
-?>
+function fn2018710307()
+{
+    $arrays = [[1, 2, 3], [4, 5, 6], [7, 8, 9]];
+    var_dump(array_map(null, ...$arrays));
+}
+fn2018710307();
 --EXPECT--
 array(3) {
   [0]=>

@@ -11,8 +11,12 @@ abc
 --BVoyv--
 --FILE--
 <?php
-var_dump($_POST);
-?>
+
+function fn787022170()
+{
+    var_dump($_POST);
+}
+fn787022170();
 --EXPECT--
 array(1) {
   ["data"]=>

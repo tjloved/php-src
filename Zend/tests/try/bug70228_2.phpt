@@ -2,7 +2,9 @@
 Bug #70228 (memleak if return in finally block)
 --FILE--
 <?php
-function test() {
+
+function test()
+{
     try {
         throw new Exception(1);
     } finally {
@@ -13,8 +15,10 @@ function test() {
         }
     }
 }
-
-var_dump(test());
-?>
+function fn62406239()
+{
+    var_dump(test());
+}
+fn62406239();
 --EXPECT--
 int(42)

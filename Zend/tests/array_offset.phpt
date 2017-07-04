@@ -3,19 +3,21 @@ Ensure "undefined offset" notice formats message corectly when undefined key is 
 --FILE--
 <?php
 
-[][-1];
-[][-1.1];
-(new ArrayObject)[-1];
-(new ArrayObject)[-1.1];
-
-echo "Done\n";
-?>
+function fn1387216208()
+{
+    [][-1];
+    [][-1.1];
+    (new ArrayObject())[-1];
+    (new ArrayObject())[-1.1];
+    echo "Done\n";
+}
+fn1387216208();
 --EXPECTF--	
-Notice: Undefined offset: -1 in %s on line 3
+Notice: Undefined offset: -1 in %s on line %d
 
-Notice: Undefined offset: -1 in %s on line 4
+Notice: Undefined offset: -1 in %s on line %d
 
-Notice: Undefined offset: -1 in %s on line 5
+Notice: Undefined offset: -1 in %s on line %d
 
-Notice: Undefined offset: -1 in %s on line 6
+Notice: Undefined offset: -1 in %s on line %d
 Done

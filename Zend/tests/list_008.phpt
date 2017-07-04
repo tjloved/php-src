@@ -3,8 +3,10 @@ Assignment to invalid list() value
 --FILE--
 <?php
 
-[42] = [1];
-
-?>
+function fn1136701330()
+{
+    [42] = [1];
+}
+fn1136701330();
 --EXPECTF--
 Fatal error: Assignments can only happen to writable values in %s on line %d

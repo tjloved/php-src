@@ -5,17 +5,17 @@ passing the return value from a function by reference
 
 function foo(&$ref)
 {
-	var_dump($ref);
+    var_dump($ref);
 }
-
 function bar($value)
 {
-	return $value;
+    return $value;
 }
-
-foo(bar(5));
-
-?>
+function fn175703436()
+{
+    foo(bar(5));
+}
+fn175703436();
 --EXPECTF--
-Notice: Only variables should be passed by reference in %s on line 13
+Notice: Only variables should be passed by reference in %s on line %d
 int(5)

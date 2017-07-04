@@ -2,8 +2,14 @@
 Issetting a non-existent static property
 --FILE--
 <?php
-Class C {}
-var_dump(isset(C::$p));
-?>
+
+class C
+{
+}
+function fn1867069885()
+{
+    var_dump(isset(C::$p));
+}
+fn1867069885();
 --EXPECTF--
 bool(false)

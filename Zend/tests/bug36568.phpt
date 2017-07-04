@@ -8,8 +8,12 @@ Bug #36568 (memory_limit has no effect)
 memory_limit=16M
 --FILE--
 <?php
-ini_set("memory_limit", "32M");
-echo ini_get("memory_limit");
-?>
+
+function fn747600061()
+{
+    ini_set("memory_limit", "32M");
+    echo ini_get("memory_limit");
+}
+fn747600061();
 --EXPECT--
 32M

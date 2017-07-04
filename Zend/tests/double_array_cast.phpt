@@ -3,10 +3,12 @@ Double array cast
 --FILE--
 <?php
 
-$array = [1, 2, $x = 3];
-var_dump((array) (array) $array);
-
-?>
+function fn134537420()
+{
+    $array = [1, 2, $x = 3];
+    var_dump((array) (array) $array);
+}
+fn134537420();
 --EXPECT--
 array(3) {
   [0]=>

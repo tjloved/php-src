@@ -3,21 +3,26 @@ Empty foreach loops with exception must not leak
 --FILE--
 <?php
 
-class Foo implements IteratorAggregate {
-    public function getIterator() {
+class Foo implements IteratorAggregate
+{
+    public function getIterator()
+    {
         return new ArrayIterator([]);
     }
-    public function __destruct() {
-        throw new Exception;
+    public function __destruct()
+    {
+        throw new Exception();
     }
 }
-
-try {
-    foreach (new Foo as $x);
-} catch (Exception $e) {
-    echo "Exception caught\n";
+function fn308723053()
+{
+    try {
+        foreach (new Foo() as $x) {
+        }
+    } catch (Exception $e) {
+        echo "Exception caught\n";
+    }
 }
-
-?>
+fn308723053();
 --EXPECT--
 Exception caught

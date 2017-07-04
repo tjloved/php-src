@@ -4,27 +4,29 @@ Bug #55137 (Legacy constructor not registered for class)
 <?php
 
 // Ensuring that the collision still occurs as expected.
-
-trait TC1 {
-    public function ReportCollision() {
+trait TC1
+{
+    public function ReportCollision()
+    {
         echo "TC1 executed\n";
     }
 }
-
-trait TC2 {
-    public function ReportCollision() {
+trait TC2
+{
+    public function ReportCollision()
+    {
         echo "TC1 executed\n";
     }
 }
-
-class ReportCollision {
-	use TC1, TC2;
+class ReportCollision
+{
+    use TC1, TC2;
 }
-
-
-echo "ReportCollision: ";
-$o = new ReportCollision;
-
-
+function fn1731379751()
+{
+    echo "ReportCollision: ";
+    $o = new ReportCollision();
+}
+fn1731379751();
 --EXPECTF--
 Fatal error: Trait method ReportCollision has not been applied, because there are collisions with other trait methods on ReportCollision in %s on line %d

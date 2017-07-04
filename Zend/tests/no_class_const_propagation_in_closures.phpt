@@ -3,23 +3,25 @@ self:: class constants should not be propagated into closures, due to scope rebi
 --FILE--
 <?php
 
-class A {
+class A
+{
     const C = 'A::C';
-
-    public function f() {
-        return function() {
+    public function f()
+    {
+        return function () {
             return self::C;
         };
     }
 }
-
-class B {
+class B
+{
     const C = 'B::C';
 }
-
-$f = (new A)->f();
-var_dump($f->bindTo(null, 'B')());
-
-?>
+function fn2003647601()
+{
+    $f = (new A())->f();
+    var_dump($f->bindTo(null, 'B')());
+}
+fn2003647601();
 --EXPECT--
 string(4) "B::C"

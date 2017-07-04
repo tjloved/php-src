@@ -11,9 +11,13 @@ Content-Disposition: form-data; name="foobar"
 -----------------------------20896060251896012921717172737--
 --FILE--
 <?php
-var_dump($_FILES);
-var_dump($_POST);
-?>
+
+function fn1152570500()
+{
+    var_dump($_FILES);
+    var_dump($_POST);
+}
+fn1152570500();
 --EXPECTF--
 Warning: POST Content-Length of %d bytes exceeds the limit of 1 bytes in %s
 array(0) {

@@ -2,45 +2,53 @@
 Testing array dereference
 --FILE--
 <?php
-error_reporting(E_ALL);
 
-function a() {
-	return array(1,array(5));
+function a()
+{
+    return array(1, array(5));
 }
-var_dump(a()[1][0]); // int(5)
-
-function b() {
-	return array();
+// int(5)
+function b()
+{
+    return array();
 }
-var_dump(b()[0]); // Notice: Undefined offset: 0 
-
-class foo {
-	public $y = 1; 
-	
-	public function test() {
-		return array(array(array('foobar')));
-	}
+// Notice: Undefined offset: 0
+class foo
+{
+    public $y = 1;
+    public function test()
+    {
+        return array(array(array('foobar')));
+    }
 }
-
-function c() {
-	return array(new foo);
+function c()
+{
+    return array(new foo());
 }
-var_dump(c()[0]->y); // int(1)
-
-function d() {
-	$obj = new foo;
-	return $obj->test();
+// int(1)
+function d()
+{
+    $obj = new foo();
+    return $obj->test();
 }
-var_dump(d()[0][0][0][3]); // string(1) "b"
-
-function e() {
-	$y = 'bar';
-	$x = array('a' => 'foo', 'b' => $y);
-	return $x;
+// string(1) "b"
+function e()
+{
+    $y = 'bar';
+    $x = array('a' => 'foo', 'b' => $y);
+    return $x;
 }
-var_dump(e()['b']); // string(3) "bar"
-
-?>
+function fn1624771744()
+{
+    error_reporting(E_ALL);
+    var_dump(a()[1][0]);
+    var_dump(b()[0]);
+    var_dump(c()[0]->y);
+    var_dump(d()[0][0][0][3]);
+    var_dump(e()['b']);
+    // string(3) "bar"
+}
+fn1624771744();
 --EXPECTF--
 int(5)
 

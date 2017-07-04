@@ -2,11 +2,15 @@
 Heredoc with double quotes
 --FILE--
 <?php
-$test = "foo";
-$var = <<<"MYLABEL"
-test: $test
+
+function fn1166552195()
+{
+    $test = "foo";
+    $var = <<<MYLABEL
+test: {$test}
 MYLABEL;
-echo $var;
-?>
+    echo $var;
+}
+fn1166552195();
 --EXPECT--
 test: foo

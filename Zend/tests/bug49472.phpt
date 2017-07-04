@@ -3,25 +3,27 @@ Bug #49472 (Constants defined in Interfaces can be overridden)
 --FILE--
 <?php
 
-interface ia {
+interface ia
+{
     const c = 'Sea';
     const y = 2;
 }
-
-class Foo implements ia {
+class Foo implements ia
+{
 }
-
-class FooBar extends Foo implements ia {
-	const x = 1;
-	const c = 'Ocean';
-	
-	public function show() {
-		return ia::c;
-	}
+class FooBar extends Foo implements ia
+{
+    const x = 1;
+    const c = 'Ocean';
+    public function show()
+    {
+        return ia::c;
+    }
 }
-
-new FooBar;
-
-?>
+function fn1900754758()
+{
+    new FooBar();
+}
+fn1900754758();
 --EXPECTF--
 Fatal error: Cannot inherit previously-inherited or override constant c from interface ia in %s on line %d

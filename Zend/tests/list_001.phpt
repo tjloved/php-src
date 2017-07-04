@@ -3,12 +3,14 @@
 --FILE--
 <?php
 
-list($a, list($b)) = array(new stdclass, array(new stdclass));
-var_dump($a, $b);
-[$a, [$b]] = array(new stdclass, array(new stdclass));
-var_dump($a, $b);
-
-?>
+function fn1969647414()
+{
+    list($a, list($b)) = array(new stdclass(), array(new stdclass()));
+    var_dump($a, $b);
+    [$a, [$b]] = array(new stdclass(), array(new stdclass()));
+    var_dump($a, $b);
+}
+fn1969647414();
 --EXPECT--
 object(stdClass)#1 (0) {
 }

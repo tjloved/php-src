@@ -5,15 +5,17 @@ register_argc_argv=1
 --GET--
 ab+cd+ef+123+test
 --FILE--
-<?php 
-$argc = $_SERVER['argc'];
-$argv = $_SERVER['argv'];
+<?php
 
-for ($i=0; $i<$argc; $i++) {
-	echo "$i: ".$argv[$i]."\n";
+function fn2104906543()
+{
+    $argc = $_SERVER['argc'];
+    $argv = $_SERVER['argv'];
+    for ($i = 0; $i < $argc; $i++) {
+        echo "{$i}: " . $argv[$i] . "\n";
+    }
 }
-
-?>
+fn2104906543();
 --EXPECT--
 0: ab
 1: cd

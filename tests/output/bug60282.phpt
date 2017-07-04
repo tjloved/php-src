@@ -4,9 +4,14 @@ Bug #60282 (Segfault when using ob_gzhandler() with open buffers)
 <?php if (!extension_loaded("zlib")) print "skip Zlib extension required"; ?>
 --FILE--
 <?php
-ob_start();
-ob_start();
-ob_start('ob_gzhandler');
-echo "done";
+
+function fn1694425154()
+{
+    ob_start();
+    ob_start();
+    ob_start('ob_gzhandler');
+    echo "done";
+}
+fn1694425154();
 --EXPECT--
 done

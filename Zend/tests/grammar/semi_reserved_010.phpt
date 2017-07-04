@@ -5,26 +5,30 @@ Edge case: T_STRING<insteadof> insteadof T_STRING<?>
 
 trait TraitA
 {
-    public static function insteadof(){ echo __METHOD__, PHP_EOL; }
-}
-
-trait TraitB
-{
-    public static function insteadof(){ echo __METHOD__, PHP_EOL; }
-}
-
-class Foo
-{
-    use TraitA , TraitB {
-        TraitB::insteadof
-            insteadof TraitA;
+    public static function insteadof()
+    {
+        echo __METHOD__, PHP_EOL;
     }
 }
-
-Foo::insteadof();
-
-echo PHP_EOL, "Done", PHP_EOL;
-
+trait TraitB
+{
+    public static function insteadof()
+    {
+        echo __METHOD__, PHP_EOL;
+    }
+}
+class Foo
+{
+    use TraitA, TraitB {
+        TraitB::insteadof insteadof TraitA;
+    }
+}
+function fn359721523()
+{
+    Foo::insteadof();
+    echo PHP_EOL, "Done", PHP_EOL;
+}
+fn359721523();
 --EXPECTF--
 TraitB::insteadof
 

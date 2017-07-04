@@ -3,15 +3,27 @@ Testing get_declared_classes() and get_declared_traits()
 --FILE--
 <?php
 
-class a { }
-interface b { }
-trait c { }
-abstract class d { }
-final class e { }
-var_dump(get_declared_classes());
-var_dump(get_declared_traits());
-
-?>
+class a
+{
+}
+interface b
+{
+}
+trait c
+{
+}
+abstract class d
+{
+}
+final class e
+{
+}
+function fn224328296()
+{
+    var_dump(get_declared_classes());
+    var_dump(get_declared_traits());
+}
+fn224328296();
 --EXPECTF--
 array(%d) {%A
   [%d]=>

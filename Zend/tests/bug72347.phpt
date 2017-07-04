@@ -2,7 +2,9 @@
 Bug #72347 (VERIFY_RETURN type casts visible in finally)
 --FILE--
 <?php
-function test() : int {
+
+function test() : int
+{
     $d = 1.5;
     try {
         return $d;
@@ -10,8 +12,11 @@ function test() : int {
         var_dump($d);
     }
 }
-var_dump(test());
-?>
+function fn1984070953()
+{
+    var_dump(test());
+}
+fn1984070953();
 --EXPECT--
 float(1.5)
 int(1)

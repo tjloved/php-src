@@ -5,14 +5,17 @@ disable_functions=strlen,defined,call_user_func,constant,is_string
 --FILE--
 <?php
 
-var_dump(function_exists("strlen"));
-var_dump(is_callable("strlen"));
-var_dump(strlen("xxx"));
-var_dump(defined("PHP_VERSION"));
-var_dump(constant("PHP_VERSION"));
-var_dump(call_user_func("strlen"));
-var_dump(is_string("xxx"));
-
+function fn1340021348()
+{
+    var_dump(function_exists("strlen"));
+    var_dump(is_callable("strlen"));
+    var_dump(strlen("xxx"));
+    var_dump(defined("PHP_VERSION"));
+    var_dump(constant("PHP_VERSION"));
+    var_dump(call_user_func("strlen"));
+    var_dump(is_string("xxx"));
+}
+fn1340021348();
 --EXPECTF--
 bool(false)
 bool(true)

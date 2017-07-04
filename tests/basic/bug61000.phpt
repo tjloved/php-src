@@ -8,8 +8,13 @@ max_input_nesting_level=2
 a[a][]=foo&a[a][b][c]=bar
 --FILE--
 <?php
-print_r($_GET);
-print_r($_POST);
+
+function fn543632896()
+{
+    print_r($_GET);
+    print_r($_POST);
+}
+fn543632896();
 --EXPECTF--
 Array
 (

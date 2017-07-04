@@ -3,18 +3,19 @@ Only arrays and Traversables can be unpacked
 --FILE--
 <?php
 
-function test(...$args) {
+function test(...$args)
+{
     var_dump($args);
 }
-
-test(...null);
-test(...42);
-test(...new stdClass);
-
-test(1, 2, 3, ..."foo", ...[4, 5]);
-test(1, 2, 3, ...new StdClass, ...3.14, ...[4, 5]);
-
-?>
+function fn1796970702()
+{
+    test(...null);
+    test(...42);
+    test(...new stdClass());
+    test(1, 2, 3, ..."foo", ...[4, 5]);
+    test(1, 2, 3, ...new StdClass(), ...3.14, ...[4, 5]);
+}
+fn1796970702();
 --EXPECTF--
 Warning: Only arrays and Traversables can be unpacked in %s on line %d
 array(0) {

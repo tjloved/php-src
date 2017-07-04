@@ -3,9 +3,11 @@ Testing each() with an undefined variable
 --FILE--
 <?php
 
-each($foo);
-
-?>
+function fn2142614228()
+{
+    each($foo);
+}
+fn2142614228();
 --EXPECTF--
 Deprecated: The each() function is deprecated. This message will be suppressed on further calls in %s on line %d
 

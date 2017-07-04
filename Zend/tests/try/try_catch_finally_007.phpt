@@ -4,36 +4,40 @@ Try catch finally (goto in try/catch block)
 adoy
 --FILE--
 <?php
-function foo($ret = FALSE) {
+
+function foo($ret = FALSE)
+{
     try {
         try {
             do {
                 goto label;
-            } while(0);
+            } while (0);
             foreach (array() as $val) {
                 continue;
             }
         } finally {
             var_dump("finally1");
             throw new Exception("exception");
-        } 
+        }
     } catch (Exception $e) {
         goto local;
-local: 
+        local:
         var_dump("catched");
-        if ($ret) return "return";
+        if ($ret) {
+            return "return";
+        }
     } finally {
-       var_dump("finally2");
+        var_dump("finally2");
     }
-
-label:
-   var_dump("label");
+    label:
+    var_dump("label");
 }
-
-var_dump(foo());
-var_dump(foo(true));
-
-?>
+function fn185062998()
+{
+    var_dump(foo());
+    var_dump(foo(true));
+}
+fn185062998();
 --EXPECTF--
 string(8) "finally1"
 string(7) "catched"

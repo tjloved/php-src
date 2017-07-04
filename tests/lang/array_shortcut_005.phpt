@@ -2,8 +2,12 @@
 Testing nested array shortcut
 --FILE--
 <?php
-print_r([1, 2, 3, ["foo" => "orange", "bar" => "apple", "baz" => "lemon"]]);
-?>
+
+function fn1272476416()
+{
+    print_r([1, 2, 3, ["foo" => "orange", "bar" => "apple", "baz" => "lemon"]]);
+}
+fn1272476416();
 --EXPECT--
 Array
 (

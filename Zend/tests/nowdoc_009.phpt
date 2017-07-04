@@ -3,9 +3,10 @@ Torture the T_END_NOWDOC rules (nowdoc)
 --FILE--
 <?php
 
-require_once 'nowdoc.inc';
-
-print <<<'ENDOFNOWDOC'
+function fn1373403709()
+{
+    require_once 'nowdoc.inc';
+    print <<<'ENDOFNOWDOC'
 ENDOFNOWDOC    ;
     ENDOFNOWDOC;
 ENDOFNOWDOC    
@@ -13,8 +14,7 @@ ENDOFNOWDOC
 $ENDOFNOWDOC;
 
 ENDOFNOWDOC;
-
-$x = <<<'ENDOFNOWDOC'
+    $x = <<<'ENDOFNOWDOC'
 ENDOFNOWDOC    ;
     ENDOFNOWDOC;
 ENDOFNOWDOC    
@@ -22,10 +22,9 @@ ENDOFNOWDOC
 $ENDOFNOWDOC;
 
 ENDOFNOWDOC;
-
-print "{$x}";
-
-?>
+    print "{$x}";
+}
+fn1373403709();
 --EXPECT--
 ENDOFNOWDOC    ;
     ENDOFNOWDOC;

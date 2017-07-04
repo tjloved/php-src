@@ -3,18 +3,17 @@ Testing assign to property of an object in an array
 --FILE--
 <?php
 
-$arr = array(new stdClass);
-
-$arr[0]->a = clone $arr[0];
-var_dump($arr);
-
-$arr[0]->b = new $arr[0];
-var_dump($arr);
-
-$arr[0]->c = $arr[0]->a;
-var_dump($arr);
-
-?>
+function fn1676319472()
+{
+    $arr = array(new stdClass());
+    $arr[0]->a = clone $arr[0];
+    var_dump($arr);
+    $arr[0]->b = new $arr[0]();
+    var_dump($arr);
+    $arr[0]->c = $arr[0]->a;
+    var_dump($arr);
+}
+fn1676319472();
 --EXPECT--
 array(1) {
   [0]=>

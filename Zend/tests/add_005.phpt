@@ -5,17 +5,17 @@ precision=14
 --FILE--
 <?php
 
-$i = 75636;
-$d = 2834681123.123123;
-
-$c = $i + $d;
-var_dump($c);
-
-$c = $d + $i;
-var_dump($c);
-
-echo "Done\n";
-?>
+function fn2116693170()
+{
+    $i = 75636;
+    $d = 2834681123.123123;
+    $c = $i + $d;
+    var_dump($c);
+    $c = $d + $i;
+    var_dump($c);
+    echo "Done\n";
+}
+fn2116693170();
 --EXPECTF--	
 float(2834756759.1231)
 float(2834756759.1231)

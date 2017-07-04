@@ -4,26 +4,31 @@ Try catch finally (re-throw exception in catch block)
 adoy
 --FILE--
 <?php
-function dummy($msg) {
-   var_dump($msg);
+
+function dummy($msg)
+{
+    var_dump($msg);
 }
-try {
+function fn1762146414()
+{
     try {
-        var_dump("try");
-        return;
+        try {
+            var_dump("try");
+            return;
+        } catch (Exception $e) {
+            dummy("catch");
+            throw $e;
+        } finally {
+            dummy("finally");
+        }
     } catch (Exception $e) {
-        dummy("catch");
-        throw $e;
+        dummy("catch2");
     } finally {
-        dummy("finally");
+        dummy("finally2");
     }
-} catch (Exception $e) {
-  dummy("catch2");
-} finally {
-  dummy("finally2");
+    var_dump("end");
 }
-var_dump("end");
-?>
+fn1762146414();
 --EXPECTF--
 string(3) "try"
 string(7) "finally"

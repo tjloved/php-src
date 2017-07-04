@@ -3,15 +3,16 @@ Unpack arguments for dynamic call
 --FILE--
 <?php
 
-$fn = function(...$args) {
-    var_dump($args);
-};
-
-$fn(...[]);
-$fn(...[1, 2, 3]);
-$fn(1, ...[2, 3], ...[], ...[4, 5]);
-
-?>
+function fn1587593700()
+{
+    $fn = function (...$args) {
+        var_dump($args);
+    };
+    $fn(...[]);
+    $fn(...[1, 2, 3]);
+    $fn(1, ...[2, 3], ...[], ...[4, 5]);
+}
+fn1587593700();
 --EXPECT--
 array(0) {
 }

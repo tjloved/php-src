@@ -3,15 +3,17 @@ Generator shouldn't crash if last yielded value is a closure
 --FILE--
 <?php
 
-function gen() {
-    yield function() {};
+function gen()
+{
+    (yield function () {
+    });
 }
-
-$gen = gen();
-$gen->next();
-
-echo "Done!";
-
-?>
+function fn358672391()
+{
+    $gen = gen();
+    $gen->next();
+    echo "Done!";
+}
+fn358672391();
 --EXPECT--
 Done!

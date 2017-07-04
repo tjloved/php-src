@@ -8,7 +8,11 @@ if(PHP_OS_FAMILY === "Windows") {
 ?>
 --FILE--
 <?php
-var_dump(function_exists('sapi_windows_vt100_support'));
-?>
+
+function fn340796939()
+{
+    var_dump(function_exists('sapi_windows_vt100_support'));
+}
+fn340796939();
 --EXPECT--
 bool(false)

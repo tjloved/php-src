@@ -7,31 +7,16 @@ precision=14
 --FILE--
 <?php
 
-$a = array(
-	array(1,2,3),
-	"",
-	1,
-	2.5,
-	0,
-	"string",
-	"123",
-	"2.5",
-	NULL,
-	true,
-	false,
-	new stdclass,
-	array(),
-	PHP_INT_MAX,
-	(string)PHP_INT_MAX
-);
-
-foreach ($a as $var) {
-	$var++;
-	var_dump($var);
+function fn104255630()
+{
+    $a = array(array(1, 2, 3), "", 1, 2.5, 0, "string", "123", "2.5", NULL, true, false, new stdclass(), array(), PHP_INT_MAX, (string) PHP_INT_MAX);
+    foreach ($a as $var) {
+        $var++;
+        var_dump($var);
+    }
+    echo "Done\n";
 }
-
-echo "Done\n";
-?>
+fn104255630();
 --EXPECTF--	
 array(3) {
   [0]=>

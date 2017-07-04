@@ -3,7 +3,8 @@ finally is run even if a generator is closed mid-execution
 --FILE--
 <?php
 
-function gen() {
+function gen()
+{
     try {
         try {
             echo "before yield\n";
@@ -18,12 +19,13 @@ function gen() {
     }
     echo "code after second finally\n";
 }
-
-$gen = gen();
-$gen->rewind();
-unset($gen);
-
-?>
+function fn570673378()
+{
+    $gen = gen();
+    $gen->rewind();
+    unset($gen);
+}
+fn570673378();
 --EXPECT--
 before yield
 finally run

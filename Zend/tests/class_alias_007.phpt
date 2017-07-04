@@ -3,15 +3,17 @@ Testing class_alias() using autoload
 --FILE--
 <?php
 
-spl_autoload_register(function ($a) {
-	class foo { }
-});
-
-class_alias('foo', 'bar', 1);
-
-var_dump(new foo, new bar);
-
-?>
+function fn1094889400()
+{
+    spl_autoload_register(function ($a) {
+        class foo
+        {
+        }
+    });
+    class_alias('foo', 'bar', 1);
+    var_dump(new foo(), new bar());
+}
+fn1094889400();
 --EXPECTF--
 object(foo)#%d (0) {
 }

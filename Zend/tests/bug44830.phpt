@@ -3,12 +3,13 @@ Bug #44830 (Very minor issue with backslash in heredoc)
 --FILE--
 <?php
 
-$backslash = <<<EOT
-\
+function fn76268695()
+{
+    $backslash = <<<EOT
+\\
 EOT;
-
-var_dump($backslash);
-
-?>
+    var_dump($backslash);
+}
+fn76268695();
 --EXPECT--
 string(1) "\"

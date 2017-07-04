@@ -2,22 +2,26 @@
 Try finally (re-throw exception in finally block)
 --FILE--
 <?php
-function foo () {
-   try {
-     throw new Exception("try");
-   } finally {
-     throw new Exception("finally");
-   }
-}
 
-try {
-  foo();
-} catch (Exception $e) {
-  do {
-    var_dump($e->getMessage());
-  } while ($e = $e->getPrevious());
+function foo()
+{
+    try {
+        throw new Exception("try");
+    } finally {
+        throw new Exception("finally");
+    }
 }
-?>
+function fn1933819759()
+{
+    try {
+        foo();
+    } catch (Exception $e) {
+        do {
+            var_dump($e->getMessage());
+        } while ($e = $e->getPrevious());
+    }
+}
+fn1933819759();
 --EXPECT--
 string(7) "finally"
 string(3) "try"

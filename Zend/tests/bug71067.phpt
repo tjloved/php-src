@@ -5,21 +5,23 @@ opcache.enable=0
 error_reporting=0
 --FILE--
 <?php
-class Test {
-	public function test(){
-		$arr = (object) [
-			'children' => []
-		];
-		$arr->children[] = 1;
-		return $arr;
-	}
+
+class Test
+{
+    public function test()
+    {
+        $arr = (object) ['children' => []];
+        $arr->children[] = 1;
+        return $arr;
+    }
 }
-
-$o = new Test();
-$o->test();
-
-print_r($o->test());
-?>
+function fn4611067()
+{
+    $o = new Test();
+    $o->test();
+    print_r($o->test());
+}
+fn4611067();
 --EXPECT--
 stdClass Object
 (

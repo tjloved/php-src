@@ -12,9 +12,13 @@ Content-Disposition: form-data
 -----------------------------20896060251896012921717172737--
 --FILE--
 <?php
-var_dump($_FILES);
-var_dump($_POST);
-?>
+
+function fn636831223()
+{
+    var_dump($_FILES);
+    var_dump($_POST);
+}
+fn636831223();
 --EXPECTF--
 Warning: File Upload Mime headers garbled in %s
 array(0) {

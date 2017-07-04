@@ -2,15 +2,20 @@
 Bug #70187 (Notice: unserialize(): Unexpected end of serialized data)
 --FILE--
 <?php
-class A {
-	public $b;
-}
 
-$a = new A;
-var_dump($a); // force properties HT
-unset($a->b);
-var_dump(serialize($a));
-?>
+class A
+{
+    public $b;
+}
+function fn1306887557()
+{
+    $a = new A();
+    var_dump($a);
+    // force properties HT
+    unset($a->b);
+    var_dump(serialize($a));
+}
+fn1306887557();
 --EXPECT--
 object(A)#1 (1) {
   ["b"]=>

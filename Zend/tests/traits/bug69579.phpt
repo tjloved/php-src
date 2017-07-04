@@ -7,14 +7,16 @@ if (!trait_exists('_ZendTestTrait')) die("skip requires internal trait");
 --FILE--
 <?php
 
-class Bar{
-  use _ZendTestTrait;
+class Bar
+{
+    use _ZendTestTrait;
 }
-
-$bar = new Bar();
-var_dump($bar->testMethod());
-// destruction causes a double-free and explodes
-
-?>
+function fn164365268()
+{
+    $bar = new Bar();
+    var_dump($bar->testMethod());
+    // destruction causes a double-free and explodes
+}
+fn164365268();
 --EXPECT--
 bool(true)

@@ -5,10 +5,12 @@ func_num_args with variable number of args
 
 function foo($a)
 {
-	var_dump(func_num_args());	
+    var_dump(func_num_args());
 }
-foo(1, 2, 3);
-
-?>
+function fn1328525966()
+{
+    foo(1, 2, 3);
+}
+fn1328525966();
 --EXPECT--
 int(3)

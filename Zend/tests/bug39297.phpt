@@ -2,43 +2,44 @@
 Bug #39297 (Memory corryption because of indirect modification of overloaded array)
 --FILE--
 <?php
-function compareByRef(&$first, &$second) {
+
+function compareByRef(&$first, &$second)
+{
     return $first === $second;
 }
-
-class MyTree implements ArrayAccess {
+class MyTree implements ArrayAccess
+{
     public $parent;
     public $children = array();
-
-    public function offsetExists($offset) {
+    public function offsetExists($offset)
+    {
     }
-
-    public function offsetUnset($offset) {
+    public function offsetUnset($offset)
+    {
     }
-
-    public function offsetSet($offset, $value) {
-    	echo "offsetSet()\n";
+    public function offsetSet($offset, $value)
+    {
+        echo "offsetSet()\n";
         $cannonicalName = strtolower($offset);
         $this->children[$cannonicalName] = $value;
         $value->parent = $this;
-    }    
-    
-    public function offsetGet($offset) {
-    	echo "offsetGet()\n";
+    }
+    public function offsetGet($offset)
+    {
+        echo "offsetGet()\n";
         $cannonicalName = strtolower($offset);
         return $this->children[$cannonicalName];
     }
-
 }
-
-$id = 'Test';
-
-$root = new MyTree();
-$child = new MyTree();
-$root[$id] = $child;
-
-var_dump(compareByRef($root[$id], $child));
-?>
+function fn383914641()
+{
+    $id = 'Test';
+    $root = new MyTree();
+    $child = new MyTree();
+    $root[$id] = $child;
+    var_dump(compareByRef($root[$id], $child));
+}
+fn383914641();
 --EXPECT--
 offsetSet()
 offsetGet()

@@ -3,23 +3,24 @@ Basic variadic function
 --FILE--
 <?php
 
-function test1(... $args) {
+function test1(...$args)
+{
     var_dump($args);
 }
-
-test1();
-test1(1);
-test1(1, 2, 3);
-
-function test2($arg1, $arg2, ...$args) {
+function test2($arg1, $arg2, ...$args)
+{
     var_dump($arg1, $arg2, $args);
 }
-
-test2(1, 2);
-test2(1, 2, 3);
-test2(1, 2, 3, 4, 5);
-
-?>
+function fn861940348()
+{
+    test1();
+    test1(1);
+    test1(1, 2, 3);
+    test2(1, 2);
+    test2(1, 2, 3);
+    test2(1, 2, 3, 4, 5);
+}
+fn861940348();
 --EXPECT--
 array(0) {
 }

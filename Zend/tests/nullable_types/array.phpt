@@ -3,13 +3,16 @@ Explicitly nullable array type
 --FILE--
 <?php
 
-function _array_(?array $v): ?array {
+function _array_(?array $v) : ?array
+{
     return $v;
 }
-
-var_dump(_array_(null));
-var_dump(_array_([]));
-
+function fn1497179682()
+{
+    var_dump(_array_(null));
+    var_dump(_array_([]));
+}
+fn1497179682();
 --EXPECT--
 NULL
 array(0) {

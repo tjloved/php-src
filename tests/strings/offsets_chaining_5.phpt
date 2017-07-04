@@ -4,14 +4,18 @@ testing the behavior of string offset chaining
 error_reporting=E_ALL | E_DEPRECATED
 --FILE--
 <?php
-$array = array('expected_array' => "foobar");
-var_dump(isset($array['expected_array']));
-var_dump($array['expected_array']);
-var_dump(isset($array['expected_array']['foo']));
-var_dump($array['expected_array']['foo']);
-var_dump(isset($array['expected_array']['foo']['bar']));
-var_dump($array['expected_array']['foo']['bar']);
-?>
+
+function fn876161592()
+{
+    $array = array('expected_array' => "foobar");
+    var_dump(isset($array['expected_array']));
+    var_dump($array['expected_array']);
+    var_dump(isset($array['expected_array']['foo']));
+    var_dump($array['expected_array']['foo']);
+    var_dump(isset($array['expected_array']['foo']['bar']));
+    var_dump($array['expected_array']['foo']['bar']);
+}
+fn876161592();
 --EXPECTF--
 bool(true)
 string(6) "foobar"

@@ -4,15 +4,19 @@ GC 032: Crash in GC because of invalid reference counting
 zend.enable_gc=1
 --FILE--
 <?php
-$a = array();
-$b =& $a;
-$a[0] = $a;
-debug_zval_dump($a);
-$a = array(array());
-$b =& $a;
-$a[0][0] = $a;
-debug_zval_dump($a);
-?>
+
+function fn1466373762()
+{
+    $a = array();
+    $b =& $a;
+    $a[0] = $a;
+    debug_zval_dump($a);
+    $a = array(array());
+    $b =& $a;
+    $a[0][0] = $a;
+    debug_zval_dump($a);
+}
+fn1466373762();
 --EXPECTF--
 array(1) refcount(%d){
   [0]=>

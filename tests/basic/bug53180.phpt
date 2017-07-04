@@ -6,8 +6,12 @@ post_max_size=0
 email=foo&password=bar&submit=Log+on
 --FILE--
 <?php
-var_dump($_POST);
-?>
+
+function fn909341430()
+{
+    var_dump($_POST);
+}
+fn909341430();
 --EXPECT--
 array(3) {
   ["email"]=>

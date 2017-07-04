@@ -3,20 +3,22 @@ Generators can return non-scalar keys
 --FILE--
 <?php
 
-function gen() {
-    yield [1, 2, 3] => [4, 5, 6];
-    yield (object) ['a' => 'b'] => (object) ['b' => 'a'];
-    yield 3.14 => 2.73;
-    yield false => true;
-    yield true => false;
-    yield null => null;
+function gen()
+{
+    (yield [1, 2, 3] => [4, 5, 6]);
+    (yield (object) ['a' => 'b'] => (object) ['b' => 'a']);
+    (yield 3.14 => 2.73);
+    (yield false => true);
+    (yield true => false);
+    (yield null => null);
 }
-
-foreach (gen() as $k => $v) {
-    var_dump($k, $v);
+function fn1128954338()
+{
+    foreach (gen() as $k => $v) {
+        var_dump($k, $v);
+    }
 }
-
-?>
+fn1128954338();
 --EXPECT--
 array(3) {
   [0]=>

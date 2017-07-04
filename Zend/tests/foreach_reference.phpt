@@ -3,19 +3,17 @@ foreach with reference
 --FILE--
 <?php
 
-$array = ['a', 'b', 'c', 'd'];
-
-foreach ($array as &$a) {
+function fn1616387956()
+{
+    $array = ['a', 'b', 'c', 'd'];
+    foreach ($array as &$a) {
+    }
+    var_dump($array);
+    var_dump(array_values($array));
+    var_dump($a);
+    var_dump(array_reverse($array));
 }
-
-var_dump($array);
-
-var_dump(array_values($array));
-var_dump($a);
-
-var_dump(array_reverse($array));
-
-?>
+fn1616387956();
 --EXPECTF--
 array(4) {
   [0]=>

@@ -2,7 +2,9 @@
 Bug #70228 (memleak if return in finally block)
 --FILE--
 <?php
-function test() {
+
+function test()
+{
     try {
         throw new Exception(1);
     } finally {
@@ -15,18 +17,21 @@ function test() {
             } finally {
                 throw new Exception(3);
             }
-        } catch (Exception $e) {}
+        } catch (Exception $e) {
+        }
     }
 }
-
-try {
-    var_dump(test());
-} catch (Exception $e) {
-    do {
-        echo $e->getMessage() . "\n";
-        $e = $e->getPrevious();
-    } while ($e);
+function fn1975753198()
+{
+    try {
+        var_dump(test());
+    } catch (Exception $e) {
+        do {
+            echo $e->getMessage() . "\n";
+            $e = $e->getPrevious();
+        } while ($e);
+    }
 }
-?>
+fn1975753198();
 --EXPECT--
 1

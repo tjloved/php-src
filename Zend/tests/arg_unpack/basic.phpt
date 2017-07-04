@@ -3,41 +3,40 @@ Basic argument unpacking
 --FILE--
 <?php
 
-function test(...$args) {
+function test(...$args)
+{
     var_dump($args);
 }
-
-function test2($arg1, $arg2, $arg3 = null) {
+function test2($arg1, $arg2, $arg3 = null)
+{
     var_dump($arg1, $arg2, $arg3);
 }
-
-function getArray($array) {
+function getArray($array)
+{
     return $array;
 }
-
-function arrayGen($array) {
+function arrayGen($array)
+{
     foreach ($array as $element) {
-        yield $element;
+        (yield $element);
     }
 }
-
-$array = [1, 2, 3];
-
-test(...[]);
-test(...[1, 2, 3]);
-test(...$array);
-test(...getArray([1, 2, 3]));
-test(...arrayGen([]));
-test(...arrayGen([1, 2, 3]));
-
-test(1, ...[2, 3], ...[4, 5]);
-test(1, ...getArray([2, 3]), ...arrayGen([4, 5]));
-
-test2(...[1, 2]);
-test2(...[1, 2, 3]);
-test2(...[1], ...[], ...[], ...[2, 3], ...[4, 5]);
-
-?>
+function fn220864455()
+{
+    $array = [1, 2, 3];
+    test(...[]);
+    test(...[1, 2, 3]);
+    test(...$array);
+    test(...getArray([1, 2, 3]));
+    test(...arrayGen([]));
+    test(...arrayGen([1, 2, 3]));
+    test(1, ...[2, 3], ...[4, 5]);
+    test(1, ...getArray([2, 3]), ...arrayGen([4, 5]));
+    test2(...[1, 2]);
+    test2(...[1, 2, 3]);
+    test2(...[1], ...[], ...[], ...[2, 3], ...[4, 5]);
+}
+fn220864455();
 --EXPECT--
 array(0) {
 }

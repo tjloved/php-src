@@ -6,39 +6,35 @@ Bug #50810 (property_exists does not work for private)
 class ExampleSuperClass
 {
     private $foo;
-    static protected $bar;
- 
+    protected static $bar;
     private function foo()
     {
     }
- 
     public function propertyFooExists()
     {
         return property_exists($this, 'foo');
     }
- 
 }
- 
 class ExampleSubClass extends ExampleSuperClass
 {
     public function methodExists()
     {
         return method_exists($this, 'foo');
     }
- 
     public function propertyBarExists()
     {
         return property_exists($this, 'bar');
     }
 }
- 
-$example = new ExampleSubClass();
-var_dump($example->methodExists());
-var_dump(method_exists($example, 'propertyFooExists'));
-var_dump($example->propertyFooExists());
-var_dump($example->propertyBarExists());
-
-?>
+function fn424486302()
+{
+    $example = new ExampleSubClass();
+    var_dump($example->methodExists());
+    var_dump(method_exists($example, 'propertyFooExists'));
+    var_dump($example->propertyFooExists());
+    var_dump($example->propertyBarExists());
+}
+fn424486302();
 --EXPECT--
 bool(true)
 bool(true)

@@ -3,26 +3,27 @@ Bug #70965 (yield from with a common iterator primes too much)
 --FILE--
 <?php
 
-function it() {
+function it()
+{
     yield from [1, 2, 3, 4, 5];
 }
-
-function bar($g) {
+function bar($g)
+{
     yield from $g;
 }
-
-$gen = it();
-$gens[] = bar($gen);
-$gens[] = bar($gen);
-
-do {
-    foreach($gens as $g) {
-        var_dump($g->current());
-        $gen->next();
-    }
-} while ($gen->valid());
-
-?>
+function fn876807882()
+{
+    $gen = it();
+    $gens[] = bar($gen);
+    $gens[] = bar($gen);
+    do {
+        foreach ($gens as $g) {
+            var_dump($g->current());
+            $gen->next();
+        }
+    } while ($gen->valid());
+}
+fn876807882();
 --EXPECT--
 int(1)
 int(2)

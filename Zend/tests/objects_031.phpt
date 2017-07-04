@@ -3,15 +3,15 @@ Cloning stdClass
 --FILE--
 <?php
 
-$x[] = clone new stdclass;
-$x[] = clone new stdclass;
-$x[] = clone new stdclass;
-
-$x[0]->a = 1;
-
-var_dump($x);
-
-?>
+function fn1038984676()
+{
+    $x[] = clone new stdclass();
+    $x[] = clone new stdclass();
+    $x[] = clone new stdclass();
+    $x[0]->a = 1;
+    var_dump($x);
+}
+fn1038984676();
 --EXPECTF--
 array(3) {
   [0]=>

@@ -6,33 +6,33 @@ Bug #20240 (order of destructor calls)
 class test
 {
     public $member;
-
-    function __construct() {
+    function __construct()
+    {
         $this->member = 1;
         register_shutdown_function(array($this, 'destructor'));
     }
-
-    function destructor() {
+    function destructor()
+    {
         print __METHOD__ . "\n";
     }
-
-    function __destruct() {
+    function __destruct()
+    {
         print __METHOD__ . "\n";
     }
-
-    function add() {
+    function add()
+    {
         $this->member += 1;
-        print $this->member."\n";
+        print $this->member . "\n";
     }
 }
-
-$t = new test();
-
-$t->add();
-$t->add();
-
-echo "Done\n";
-?>
+function fn1873380805()
+{
+    $t = new test();
+    $t->add();
+    $t->add();
+    echo "Done\n";
+}
+fn1873380805();
 --EXPECT--
 2
 3

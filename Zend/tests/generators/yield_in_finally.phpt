@@ -3,25 +3,26 @@ yield can be used in finally (apart from forced closes)
 --FILE--
 <?php
 
-function gen() {
+function gen()
+{
     try {
         echo "before return\n";
         return;
         echo "after return\n";
     } finally {
         echo "before yield\n";
-        yield "yielded value";
+        (yield "yielded value");
         echo "after yield\n";
     }
-
     echo "after finally\n";
 }
-
-$gen = gen();
-var_dump($gen->current());
-$gen->next();
-
-?>
+function fn575759135()
+{
+    $gen = gen();
+    var_dump($gen->current());
+    $gen->next();
+}
+fn575759135();
 --EXPECTF--
 before return
 before yield

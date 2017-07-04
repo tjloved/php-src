@@ -7,20 +7,16 @@ precision=14
 --FILE--
 <?php
 
-$doubles = array(
-	0x1736123FFFAAA,
-	0XFFFFFFFFFFFFFFFFFF,
-	0xAAAAAAAAAAAAAAEEEEEEEEEBBB,
-	0x66666666666666666777777,
-	);
-
-foreach ($doubles as $d) {
-	$l = $d;
-	var_dump($l);
+function fn1064738832()
+{
+    $doubles = array(0x1736123fffaaa, 4.722366482869645E+21, 0.0, 1.9807040628566085E+27);
+    foreach ($doubles as $d) {
+        $l = $d;
+        var_dump($l);
+    }
+    echo "Done\n";
 }
-
-echo "Done\n";
-?>
+fn1064738832();
 --EXPECTF--	
 float(4.0833602971%dE+14)
 float(4.7223664828%dE+21)

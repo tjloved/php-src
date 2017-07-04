@@ -1,21 +1,23 @@
 --TEST--
 Trying declare interface with repeated name of inherited method
 --FILE--
-<?php 
+<?php
 
-interface a {
-	function b();
+interface a
+{
+    function b();
 }
-
-interface b {
-	function b();
+interface b
+{
+    function b();
 }
-
-interface c extends a, b {
+interface c extends a, b
+{
 }
-
-echo "done!\n";
-
-?>
+function fn2043260179()
+{
+    echo "done!\n";
+}
+fn2043260179();
 --EXPECTF--
 done!

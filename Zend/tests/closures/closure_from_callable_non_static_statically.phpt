@@ -3,18 +3,21 @@ Testing Closure::fromCallable() functionality: Getting non-static method statica
 --FILE--
 <?php
 
-class A {
-    public function method() {
+class A
+{
+    public function method()
+    {
     }
 }
-
-try {
-    $fn = Closure::fromCallable(['A', 'method']);
-    $fn();
-} catch (TypeError $e) {
-    echo $e->getMessage(), "\n";
+function fn550751718()
+{
+    try {
+        $fn = Closure::fromCallable(['A', 'method']);
+        $fn();
+    } catch (TypeError $e) {
+        echo $e->getMessage(), "\n";
+    }
 }
-
-?>
+fn550751718();
 --EXPECT--
 Failed to create closure from callable: non-static method A::method() should not be called statically

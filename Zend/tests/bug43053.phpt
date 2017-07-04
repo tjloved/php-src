@@ -2,11 +2,15 @@
 Bug #43053 (Regression: some numbers shown in scientific notation)
 --FILE--
 <?php
-echo 1200000.00."\n";
-echo 1300000.00."\n";
-echo 1400000.00."\n";
-echo 1500000.00."\n";
-?>
+
+function fn135245890()
+{
+    echo 1200000.0 . "\n";
+    echo 1300000.0 . "\n";
+    echo 1400000.0 . "\n";
+    echo 1500000.0 . "\n";
+}
+fn135245890();
 --EXPECT--
 1200000
 1300000

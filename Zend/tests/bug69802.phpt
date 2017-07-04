@@ -2,14 +2,19 @@
 Bug #69802 (Reflection on Closure::__invoke borks type hint class name)
 --FILE--
 <?php
-$f = function(stdClass $x): stdClass {};
-$r = new ReflectionMethod($f, '__invoke');
-var_dump($r->getParameters()[0]->getName());
-var_dump($r->getParameters()[0]->getClass());
-echo $r->getParameters()[0], "\n";
-echo $r->getReturnType()->getName(), "\n";
-echo $r,"\n";
-?>
+
+function fn185380657()
+{
+    $f = function (stdClass $x) : stdClass {
+    };
+    $r = new ReflectionMethod($f, '__invoke');
+    var_dump($r->getParameters()[0]->getName());
+    var_dump($r->getParameters()[0]->getClass());
+    echo $r->getParameters()[0], "\n";
+    echo $r->getReturnType()->getName(), "\n";
+    echo $r, "\n";
+}
+fn185380657();
 --EXPECT--
 string(1) "x"
 object(ReflectionClass)#4 (1) {

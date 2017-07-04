@@ -4,13 +4,17 @@ GC 004: Simple array cycle
 zend.enable_gc=1
 --FILE--
 <?php
-$a = array();
-$a[] =& $a;
-var_dump($a);
-unset($a);
-var_dump(gc_collect_cycles());
-echo "ok\n"
-?>
+
+function fn23519305()
+{
+    $a = array();
+    $a[] =& $a;
+    var_dump($a);
+    unset($a);
+    var_dump(gc_collect_cycles());
+    echo "ok\n";
+}
+fn23519305();
 --EXPECT--
 array(1) {
   [0]=>

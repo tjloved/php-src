@@ -3,15 +3,17 @@ Testing interface_exists()
 --FILE--
 <?php
 
-interface foo {
+interface foo
+{
 }
-
-var_dump(interface_exists('foo'));
-var_dump(interface_exists(1));
-var_dump(interface_exists(NULL));
-var_dump(interface_exists(new stdClass));
-
-?>
+function fn1753978750()
+{
+    var_dump(interface_exists('foo'));
+    var_dump(interface_exists(1));
+    var_dump(interface_exists(NULL));
+    var_dump(interface_exists(new stdClass()));
+}
+fn1753978750();
 --EXPECTF--
 bool(true)
 bool(false)

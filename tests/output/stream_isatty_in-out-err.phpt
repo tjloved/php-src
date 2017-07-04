@@ -10,9 +10,13 @@ if (getenv("SKIP_IO_CAPTURE_TESTS")) {
 STDIN STDOUT STDERR
 --FILE--
 <?php
-require dirname(__FILE__).'/stream_isatty.inc';
-testToStdOut();
-?>
+
+function fn1975707318()
+{
+    require dirname(__FILE__) . '/stream_isatty.inc';
+    testToStdOut();
+}
+fn1975707318();
 --EXPECTF--
 STDIN (constant): bool(false)
 STDIN (fopen): bool(false)

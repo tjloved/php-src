@@ -2,27 +2,34 @@
 Bug #60833 (self, parent, static behave inconsistently case-sensitive)
 --FILE--
 <?php
-class A {
-	static $x = "A";
-	function testit() {
-		$this->v1 = new sELF;
-		$this->v2 = new SELF;
-	}
-}
 
-class B extends A {
-	static $x = "B";
-	function testit() {
-		PARENT::testit();
-		$this->v3 = new sELF;
-		$this->v4 = new PARENT;
-		$this->v4 = STATIC::$x;
-	}
+class A
+{
+    static $x = "A";
+    function testit()
+    {
+        $this->v1 = new sELF();
+        $this->v2 = new SELF();
+    }
 }
-$t = new B();
-$t->testit();
-var_dump($t);
-?>
+class B extends A
+{
+    static $x = "B";
+    function testit()
+    {
+        PARENT::testit();
+        $this->v3 = new sELF();
+        $this->v4 = new PARENT();
+        $this->v4 = STATIC::$x;
+    }
+}
+function fn1765626790()
+{
+    $t = new B();
+    $t->testit();
+    var_dump($t);
+}
+fn1765626790();
 --EXPECTF--
 object(B)#%d (4) {
   ["v1"]=>

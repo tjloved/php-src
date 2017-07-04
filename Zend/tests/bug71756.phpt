@@ -2,24 +2,31 @@
 Bug #71756 (Call-by-reference widens scope to uninvolved functions when used in switch)
 --FILE--
 <?php
-function a ($option) {
-	b($option['bla']);
-	c($option);
-	var_dump($option);
+
+function a($option)
+{
+    b($option['bla']);
+    c($option);
+    var_dump($option);
 }
-function b (&$string) {
-	$string = 'changed';
+function b(&$string)
+{
+    $string = 'changed';
 }
-function c ($option) {
-	switch ($option['bla']) {
-	case 'changed':
-		$copy = $option;
-		$copy['bla'] = 'copy';
-		break;
-	}
+function c($option)
+{
+    switch ($option['bla']) {
+        case 'changed':
+            $copy = $option;
+            $copy['bla'] = 'copy';
+            break;
+    }
 }
-a(array('bla' => 'false'));
-?>
+function fn2000307802()
+{
+    a(array('bla' => 'false'));
+}
+fn2000307802();
 --EXPECTF--
 array(1) {
   ["bla"]=>

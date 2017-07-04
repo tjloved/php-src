@@ -2,11 +2,16 @@
 Bug #64515 (Memoryleak when using the same variablename 2times in function declaration) (PHP7)
 --FILE--
 <?php
-function foo($unused = null, $unused = null, $arg = array()) {
-	    return 1;
+
+function foo($unused = null, $unused = null, $arg = array())
+{
+    return 1;
 }
-foo();
-echo "okey";
-?>
+function fn1558289456()
+{
+    foo();
+    echo "okey";
+}
+fn1558289456();
 --EXPECTF--
-Fatal error: Redefinition of parameter $unused in %sbug64515.php on line 2
+Fatal error: Redefinition of parameter $unused in %sbug64515.php on line %d

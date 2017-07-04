@@ -4,29 +4,35 @@ Bug #60139 (Anonymous functions create cycles not detected by the GC)
 zend.enable_gc=1
 --FILE--
 <?php
-class Foo {
-    public $x;
 
-    public function __construct() {
-        $this->x = function() {};
+class Foo
+{
+    public $x;
+    public function __construct()
+    {
+        $this->x = function () {
+        };
     }
 }
-
-class Bar {
+class Bar
+{
     public $x;
-
-    public function __construct() {
+    public function __construct()
+    {
         $self = $this;
-        $this->x = function() use ($self) {};
+        $this->x = function () use($self) {
+        };
     }
 }
-
-gc_collect_cycles();
-new Foo;
-var_dump(gc_collect_cycles());
-new Bar;
-var_dump(gc_collect_cycles());
-?>
+function fn1271365547()
+{
+    gc_collect_cycles();
+    new Foo();
+    var_dump(gc_collect_cycles());
+    new Bar();
+    var_dump(gc_collect_cycles());
+}
+fn1271365547();
 --EXPECT--
 int(2)
 int(2)

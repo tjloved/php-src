@@ -3,15 +3,16 @@
 --FILE--
 <?php
 
-$arr = [1, 2, 3];
-var_dump((object) (array) $arr);
-var_dump($arr);
-
-$obj = (object) [1, 2, 3];
-var_dump((array) (object) $obj);
-var_dump($obj);
-
-?>
+function fn995081498()
+{
+    $arr = [1, 2, 3];
+    var_dump((object) (array) $arr);
+    var_dump($arr);
+    $obj = (object) [1, 2, 3];
+    var_dump((array) (object) $obj);
+    var_dump($obj);
+}
+fn995081498();
 --EXPECT--
 object(stdClass)#1 (3) {
   ["0"]=>

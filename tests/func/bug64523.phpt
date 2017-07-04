@@ -4,7 +4,11 @@ Bug #64523: XOR not parsed in INI
 error_reporting = E_ALL ^ E_NOTICE ^ E_STRICT ^ E_DEPRECATED
 --FILE--
 <?php
-echo ini_get('error_reporting');
-?>
+
+function fn636772999()
+{
+    echo ini_get('error_reporting');
+}
+fn636772999();
 --EXPECTF--
 22519

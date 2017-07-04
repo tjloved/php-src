@@ -3,32 +3,31 @@ Returning a references returned by another function
 --FILE--
 <?php
 
-
-function &returnVarByRef () {
-    $b=1;
-	return $b; 
+function &returnVarByRef()
+{
+    $b = 1;
+    return $b;
 }
-
-function &testReturnVarByRef() {
-	return returnVarByRef();
+function &testReturnVarByRef()
+{
+    return returnVarByRef();
 }
-
-function returnVal () {
-return 1; 
+function returnVal()
+{
+    return 1;
 }
-
-function &testReturnValByRef() {
-	return returnVal();
+function &testReturnValByRef()
+{
+    return returnVal();
 }
-
-echo "\n---> 1. Return a variable by reference -> No warning:\n";
-
-var_dump (testReturnVarByRef());
-
-echo "\n---> 2. Return a value by reference -> Warning:\n";
-
-var_dump (testReturnValByRef());
-
+function fn837090417()
+{
+    echo "\n---> 1. Return a variable by reference -> No warning:\n";
+    var_dump(testReturnVarByRef());
+    echo "\n---> 2. Return a value by reference -> Warning:\n";
+    var_dump(testReturnValByRef());
+}
+fn837090417();
 --EXPECTF--
 ---> 1. Return a variable by reference -> No warning:
 int(1)

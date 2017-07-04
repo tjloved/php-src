@@ -3,21 +3,20 @@ simple variable replacement test (heredoc)
 --FILE--
 <?php
 
-require_once 'nowdoc.inc';
-
-print <<<ENDOFHEREDOC
-This is heredoc test #$a.
-
-ENDOFHEREDOC;
-
-$x = <<<ENDOFHEREDOC
-This is heredoc test #$b.
+function fn339436602()
+{
+    require_once 'nowdoc.inc';
+    print <<<ENDOFHEREDOC
+This is heredoc test #{$a}.
 
 ENDOFHEREDOC;
+    $x = <<<ENDOFHEREDOC
+This is heredoc test #{$b}.
 
-print "{$x}";
-
-?>
+ENDOFHEREDOC;
+    print "{$x}";
+}
+fn339436602();
 --EXPECT--
 This is heredoc test #1.
 This is heredoc test #2.

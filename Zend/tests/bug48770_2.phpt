@@ -4,47 +4,57 @@ Bug #48770 (call_user_func_array() fails to call parent from inheriting class)
 See Bug #48770
 --FILE--
 <?php
- 
-class A {
-	public function func($str) {
-		var_dump(__METHOD__ .': '. $str);
-	}
-	private function func2($str) {
-		var_dump(__METHOD__ .': '. $str);
-	}
-	protected function func3($str) {
-		var_dump(__METHOD__ .': '. $str);		
-	}
-	private function func22($str) {
-		var_dump(__METHOD__ .': '. $str);		
-	}
+
+class A
+{
+    public function func($str)
+    {
+        var_dump(__METHOD__ . ': ' . $str);
+    }
+    private function func2($str)
+    {
+        var_dump(__METHOD__ . ': ' . $str);
+    }
+    protected function func3($str)
+    {
+        var_dump(__METHOD__ . ': ' . $str);
+    }
+    private function func22($str)
+    {
+        var_dump(__METHOD__ . ': ' . $str);
+    }
 }
-
-class B extends A {
-	public function func($str) {
-  		call_user_func_array(array($this, 'parent::func2'), array($str));
-  		call_user_func_array(array($this, 'parent::func3'), array($str));
-  		call_user_func_array(array($this, 'parent::func22'), array($str));
-  		call_user_func_array(array($this, 'parent::inexistent'), array($str));
-	}
-	private function func2($str) {
-		var_dump(__METHOD__ .': '. $str);
-	}
-	protected function func3($str) {
-		var_dump(__METHOD__ .': '. $str);
-	}
+class B extends A
+{
+    public function func($str)
+    {
+        call_user_func_array(array($this, 'parent::func2'), array($str));
+        call_user_func_array(array($this, 'parent::func3'), array($str));
+        call_user_func_array(array($this, 'parent::func22'), array($str));
+        call_user_func_array(array($this, 'parent::inexistent'), array($str));
+    }
+    private function func2($str)
+    {
+        var_dump(__METHOD__ . ': ' . $str);
+    }
+    protected function func3($str)
+    {
+        var_dump(__METHOD__ . ': ' . $str);
+    }
 }
-
-class C extends B {
-	public function func($str) {
-		parent::func($str);
-	}
+class C extends B
+{
+    public function func($str)
+    {
+        parent::func($str);
+    }
 }
-
-$c = new C;
-$c->func('This should work!');
-
-?>
+function fn1652642170()
+{
+    $c = new C();
+    $c->func('This should work!');
+}
+fn1652642170();
 --EXPECTF--
 string(27) "A::func2: This should work!"
 string(27) "A::func3: This should work!"

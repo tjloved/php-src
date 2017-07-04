@@ -7,21 +7,16 @@ precision=14
 --FILE--
 <?php
 
-$doubles = array(
-	076545676543223,
-	032325463734,
-	0777777,
-	07777777777777,
-	033333333333333,
-	);
-
-foreach ($doubles as $d) {
-	$l = (double)$d;
-	var_dump($l);
+function fn1893273750()
+{
+    $doubles = array(076545676543223, 032325463734, 0777777, 07777777777777, 033333333333333);
+    foreach ($doubles as $d) {
+        $l = (double) $d;
+        var_dump($l);
+    }
+    echo "Done\n";
 }
-
-echo "Done\n";
-?>
+fn1893273750();
 --EXPECTF--	
 float(4308640384%d)
 float(3545655%d)

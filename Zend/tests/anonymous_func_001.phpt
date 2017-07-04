@@ -1,17 +1,18 @@
 --TEST--
 Testing calls to anonymous function
 --FILE--
-<?php 
+<?php
 
-for ($i = 0; $i < 10; $i++) {
-	$a = create_function('', 'return '. $i .';');
-	var_dump($a());
-	
-	$b = "\0lambda_". ($i + 1);
-	var_dump($b());
+function fn814732811()
+{
+    for ($i = 0; $i < 10; $i++) {
+        $a = create_function('', 'return ' . $i . ';');
+        var_dump($a());
+        $b = "\0lambda_" . ($i + 1);
+        var_dump($b());
+    }
 }
-
-?>
+fn814732811();
 --EXPECTF--
 Deprecated: Function create_function() is deprecated in %s on line %d
 int(0)

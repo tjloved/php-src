@@ -6,11 +6,13 @@ Test PHP_INT_MIN, PHP_INT_MAX and PHP_INT_SIZE (64-bit)
 --FILE--
 <?php
 
-var_dump(PHP_INT_MIN);
-var_dump(PHP_INT_MAX);
-var_dump(PHP_INT_SIZE);
-
-?>
+function fn450764090()
+{
+    var_dump(PHP_INT_MIN);
+    var_dump(PHP_INT_MAX);
+    var_dump(PHP_INT_SIZE);
+}
+fn450764090();
 --EXPECT--
 int(-9223372036854775808)
 int(9223372036854775807)

@@ -7,11 +7,16 @@ Content-Type: application/x-www-form-urlencoded
 a=1&b=ZYX
 --FILE--
 <?php
-var_dump($_FILES);
-var_dump($_POST);
-var_dump($HTTP_RAW_POST_DATA);
-var_dump(file_get_contents("php://input"));
-var_dump(file_get_contents("php://input"));
+
+function fn849391638()
+{
+    var_dump($_FILES);
+    var_dump($_POST);
+    var_dump($HTTP_RAW_POST_DATA);
+    var_dump(file_get_contents("php://input"));
+    var_dump(file_get_contents("php://input"));
+}
+fn849391638();
 --EXPECTF--
 array(0) {
 }

@@ -2,8 +2,12 @@
 Including a file in the current script directory from an included function
 --FILE--
 <?php
-require_once 'include_files/function.inc';
-test();
-?>
+
+function fn768158420()
+{
+    require_once 'include_files/function.inc';
+    test();
+}
+fn768158420();
 --EXPECT--
 Included!

@@ -8,9 +8,13 @@ if(PHP_OS_FAMILY !== "WIN") {
 ?>
 --FILE--
 <?php
-$file = dirname(__FILE__)."/bug38579.inc";
-include_once(strtolower($file));
-include_once(strtoupper($file));
-?>
+
+function fn1401825371()
+{
+    $file = dirname(__FILE__) . "/bug38579.inc";
+    include_once strtolower($file);
+    include_once strtoupper($file);
+}
+fn1401825371();
 --EXPECT--
 ok

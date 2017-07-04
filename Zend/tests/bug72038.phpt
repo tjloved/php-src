@@ -3,18 +3,20 @@ Bug #72038 (Function calls with values to a by-ref parameter don't always throw 
 --FILE--
 <?php
 
-test($foo = new stdClass);
-var_dump($foo);
-test($bar = 2);
-var_dump($bar);
-test($baz = &$bar);
-var_dump($baz);
-
-function test(&$param) {
-        $param = 1;
+function test(&$param)
+{
+    $param = 1;
 }
-
-?>
+function fn1957368656()
+{
+    test($foo = new stdClass());
+    var_dump($foo);
+    test($bar = 2);
+    var_dump($bar);
+    test($baz =& $bar);
+    var_dump($baz);
+}
+fn1957368656();
 --EXPECTF--
 
 Notice: Only variables should be passed by reference in %s on line %d

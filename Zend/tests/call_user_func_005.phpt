@@ -3,20 +3,24 @@ Passing Closure as parameter to an non-existent function
 --FILE--
 <?php
 
-class foo {
-	public static function __callstatic($x, $y) {
-		var_dump($x,$y);
-		return 1;
-	}
-	
-	public function teste() {
-		return foo::x(function &($a=1,$b) { });
-	}
+class foo
+{
+    public static function __callstatic($x, $y)
+    {
+        var_dump($x, $y);
+        return 1;
+    }
+    public function teste()
+    {
+        return foo::x(function &($a = 1, $b) {
+        });
+    }
 }
-
-var_dump(call_user_func(array('foo', 'teste')));
-
-?>
+function fn1025259722()
+{
+    var_dump(call_user_func(array('foo', 'teste')));
+}
+fn1025259722();
 --EXPECTF--
 Deprecated: %son-static method foo::teste() should not be called statically in %s on line %d
 %string|unicode%(1) "x"

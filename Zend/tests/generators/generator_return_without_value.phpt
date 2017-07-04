@@ -3,35 +3,34 @@ Generators can return without values
 --FILE--
 <?php
 
-function gen() {
+function gen()
+{
     yield;
     return;
 }
-
-function gen2() {
+function gen2()
+{
     yield;
     return null;
 }
-
-function gen3() {
-	return;
+function gen3()
+{
+    return;
     yield;
 }
-
-function gen4() {
-	return;
+function gen4()
+{
+    return;
     yield;
 }
-
-var_dump(gen());
-
-var_dump(gen2());
-
-var_dump(gen3());
-
-var_dump(gen4());
-
-?>
+function fn789539052()
+{
+    var_dump(gen());
+    var_dump(gen2());
+    var_dump(gen3());
+    var_dump(gen4());
+}
+fn789539052();
 --EXPECTF--
 object(Generator)#%d (0) {
 }

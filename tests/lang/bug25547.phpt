@@ -5,22 +5,21 @@ Bug #25547 (error_handler and array index with function call)
 
 function handler($errno, $errstr, $errfile, $errline, $context)
 {
-	echo __FUNCTION__ . "($errstr)\n";
+    echo __FUNCTION__ . "({$errstr})\n";
 }
-
-set_error_handler('handler');
-
-function foo($x) {
-	return "foo";
+function foo($x)
+{
+    return "foo";
 }
-
-$output = array();
-++$output[foo("bar")];
-
-print_r($output);
-
-echo "Done";
-?>
+function fn1686129327()
+{
+    set_error_handler('handler');
+    $output = array();
+    ++$output[foo("bar")];
+    print_r($output);
+    echo "Done";
+}
+fn1686129327();
 --EXPECT--
 handler(Undefined index: foo)
 Array

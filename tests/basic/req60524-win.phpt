@@ -8,6 +8,12 @@ if(PHP_OS_FAMILY !== "Windows")
   die('skip Run only on Windows');
 ?>
 --FILE--
-<?php echo sys_get_temp_dir(); ?>
+<?php
+
+function fn1504164198()
+{
+    echo sys_get_temp_dir();
+}
+fn1504164198();
 --EXPECT--
 C:\\Windows

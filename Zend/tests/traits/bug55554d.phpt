@@ -7,25 +7,29 @@ Bug #55137 (Legacy constructor not registered for class)
 // these cases, since that can lead to un-expected behavior.
 // It is not consistent with the normal constructor handling, but
 // here we have a chance to be more strict for the new traits.
-
-trait TNew {
-    public function __construct() {
+trait TNew
+{
+    public function __construct()
+    {
         echo "TNew executed\n";
     }
 }
-
-trait TLegacy {
-    public function ReportCollision() {
+trait TLegacy
+{
+    public function ReportCollision()
+    {
         echo "ReportCollision executed\n";
     }
 }
-
-class ReportCollision {
+class ReportCollision
+{
     use TNew, TLegacy;
 }
-
-$o = new ReportCollision;
-
+function fn2088048045()
+{
+    $o = new ReportCollision();
+}
+fn2088048045();
 --EXPECTF--
 
 Fatal error: ReportCollision has colliding constructor definitions coming from traits in %s on line %d

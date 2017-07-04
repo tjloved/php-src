@@ -5,10 +5,12 @@ func_num_args with no args
 
 function foo()
 {
-	var_dump(func_num_args());	
+    var_dump(func_num_args());
 }
-foo();
-
-?>
+function fn242602511()
+{
+    foo();
+}
+fn242602511();
 --EXPECT--
 int(0)

@@ -2,20 +2,25 @@
 Calling generator through magic __call()
 --FILE--
 <?php
-class A {
-    public function __call($name, $args) {
+
+class A
+{
+    public function __call($name, $args)
+    {
         for ($i = 0; $i < 5; $i++) {
-            yield $i;
+            (yield $i);
         }
     }
 }
-
-$a = new A();
-foreach ($a->gen() as $n) {
-    var_dump($n);
+function fn1149859388()
+{
+    $a = new A();
+    foreach ($a->gen() as $n) {
+        var_dump($n);
+    }
+    $a->gen();
 }
-$a->gen();
-?>
+fn1149859388();
 --EXPECT--
 int(0)
 int(1)

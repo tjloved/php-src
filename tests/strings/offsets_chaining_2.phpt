@@ -4,9 +4,13 @@ testing the behavior of string offset chaining
 error_reporting=E_ALL | E_DEPRECATED
 --FILE--
 <?php
-$string = "foobar";
-var_dump($string{0}{0}[0][0]);
-?>
+
+function fn370230858()
+{
+    $string = "foobar";
+    var_dump($string[0][0][0][0]);
+}
+fn370230858();
 --EXPECTF--
 string(1) "f"
 

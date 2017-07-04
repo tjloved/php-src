@@ -3,7 +3,13 @@ Scalar type names cannot be used as class, trait or interface names (4) - class_
 --FILE--
 <?php
 
-class foobar {}
-class_alias("foobar", "string");
+class foobar
+{
+}
+function fn1264733174()
+{
+    class_alias("foobar", "string");
+}
+fn1264733174();
 --EXPECTF--
 Fatal error: Cannot use 'string' as class name as it is reserved in %s on line %d

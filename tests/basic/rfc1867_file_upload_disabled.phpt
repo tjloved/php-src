@@ -20,9 +20,13 @@ foo
 -----------------------------20896060251896012921717172737--
 --FILE--
 <?php
-var_dump($_FILES);
-var_dump($_POST);
-?>
+
+function fn1300286295()
+{
+    var_dump($_FILES);
+    var_dump($_POST);
+}
+fn1300286295();
 --EXPECTF--
 array(0) {
 }

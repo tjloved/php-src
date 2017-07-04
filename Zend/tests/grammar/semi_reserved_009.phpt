@@ -5,20 +5,23 @@ Edge case: T_STRING<as> as T_STRING<?>
 
 trait TraitA
 {
-    public static function as(){ echo __METHOD__, PHP_EOL; }
+    public static function as()
+    {
+        echo __METHOD__, PHP_EOL;
+    }
 }
-
 class Foo
 {
-    use TraitA  {
+    use TraitA {
         as as try;
     }
 }
-
-Foo::try();
-
-echo PHP_EOL, "Done", PHP_EOL;
-
+function fn208001263()
+{
+    Foo::try();
+    echo PHP_EOL, "Done", PHP_EOL;
+}
+fn208001263();
 --EXPECTF--
 TraitA::as
 

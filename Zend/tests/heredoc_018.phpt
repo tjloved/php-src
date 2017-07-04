@@ -3,15 +3,16 @@ Testing heredoc with tabs before identifier
 --FILE--
 <?php
 
-$heredoc = <<<	A
+function fn1817533850()
+{
+    $heredoc = <<<A
 
 foo
 
-	A;
+\tA;
 A;
-
-var_dump(strlen($heredoc) == 9);
-
-?>
+    var_dump(strlen($heredoc) == 9);
+}
+fn1817533850();
 --EXPECT--
 bool(true)

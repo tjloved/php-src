@@ -2,16 +2,19 @@
 Bug #69167 (call_user_func does not support references anymore)
 --FILE--
 <?php
-function l($m) {
-	    echo $m . "\n";
+
+function l($m)
+{
+    echo $m . "\n";
 }
- 
-$cb = 'l';
-call_user_func($cb, 'hi');
- 
-$cb2 = &$cb;
-call_user_func($cb2, 'hi2');
-?>
+function fn1153144956()
+{
+    $cb = 'l';
+    call_user_func($cb, 'hi');
+    $cb2 =& $cb;
+    call_user_func($cb2, 'hi2');
+}
+fn1153144956();
 --EXPECT--
 hi
 hi2

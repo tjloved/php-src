@@ -4,18 +4,20 @@ Ensure the ReflectionProperty constructor triggers autoload.
 <?php extension_loaded('reflection') or die('skip'); ?>
 --FILE--
 <?php
-spl_autoload_register(function ($name) {
-  echo "In autoload: ";
-  var_dump($name);
-});
 
-try {
-  new ReflectionProperty('UndefC', 'p');
+function fn1426792907()
+{
+    spl_autoload_register(function ($name) {
+        echo "In autoload: ";
+        var_dump($name);
+    });
+    try {
+        new ReflectionProperty('UndefC', 'p');
+    } catch (ReflectionException $e) {
+        echo $e->getMessage();
+    }
 }
-catch (ReflectionException $e) {
-  echo $e->getMessage();
-}
-?>
+fn1426792907();
 --EXPECTF--
 In autoload: string(6) "UndefC"
 Class UndefC does not exist

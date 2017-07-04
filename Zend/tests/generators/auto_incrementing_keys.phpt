@@ -3,18 +3,20 @@ Generator keys are auto-incrementing by default
 --FILE--
 <?php
 
-function gen() {
-    yield 'foo';
-    yield 'bar';
-    yield 5 => 'rab';
-    yield 'oof';
+function gen()
+{
+    (yield 'foo');
+    (yield 'bar');
+    (yield 5 => 'rab');
+    (yield 'oof');
 }
-
-foreach (gen() as $k => $v) {
-    echo $k, ' => ', $v, "\n";
+function fn1145832122()
+{
+    foreach (gen() as $k => $v) {
+        echo $k, ' => ', $v, "\n";
+    }
 }
-
-?>
+fn1145832122();
 --EXPECT--
 0 => foo
 1 => bar

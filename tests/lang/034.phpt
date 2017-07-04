@@ -9,11 +9,14 @@ if (setlocale(LC_NUMERIC, "de_DE.UTF-8", "de_DE", "de", "german", "ge", "de_DE.I
 }
 ?>
 --FILE--
-<?php 
-# activate the german locale
-setlocale(LC_NUMERIC, "de_DE.UTF-8", "de_DE", "de", "german", "ge", "de_DE.ISO-8859-1");
+<?php
 
-echo (float)"3.14", "\n";
-?>
+function fn988331323()
+{
+    # activate the german locale
+    setlocale(LC_NUMERIC, "de_DE.UTF-8", "de_DE", "de", "german", "ge", "de_DE.ISO-8859-1");
+    echo (double) "3.14", "\n";
+}
+fn988331323();
 --EXPECT--
 3,14

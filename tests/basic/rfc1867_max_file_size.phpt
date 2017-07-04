@@ -28,15 +28,19 @@ Content-Type: text/plain-file3;
 -----------------------------20896060251896012921717172737--
 --FILE--
 <?php
-var_dump($_FILES);
-var_dump($_POST);
-if (is_uploaded_file($_FILES["file1"]["tmp_name"])) {
-	var_dump(file_get_contents($_FILES["file1"]["tmp_name"]));
+
+function fn586849578()
+{
+    var_dump($_FILES);
+    var_dump($_POST);
+    if (is_uploaded_file($_FILES["file1"]["tmp_name"])) {
+        var_dump(file_get_contents($_FILES["file1"]["tmp_name"]));
+    }
+    if (is_uploaded_file($_FILES["file3"]["tmp_name"])) {
+        var_dump(file_get_contents($_FILES["file3"]["tmp_name"]));
+    }
 }
-if (is_uploaded_file($_FILES["file3"]["tmp_name"])) {
-	var_dump(file_get_contents($_FILES["file3"]["tmp_name"]));
-}
-?>
+fn586849578();
 --EXPECTF--
 array(3) {
   ["file1"]=>

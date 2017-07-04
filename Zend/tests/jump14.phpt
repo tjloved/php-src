@@ -1,28 +1,19 @@
 --TEST--
 Testing GOTO inside blocks
 --FILE--
-<?php 
+<?php
 
-goto A;
-
+function fn1971881232()
 {
-	B:
-		goto C;	
-		return;
+    goto A;
+    B:
+    goto C;
+    return;
+    A:
+    goto B;
+    C:
+    print "Done!\n";
 }
-
-A:
-	goto B;
-
-
-
-{
-	C:
-	{
-		print "Done!\n";
-	}
-}
-
-?>
+fn1971881232();
 --EXPECT--
 Done!

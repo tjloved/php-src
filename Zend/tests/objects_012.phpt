@@ -3,13 +3,16 @@ implementing a class
 --FILE--
 <?php
 
-class foo {
+class foo
+{
 }
-
-interface bar extends foo {
+interface bar extends foo
+{
 }
-
-echo "Done\n";
-?>
+function fn1983134205()
+{
+    echo "Done\n";
+}
+fn1983134205();
 --EXPECTF--	
 Fatal error: bar cannot implement foo - it is not an interface in %s on line %d

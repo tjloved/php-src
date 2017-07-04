@@ -3,14 +3,17 @@ Calling parse_str through argument unpacking
 --FILE--
 <?php
 
-function test() {
+function test()
+{
     $i = 0;
     parse_str(...["i=41"]);
     var_dump($i + 1);
 }
-test();
-
-?>
+function fn1109424555()
+{
+    test();
+}
+fn1109424555();
 --EXPECTF--
 Deprecated: parse_str(): Calling parse_str() without the result argument is deprecated in %s on line %d
 int(42)

@@ -19,8 +19,12 @@ even more data
 --BVoyv--
 --FILE--
 <?php
-var_dump($_POST);
-?>
+
+function fn105889736()
+{
+    var_dump($_POST);
+}
+fn105889736();
 --EXPECT--
 array(3) {
   ["data"]=>

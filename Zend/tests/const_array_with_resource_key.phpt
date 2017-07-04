@@ -4,9 +4,11 @@ Constexpr arrays should be able to handle resource keys
 <?php
 
 const FOO = [STDIN => 42];
-var_dump(FOO);
-
-?>
+function fn348343552()
+{
+    var_dump(FOO);
+}
+fn348343552();
 --EXPECTF--
 Notice: Resource ID#%d used as offset, casting to integer (%d) in %s on line %d
 array(1) {

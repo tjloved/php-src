@@ -4,19 +4,26 @@ Bug #31525 (object reference being dropped. $this getting lost)
 error_reporting=4095
 --FILE--
 <?php
-class Foo {
-  function getThis() {
-    return $this;
-  }
-  function destroyThis() {
-    $baz =& $this->getThis();
-  }
+
+class Foo
+{
+    function getThis()
+    {
+        return $this;
+    }
+    function destroyThis()
+    {
+        $baz =& $this->getThis();
+    }
 }
-$bar = new Foo();
-$bar->destroyThis();
-var_dump($bar);
-?>
+function fn740599204()
+{
+    $bar = new Foo();
+    $bar->destroyThis();
+    var_dump($bar);
+}
+fn740599204();
 --EXPECTF--
-Notice: Only variables should be assigned by reference in %sbug31525.php on line 7
+Notice: Only variables should be assigned by reference in %sbug31525.php on line %d
 object(Foo)#1 (0) {
 }

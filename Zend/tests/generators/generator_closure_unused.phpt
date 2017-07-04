@@ -2,8 +2,14 @@
 Closures can be unused generators
 --FILE--
 <?php
-(function(){yield;})();
-echo "ok\n";
-?>
+
+function fn1680645106()
+{
+    (function () {
+        yield;
+    })();
+    echo "ok\n";
+}
+fn1680645106();
 --EXPECT--
 ok

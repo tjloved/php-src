@@ -9,14 +9,17 @@ if (setlocale(LC_NUMERIC, "de_DE.UTF-8", "de_DE", "de", "german", "ge", "de_DE.I
 }
 ?>
 --FILE--
-<?php 
-# activate the german locale
-setlocale(LC_NUMERIC, "de_DE.UTF-8", "de_DE", "de", "german", "ge", "de_DE.ISO-8859-1");
+<?php
 
-$lc = localeconv();
-printf("decimal_point: %s\n", $lc['decimal_point']);
-printf("thousands_sep: %s\n", $lc['thousands_sep']);
-?>
+function fn1207559379()
+{
+    # activate the german locale
+    setlocale(LC_NUMERIC, "de_DE.UTF-8", "de_DE", "de", "german", "ge", "de_DE.ISO-8859-1");
+    $lc = localeconv();
+    printf("decimal_point: %s\n", $lc['decimal_point']);
+    printf("thousands_sep: %s\n", $lc['thousands_sep']);
+}
+fn1207559379();
 --EXPECT--
 decimal_point: ,
 thousands_sep: .

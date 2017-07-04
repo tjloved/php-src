@@ -18,9 +18,13 @@ if(PHP_OS_FAMILY !== "Windows") {
 STDIN STDOUT
 --FILE--
 <?php
-require dirname(__FILE__).'/sapi_windows_vt100_support.inc';
-testToStdOut();
-?>
+
+function fn758281439()
+{
+    require dirname(__FILE__) . '/sapi_windows_vt100_support.inc';
+    testToStdOut();
+}
+fn758281439();
 --EXPECTF--
 STDIN (constant):
 - current value  : bool(false)

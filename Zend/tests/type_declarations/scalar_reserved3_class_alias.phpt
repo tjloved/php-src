@@ -3,7 +3,13 @@ Scalar type names cannot be used as class, trait or interface names (3) - class_
 --FILE--
 <?php
 
-class foobar {}
-class_alias("foobar", "float");
+class foobar
+{
+}
+function fn346355822()
+{
+    class_alias("foobar", "float");
+}
+fn346355822();
 --EXPECTF--
 Fatal error: Cannot use 'float' as class name as it is reserved in %s on line %d

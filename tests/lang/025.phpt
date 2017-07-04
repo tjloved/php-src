@@ -1,21 +1,25 @@
 --TEST--
 Mean recursion test
 --FILE--
-<?php 
-function RekTest ($nr) {
-	echo " $nr ";
-	$j=$nr+1;
-	while ($j < 10) {
-	  echo " a ";
-	  RekTest($j);
-	  $j++;
-	  echo " b $j ";
-	}
-	echo "\n";
-}
+<?php
 
-RekTest(0);
-?>
+function RekTest($nr)
+{
+    echo " {$nr} ";
+    $j = $nr + 1;
+    while ($j < 10) {
+        echo " a ";
+        RekTest($j);
+        $j++;
+        echo " b {$j} ";
+    }
+    echo "\n";
+}
+function fn545596156()
+{
+    RekTest(0);
+}
+fn545596156();
 --EXPECT--
  0  a  1  a  2  a  3  a  4  a  5  a  6  a  7  a  8  a  9 
  b 10 

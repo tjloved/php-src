@@ -2,13 +2,17 @@
 __DIR__ constant test with includes
 --FILE--
 <?php
-echo __DIR__ . "\n";
-echo dirname(__FILE__) . "\n";
-include 'fixtures/folder1/fixture.inc';
-include 'fixtures/folder2/fixture.inc';
-include 'fixtures/folder3/fixture.inc';
-include 'fixtures/folder4/fixture.inc';
-?>
+
+function fn1403950763()
+{
+    echo __DIR__ . "\n";
+    echo dirname(__FILE__) . "\n";
+    include 'fixtures/folder1/fixture.inc';
+    include 'fixtures/folder2/fixture.inc';
+    include 'fixtures/folder3/fixture.inc';
+    include 'fixtures/folder4/fixture.inc';
+}
+fn1403950763();
 --EXPECTF--
 %stests%sconstants
 %stests%sconstants

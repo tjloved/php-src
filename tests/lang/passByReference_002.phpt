@@ -5,11 +5,12 @@ Attempt to pass a constant by reference
 
 function f(&$arg1)
 {
-	var_dump($arg1++);
+    var_dump($arg1++);
 }
-
-f(2);
-
-?>
+function fn640418102()
+{
+    f(2);
+}
+fn640418102();
 --EXPECTF--
-Fatal error: Only variables can be passed by reference in %s on line 8
+Fatal error: Only variables can be passed by reference in %s on line %d

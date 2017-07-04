@@ -2,24 +2,24 @@
 Bug #35509 (string constant as array key has different behavior inside object)
 --FILE--
 <?php
+
 class mytest
 {
-  const classConstant = '01';
-
-  private $classArray = array( mytest::classConstant => 'value' );
-
-  public function __construct()
-  {
-    print_r($this->classArray);
-  }
+    const classConstant = '01';
+    private $classArray = array(mytest::classConstant => 'value');
+    public function __construct()
+    {
+        print_r($this->classArray);
+    }
 }
-
-$classtest = new mytest();
-
-define( "normalConstant", '01' );
-$normalArray = array( normalConstant => 'value' );
-print_r($normalArray);
-?>
+function fn171494540()
+{
+    $classtest = new mytest();
+    define("normalConstant", '01');
+    $normalArray = array(normalConstant => 'value');
+    print_r($normalArray);
+}
+fn171494540();
 --EXPECT--
 Array
 (

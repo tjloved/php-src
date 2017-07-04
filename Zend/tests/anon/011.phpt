@@ -3,12 +3,20 @@ Ensure proper inheritance with get_class(anon class instance) used via class_ali
 --FILE--
 <?php
 
-class_alias(get_class(new class { protected $foo = 1; }), "AnonBase");
-var_dump((new class extends AnonBase {
-	function getFoo() {
-		return $this->foo;
-	}
-})->getFoo());
-?>
+function fn1877779553()
+{
+    class_alias(get_class(new class
+    {
+        protected $foo = 1;
+    }), "AnonBase");
+    var_dump((new class extends AnonBase
+    {
+        function getFoo()
+        {
+            return $this->foo;
+        }
+    })->getFoo());
+}
+fn1877779553();
 --EXPECT--
 int(1)

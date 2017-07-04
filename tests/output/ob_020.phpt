@@ -2,20 +2,20 @@
 output buffering - ob_list_handlers
 --FILE--
 <?php
-print_r(ob_list_handlers());
 
-ob_start();
-print_r(ob_list_handlers());
-
-ob_start();
-print_r(ob_list_handlers());
-
-ob_end_flush();
-print_r(ob_list_handlers());
-
-ob_end_flush();
-print_r(ob_list_handlers());
-?>
+function fn782318910()
+{
+    print_r(ob_list_handlers());
+    ob_start();
+    print_r(ob_list_handlers());
+    ob_start();
+    print_r(ob_list_handlers());
+    ob_end_flush();
+    print_r(ob_list_handlers());
+    ob_end_flush();
+    print_r(ob_list_handlers());
+}
+fn782318910();
 --EXPECT--
 Array
 (

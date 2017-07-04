@@ -2,15 +2,19 @@
 Bug #35411 (Regression with \{$ handling)
 --FILE--
 <?php
-$abc = "bar";
-echo "foo\{$abc}baz\n";
-echo "foo\{ $abc}baz\n";
-echo <<<TEST
+
+function fn1680813606()
+{
+    $abc = "bar";
+    echo "foo\\{{$abc}}baz\n";
+    echo "foo\\{ {$abc}}baz\n";
+    echo <<<TEST
 foo{$abc}baz
-foo\{$abc}baz
-foo\{ $abc}baz
+foo\\{{$abc}}baz
+foo\\{ {$abc}}baz
 TEST;
-?>
+}
+fn1680813606();
 --EXPECT--
 foo\{bar}baz
 foo\{ bar}baz

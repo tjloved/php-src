@@ -3,20 +3,20 @@ Testing array dereference and references
 --FILE--
 <?php
 
-error_reporting(E_ALL);
-
-function &foo(&$foo) {
-	return $foo;
+function &foo(&$foo)
+{
+    return $foo;
 }
-
-$a = array(1);
-foo($a)[0] = 2;
-var_dump($a);
-
-foo($a)[] = 3;
-var_dump($a);
-
-?>
+function fn1640923731()
+{
+    error_reporting(E_ALL);
+    $a = array(1);
+    foo($a)[0] = 2;
+    var_dump($a);
+    foo($a)[] = 3;
+    var_dump($a);
+}
+fn1640923731();
 --EXPECT--
 array(1) {
   [0]=>

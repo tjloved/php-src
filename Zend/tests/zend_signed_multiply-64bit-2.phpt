@@ -4,15 +4,19 @@ Zend signed multiply 64-bit, variation 2
 <?php if ((1 << 31) < 0) print "skip Running on 32-bit target"; ?>
 --FILE--
 <?php
-for($c = -16; $c < 0; $c++) {
+
+function fn1510708477()
+{
+    for ($c = -16; $c < 0; $c++) {
         var_dump($c, intdiv(PHP_INT_MIN, 10), intdiv(PHP_INT_MIN, 10) * $c);
-	echo "-----------\n";
-}
-for($c = 0; $c <= 16; $c++) {
+        echo "-----------\n";
+    }
+    for ($c = 0; $c <= 16; $c++) {
         var_dump($c, intdiv(PHP_INT_MAX, 10), intdiv(PHP_INT_MAX, 10) * $c);
-	echo "-----------\n";
+        echo "-----------\n";
+    }
 }
-?>
+fn1510708477();
 --EXPECTF--
 int(-16)
 int(-922337203685477580)

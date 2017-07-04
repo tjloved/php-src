@@ -6,8 +6,12 @@ if (!class_exists('_ZendTestClass')) die("skip needs class with overloaded funct
 ?>
 --FILE--
 <?php
-$a = new _ZendTestClass();
-var_dump($a->{trim(" test")}());
-?>
+
+function fn983996755()
+{
+    $a = new _ZendTestClass();
+    var_dump($a->{trim(" test")}());
+}
+fn983996755();
 --EXPECT--
 string(4) "test"

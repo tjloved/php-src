@@ -4,6 +4,11 @@ Simple POST Method test
 a=Hello+World
 --FILE--
 <?php
-echo $_POST['a']; ?>
+
+function fn1365751742()
+{
+    echo $_POST['a'];
+}
+fn1365751742();
 --EXPECT--
 Hello World

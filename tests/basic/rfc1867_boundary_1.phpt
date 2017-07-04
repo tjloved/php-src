@@ -11,9 +11,13 @@ Content-Disposition: form-data; name="foobar"
 --------------------------------------foobar--
 --FILE--
 <?php
-var_dump($_FILES);
-var_dump($_POST);
-?>
+
+function fn493026376()
+{
+    var_dump($_FILES);
+    var_dump($_POST);
+}
+fn493026376();
 --EXPECTF--
 array(0) {
 }

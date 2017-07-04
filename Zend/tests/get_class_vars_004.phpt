@@ -3,32 +3,30 @@ get_class_vars(): Testing the scope
 --FILE--
 <?php
 
-class A {
-	public $a = 1;
-	static public $A = 2;
-
-	private $b = 3;
-	static private $B = 4;
-
-	protected $c = 5;
-	static protected $C = 6;
-	
-	public function __construct() {
-		var_dump(get_class_vars('A'));
-	}
-	
-	static public function test() {
-		var_dump(get_class_vars('A'));
-	}
+class A
+{
+    public $a = 1;
+    public static $A = 2;
+    private $b = 3;
+    private static $B = 4;
+    protected $c = 5;
+    protected static $C = 6;
+    public function __construct()
+    {
+        var_dump(get_class_vars('A'));
+    }
+    public static function test()
+    {
+        var_dump(get_class_vars('A'));
+    }
 }
-
-var_dump(get_class_vars('A'));
-
-new A;
-
-var_dump(A::test());
-
-?>
+function fn528064256()
+{
+    var_dump(get_class_vars('A'));
+    new A();
+    var_dump(A::test());
+}
+fn528064256();
 --EXPECT--
 array(2) {
   ["a"]=>

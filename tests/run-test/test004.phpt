@@ -4,7 +4,11 @@ INI section allows '='
 arg_separator.input==
 --FILE--
 <?php
-var_dump(ini_get('arg_separator.input'));
-?>
+
+function fn1861052195()
+{
+    var_dump(ini_get('arg_separator.input'));
+}
+fn1861052195();
 --EXPECT--
 string(1) "="

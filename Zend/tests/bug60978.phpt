@@ -8,9 +8,13 @@ Bug #60978 (exit code incorrect)
 ?>
 --FILE--
 <?php
-$php = getenv('TEST_PHP_EXECUTABLE');
-exec($php . ' -n -r "exit(2);"', $output, $exit_code);
-echo $exit_code;
-?>
+
+function fn1463362857()
+{
+    $php = getenv('TEST_PHP_EXECUTABLE');
+    exec($php . ' -n -r "exit(2);"', $output, $exit_code);
+    echo $exit_code;
+}
+fn1463362857();
 --EXPECT--
 2

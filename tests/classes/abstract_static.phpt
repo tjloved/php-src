@@ -5,29 +5,29 @@ ZE2 A static abstract methods
 
 interface showable
 {
-	static function show();
+    static function show();
 }
-
 class pass implements showable
 {
-	static function show() {
-		echo "Call to function show()\n";
-	}
+    static function show()
+    {
+        echo "Call to function show()\n";
+    }
 }
-
-pass::show();
-
-eval('
+function fn70087480()
+{
+    pass::show();
+    eval('
 class fail
 {
 	abstract static function func();
 }
 ');
-
-fail::show();
-
-echo "Done\n"; // shouldn't be displayed
-?>
+    fail::show();
+    echo "Done\n";
+    // shouldn't be displayed
+}
+fn70087480();
 --EXPECTF--
 Call to function show()
 

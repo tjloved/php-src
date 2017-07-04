@@ -13,12 +13,16 @@ if ($zend_mm_enabled === "0") {
 memory_limit=-1
 --FILE--
 <?php
-var_dump($a = memory_get_peak_usage());
-var_dump(memory_get_peak_usage(true));
-var_dump(memory_get_peak_usage(false));
-$array = range(1,1024*1024);
-var_dump(memory_get_peak_usage() > $a);
-?>
+
+function fn1245467760()
+{
+    var_dump($a = memory_get_peak_usage());
+    var_dump(memory_get_peak_usage(true));
+    var_dump(memory_get_peak_usage(false));
+    $array = range(1, 1024 * 1024);
+    var_dump(memory_get_peak_usage() > $a);
+}
+fn1245467760();
 --EXPECTF--
 int(%d)
 int(%d)

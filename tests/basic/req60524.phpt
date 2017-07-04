@@ -9,6 +9,12 @@ if(PHP_OS_FAMILY === "Windows") {
 }
 ?>
 --FILE--
-<?php echo sys_get_temp_dir(); ?>
+<?php
+
+function fn1665683846()
+{
+    echo sys_get_temp_dir();
+}
+fn1665683846();
 --EXPECT--
 /path/to/temp/dir

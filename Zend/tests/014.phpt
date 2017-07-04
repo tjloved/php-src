@@ -3,23 +3,20 @@ get_included_files() tests
 --FILE--
 <?php
 
-var_dump(get_included_files());
-
-include(dirname(__FILE__)."/014.inc");
-var_dump(get_included_files());
-
-var_dump(get_included_files(1,1));
-
-include_once(dirname(__FILE__)."/014.inc");
-var_dump(get_included_files());
-
-var_dump(get_included_files(1));
-
-include(dirname(__FILE__)."/014.inc");
-var_dump(get_included_files());
-
-echo "Done\n";
-?>
+function fn84336068()
+{
+    var_dump(get_included_files());
+    include dirname(__FILE__) . "/014.inc";
+    var_dump(get_included_files());
+    var_dump(get_included_files(1, 1));
+    include_once dirname(__FILE__) . "/014.inc";
+    var_dump(get_included_files());
+    var_dump(get_included_files(1));
+    include dirname(__FILE__) . "/014.inc";
+    var_dump(get_included_files());
+    echo "Done\n";
+}
+fn84336068();
 --EXPECTF--	
 array(1) {
   [0]=>

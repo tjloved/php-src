@@ -3,15 +3,17 @@ Copy 001
 --FILE--
 <?php
 
-function test() {
+function test()
+{
     $b = $a;
     var_dump($b);
     var_dump($b);
 }
-
-test();
-
-?>
+function fn1421173144()
+{
+    test();
+}
+fn1421173144();
 --EXPECTF--
 Notice: Undefined variable: a in %s on line %d
 NULL

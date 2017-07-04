@@ -3,11 +3,15 @@ RFC example: Scalar Types
 
 --FILE--
 <?php
-function answer(): int {
+
+function answer() : int
+{
     return 42;
 }
-
-var_dump(answer());
-
+function fn1725753520()
+{
+    var_dump(answer());
+}
+fn1725753520();
 --EXPECTF--
 int(42)

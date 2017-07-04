@@ -2,19 +2,28 @@
 Bug #64239 (get_class_methods() changed behavior)
 --FILE--
 <?php
-class A {
-	use T2 { t2method as Bmethod; }
-}
 
-class B extends A {
+class A
+{
+    use T2 {
+        t2method as Bmethod;
+    }
 }
-
-trait T2 {
-	public function t2method() {
-	}
+class B extends A
+{
 }
-print_r(get_class_methods("A"));
-print_r(get_class_methods("B"));
+trait T2
+{
+    public function t2method()
+    {
+    }
+}
+function fn743505239()
+{
+    print_r(get_class_methods("A"));
+    print_r(get_class_methods("B"));
+}
+fn743505239();
 --EXPECT--
 Array
 (

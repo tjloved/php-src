@@ -5,13 +5,14 @@ zend.enable_gc=1
 --FILE--
 <?php
 
-error_reporting(E_ALL);
-
-foreach (($a = array('a' => array('a' => &$a))) as $a) {
-	var_dump($a);
+function fn587627267()
+{
+    error_reporting(E_ALL);
+    foreach ($a = array('a' => array('a' => &$a)) as $a) {
+        var_dump($a);
+    }
 }
-
-?>
+fn587627267();
 --EXPECT--
 array(1) {
   ["a"]=>

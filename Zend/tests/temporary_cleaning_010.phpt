@@ -2,20 +2,24 @@
 Live range & throw from finally
 --FILE--
 <?php
-function test() {
+
+function test()
+{
     try {
         $a = [1, 2, 3];
         return $a + [];
     } finally {
-        throw new Exception;
+        throw new Exception();
     }
 }
-
-try {
-    test();
-} catch (Exception $e) {
-	echo "exception\n";
+function fn1154964707()
+{
+    try {
+        test();
+    } catch (Exception $e) {
+        echo "exception\n";
+    }
 }
-?>
+fn1154964707();
 --EXPECT--
 exception

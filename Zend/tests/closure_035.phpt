@@ -3,17 +3,18 @@ Testing recursion detection with Closures
 --FILE--
 <?php
 
-$x = function () use (&$x) {
-	$h = function () use ($x) {
-		var_dump($x);
-		return 1;
-	};	
-	return $h();
-};
-
-var_dump($x());
-
-?>
+function fn1860952288()
+{
+    $x = function () use(&$x) {
+        $h = function () use($x) {
+            var_dump($x);
+            return 1;
+        };
+        return $h();
+    };
+    var_dump($x());
+}
+fn1860952288();
 --EXPECTF--
 object(Closure)#%d (1) {
   ["static"]=>

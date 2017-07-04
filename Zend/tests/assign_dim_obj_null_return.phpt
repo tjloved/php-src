@@ -3,27 +3,26 @@ Various null return conditions of dim/obj assignments
 --FILE--
 <?php
 
-function test() {
+function test()
+{
     $array = [PHP_INT_MAX => 42];
     $true = true;
-
     var_dump($array[] = 123);
     var_dump($array[[]] = 123);
-    var_dump($array[new stdClass] = 123);
+    var_dump($array[new stdClass()] = 123);
     var_dump($true[123] = 456);
-
     var_dump($array[] += 123);
     var_dump($array[[]] += 123);
-    var_dump($array[new stdClass] += 123);
+    var_dump($array[new stdClass()] += 123);
     var_dump($true[123] += 456);
-
     var_dump($true->foo = 123);
     var_dump($true->foo += 123);
 }
-
-test();
-
-?>
+function fn254678808()
+{
+    test();
+}
+fn254678808();
 --EXPECTF--
 Warning: Cannot add element to the array as the next element is already occupied in %s on line %d
 NULL

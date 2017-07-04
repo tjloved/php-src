@@ -3,15 +3,18 @@ func_get_args() can be used inside generator functions
 --FILE--
 <?php
 
-function gen() {
+function gen()
+{
     var_dump(func_get_args());
-    yield; // trigger generator
+    yield;
+    // trigger generator
 }
-
-$gen = gen("foo", "bar");
-$gen->rewind();
-
-?>
+function fn718839323()
+{
+    $gen = gen("foo", "bar");
+    $gen->rewind();
+}
+fn718839323();
 --EXPECT--
 array(2) {
   [0]=>

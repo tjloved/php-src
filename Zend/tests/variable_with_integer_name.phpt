@@ -3,9 +3,11 @@ Variable with integer name
 --FILE--
 <?php
 
-${10} = 42;
-var_dump(${10});
-
-?>
+function fn204164807()
+{
+    ${10} = 42;
+    var_dump(${10});
+}
+fn204164807();
 --EXPECT--
 int(42)

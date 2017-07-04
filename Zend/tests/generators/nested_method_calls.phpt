@@ -3,32 +3,34 @@ Yield can be used in nested method calls
 --FILE--
 <?php
 
-class A {
-    function foo() {
+class A
+{
+    function foo()
+    {
         echo "Called A::foo\n";
     }
 }
-
-class B {
-    function foo() {
+class B
+{
+    function foo()
+    {
         echo "Called B::foo\n";
     }
 }
-
-function gen($obj) {
+function gen($obj)
+{
     $obj->foo($obj->foo(yield));
 }
-
-$g1 = gen(new A);
-$g1->current();
-
-$g2 = gen(new B);
-$g2->current();
-
-$g1->next();
-$g2->next();
-
-?>
+function fn1934261630()
+{
+    $g1 = gen(new A());
+    $g1->current();
+    $g2 = gen(new B());
+    $g2->current();
+    $g1->next();
+    $g2->next();
+}
+fn1934261630();
 --EXPECT--
 Called A::foo
 Called A::foo

@@ -2,36 +2,42 @@
 Closure 016: closures and is_callable()
 --FILE--
 <?php
-class Foo {
-	function __invoke() {
-		echo "Hello World!\n";
-	}
-}
 
-function foo() {
-	return function() {
-		echo "Hello World!\n";
-	};
+class Foo
+{
+    function __invoke()
+    {
+        echo "Hello World!\n";
+    }
 }
-$test = new Foo;
-var_dump(is_callable($test, true, $name));
-echo $name."\n";
-var_dump(is_callable($test, false, $name));
-echo $name."\n";
-var_dump(is_callable(array($test,"__invoke"), true, $name));
-echo $name."\n";
-var_dump(is_callable(array($test,"__invoke"), false, $name));
-echo $name."\n";
-$test = foo();
-var_dump(is_callable($test, true, $name));
-echo $name."\n";
-var_dump(is_callable($test, false, $name));
-echo $name."\n";
-var_dump(is_callable(array($test,"__invoke"), true, $name));
-echo $name."\n";
-var_dump(is_callable(array($test,"__invoke"), false, $name));
-echo $name."\n";
-?>
+function foo()
+{
+    return function () {
+        echo "Hello World!\n";
+    };
+}
+function fn937765307()
+{
+    $test = new Foo();
+    var_dump(is_callable($test, true, $name));
+    echo $name . "\n";
+    var_dump(is_callable($test, false, $name));
+    echo $name . "\n";
+    var_dump(is_callable(array($test, "__invoke"), true, $name));
+    echo $name . "\n";
+    var_dump(is_callable(array($test, "__invoke"), false, $name));
+    echo $name . "\n";
+    $test = foo();
+    var_dump(is_callable($test, true, $name));
+    echo $name . "\n";
+    var_dump(is_callable($test, false, $name));
+    echo $name . "\n";
+    var_dump(is_callable(array($test, "__invoke"), true, $name));
+    echo $name . "\n";
+    var_dump(is_callable(array($test, "__invoke"), false, $name));
+    echo $name . "\n";
+}
+fn937765307();
 --EXPECT--
 bool(true)
 Foo::__invoke

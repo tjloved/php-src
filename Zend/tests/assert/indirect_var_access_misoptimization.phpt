@@ -5,15 +5,18 @@ zend.assertions=1
 --FILE--
 <?php
 
-function test() {
+function test()
+{
     $i = 0;
     assert('$i = new stdClass');
     $i += 1;
     var_dump($i);
 }
-test();
-
-?>
+function fn845939789()
+{
+    test();
+}
+fn845939789();
 --EXPECTF--
 Deprecated: assert(): Calling assert() with a string argument is deprecated in %s on line %d
 

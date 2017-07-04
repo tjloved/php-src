@@ -4,14 +4,18 @@ GC 007: Unreferenced array cycle
 zend.enable_gc=1
 --FILE--
 <?php
-$a = array(array());
-$a[0][0] =& $a[0];
-var_dump($a[0]);
-var_dump(gc_collect_cycles());
-unset($a);
-var_dump(gc_collect_cycles());
-echo "ok\n"
-?>
+
+function fn570610072()
+{
+    $a = array(array());
+    $a[0][0] =& $a[0];
+    var_dump($a[0]);
+    var_dump(gc_collect_cycles());
+    unset($a);
+    var_dump(gc_collect_cycles());
+    echo "ok\n";
+}
+fn570610072();
 --EXPECT--
 array(1) {
   [0]=>

@@ -2,14 +2,17 @@
 Bug #34518 (Unset doesn't separate container in CV)
 --FILE--
 <?php
-$arr = array(1,2,3);
-$arr["foo"] = array(4,5,6);
-$copy = $arr;
 
-unset($copy["foo"][0]);
-print_r($arr);
-print_r($copy);
-?>
+function fn1781830174()
+{
+    $arr = array(1, 2, 3);
+    $arr["foo"] = array(4, 5, 6);
+    $copy = $arr;
+    unset($copy["foo"][0]);
+    print_r($arr);
+    print_r($copy);
+}
+fn1781830174();
 --EXPECT--
 Array
 (

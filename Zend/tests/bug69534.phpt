@@ -4,17 +4,21 @@ Bug #69534 (Cycle leaks through declared properties on internal classes)
 zend.enable_gc = 1
 --FILE--
 <?php
-class Node extends SplObjectStorage {
+
+class Node extends SplObjectStorage
+{
     public $prop;
 }
-
-$node1 = new Node;
-$node2 = new Node;
-$node1->prop = $node2;
-$node2->prop = $node1;
-unset($node1);
-unset($node2);
-var_dump(gc_collect_cycles());
-?>
+function fn631894502()
+{
+    $node1 = new Node();
+    $node2 = new Node();
+    $node1->prop = $node2;
+    $node2->prop = $node1;
+    unset($node1);
+    unset($node2);
+    var_dump(gc_collect_cycles());
+}
+fn631894502();
 --EXPECT--
 int(2)
