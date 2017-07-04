@@ -208,6 +208,8 @@ static zend_bool try_replace_op1(
 		ZVAL_DUP(&zv, value);
 		if (zend_optimizer_update_op1_const(ctx->op_array, opline, &zv)) {
 			return 1;
+		} else {
+			zval_ptr_dtor_nogc(&zv);
 		}
 	}
 	return 0;
@@ -219,6 +221,8 @@ static zend_bool try_replace_op2(
 		ZVAL_DUP(&zv, value);
 		if (zend_optimizer_update_op2_const(ctx->op_array, opline, &zv)) {
 			return 1;
+		} else {
+			zval_ptr_dtor_nogc(&zv);
 		}
 	}
 	return 0;
