@@ -387,8 +387,9 @@ void shutdown_executor(void) /* {{{ */
 
 	EG(ht_iterators_used) = 0;
 
-<<<<<<< HEAD
-	EG(active) = 0;
+	zend_cleanup_internal_classes();
+
+	zend_shutdown_fpu();
 
 #if ZEND_VM_BENCH
 	if (EG(assertions) < -1) {
@@ -401,11 +402,6 @@ void shutdown_executor(void) /* {{{ */
 		}
 	}
 #endif
-=======
-	zend_cleanup_internal_classes();
-
-	zend_shutdown_fpu();
->>>>>>> php-src/master
 }
 /* }}} */
 

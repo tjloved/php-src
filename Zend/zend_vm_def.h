@@ -8531,7 +8531,7 @@ ZEND_VM_HOT_HANDLER(220, ZEND_RECV_INIT_FAST, NUM, CONST)
 	ZEND_VM_REPEATABLE_OPCODE
 
 	arg_num = opline->op1.num;
-	param = _get_zval_ptr_cv_undef_BP_VAR_W(execute_data, opline->result.var);
+	param = _get_zval_ptr_cv_undef_BP_VAR_W(opline->result.var EXECUTE_DATA_CC);
 	if (arg_num > EX_NUM_ARGS()) {
 		ZVAL_COPY_VALUE(param, EX_CONSTANT(opline->op2));
 	}
