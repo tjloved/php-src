@@ -195,6 +195,10 @@ static zend_bool can_inline_opcodes(
 					return 0;
 				}
 				break;
+			case ZEND_SWITCH_LONG:
+			case ZEND_SWITCH_STRING:
+				// TODO Jump offset adjustment currently not handled for these
+				return 0;
 		}
 	}
 	return 1;
