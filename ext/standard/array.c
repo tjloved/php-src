@@ -813,7 +813,7 @@ PHP_FUNCTION(count)
 				}
 			}
 			/* if not and the object implements Countable we call its count() method */
-			if (instanceof_function(Z_OBJCE_P(array), spl_ce_Countable)) {
+			if (instanceof_function(Z_OBJCE_P(array), zend_ce_countable)) {
 				zend_call_method_with_0_params(array, NULL, NULL, "count", &retval);
 				if (Z_TYPE(retval) != IS_UNDEF) {
 					RETVAL_LONG(zval_get_long(&retval));
@@ -1035,7 +1035,7 @@ static void php_usort(INTERNAL_FUNCTION_PARAMETERS, compare_func_t compare_func,
 	PHP_ARRAY_CMP_FUNC_BACKUP();
 
 	ZEND_PARSE_PARAMETERS_START(2, 2)
-		Z_PARAM_ARRAY(array)
+		Z_PARAM_ARRAY_EX2(array, 0, 1, 0)
 		Z_PARAM_FUNC(BG(user_compare_fci), BG(user_compare_fci_cache))
 	ZEND_PARSE_PARAMETERS_END_EX( PHP_ARRAY_CMP_FUNC_RESTORE(); return );
 
@@ -1316,7 +1316,6 @@ PHP_FUNCTION(min)
 			}
 		}
 
-		ZVAL_DEREF(min);
 		ZVAL_COPY(return_value, min);
 	}
 }
@@ -1363,7 +1362,6 @@ PHP_FUNCTION(max)
 			}
 		}
 
-		ZVAL_DEREF(max);
 		ZVAL_COPY(return_value, max);
 	}
 }
@@ -1515,7 +1513,7 @@ PHP_FUNCTION(array_walk)
 		Z_PARAM_ARRAY_OR_OBJECT_EX(array, 0, 1)
 		Z_PARAM_FUNC(BG(array_walk_fci), BG(array_walk_fci_cache))
 		Z_PARAM_OPTIONAL
-		Z_PARAM_ZVAL_EX(userdata, 0, 1)
+		Z_PARAM_ZVAL(userdata)
 	ZEND_PARSE_PARAMETERS_END_EX(
 		BG(array_walk_fci) = orig_array_walk_fci;
 		BG(array_walk_fci_cache) = orig_array_walk_fci_cache;
@@ -1545,7 +1543,7 @@ PHP_FUNCTION(array_walk_recursive)
 		Z_PARAM_ARRAY_OR_OBJECT_EX(array, 0, 1)
 		Z_PARAM_FUNC(BG(array_walk_fci), BG(array_walk_fci_cache))
 		Z_PARAM_OPTIONAL
-		Z_PARAM_ZVAL_DEREF_EX(userdata, 0, 1)
+		Z_PARAM_ZVAL(userdata)
 	ZEND_PARSE_PARAMETERS_END_EX(
 		BG(array_walk_fci) = orig_array_walk_fci;
 		BG(array_walk_fci_cache) = orig_array_walk_fci_cache;
@@ -2469,10 +2467,10 @@ PHP_FUNCTION(extract)
 	zend_array *symbol_table;
 
 	ZEND_PARSE_PARAMETERS_START(1, 3)
-		Z_PARAM_ARRAY(var_array_param)
+		Z_PARAM_ARRAY_EX2(var_array_param, 0, 1, 0)
 		Z_PARAM_OPTIONAL
 		Z_PARAM_LONG(extract_type)
-		Z_PARAM_ZVAL_EX(prefix, 0, 1)
+		Z_PARAM_ZVAL(prefix)
 	ZEND_PARSE_PARAMETERS_END();
 
 	extract_refs = (extract_type & EXTR_REFS);
@@ -2713,7 +2711,7 @@ PHP_FUNCTION(array_fill_keys)
 
 	ZEND_PARSE_PARAMETERS_START(2, 2)
 		Z_PARAM_ARRAY(keys)
-		Z_PARAM_ZVAL_DEREF(val)
+		Z_PARAM_ZVAL(val)
 	ZEND_PARSE_PARAMETERS_END();
 
 	/* Initialize return array */
@@ -2764,10 +2762,10 @@ PHP_FUNCTION(range)
 	double step = 1.0;
 
 	ZEND_PARSE_PARAMETERS_START(2, 3)
-		Z_PARAM_ZVAL_DEREF(zlow)
-		Z_PARAM_ZVAL_DEREF(zhigh)
+		Z_PARAM_ZVAL(zlow)
+		Z_PARAM_ZVAL(zhigh)
 		Z_PARAM_OPTIONAL
-		Z_PARAM_ZVAL_DEREF(zstep)
+		Z_PARAM_ZVAL(zstep)
 	ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
 
 	if (zstep) {
@@ -3474,7 +3472,7 @@ PHP_FUNCTION(array_splice)
 		Z_PARAM_LONG(offset)
 		Z_PARAM_OPTIONAL
 		Z_PARAM_LONG(length)
-		Z_PARAM_ZVAL_DEREF_EX(repl_array, 0, 1)
+		Z_PARAM_ZVAL(repl_array)
 	ZEND_PARSE_PARAMETERS_END();
 
 	num_in = zend_hash_num_elements(Z_ARRVAL_P(array));
@@ -3809,47 +3807,53 @@ static inline void php_array_merge_or_replace_wrapper(INTERNAL_FUNCTION_PARAMETE
 		Z_PARAM_VARIADIC('+', args, argc)
 	ZEND_PARSE_PARAMETERS_END();
 
-	for (i = 0; i < argc; i++) {
-		zval *arg = args + i;
-
-		ZVAL_DEREF(arg);
-		if (Z_TYPE_P(arg) != IS_ARRAY) {
-			php_error_docref(NULL, E_WARNING, "Argument #%d is not an array", i + 1);
-			RETURN_NULL();
-		}
-	}
-
 
 	if (replace) {
 		HashTable *dest;
 
+		for (i = 0; i < argc; i++) {
+			zval *arg = args + i;
+
+			if (Z_TYPE_P(arg) != IS_ARRAY) {
+				php_error_docref(NULL, E_WARNING, "Argument #%d is not an array", i + 1);
+				RETURN_NULL();
+			}
+		}
+
 		/* copy first array */
 		arg = args;
-		ZVAL_DEREF(arg);
 		dest = zend_array_dup(Z_ARRVAL_P(arg));
 		ZVAL_ARR(return_value, dest);
 		if (recursive) {
 			for (i = 1; i < argc; i++) {
 				arg = args + i;
-				ZVAL_DEREF(arg);
 				php_array_replace_recursive(dest, Z_ARRVAL_P(arg));
 			}
 		} else {
 			for (i = 1; i < argc; i++) {
 				arg = args + i;
-				ZVAL_DEREF(arg);
 				zend_hash_merge(dest, Z_ARRVAL_P(arg), zval_add_ref, 1);
 			}
 		}
 	} else {
 		zval *src_entry;
 		HashTable *src, *dest;
+		uint32_t count = 0;
+
+		for (i = 0; i < argc; i++) {
+			zval *arg = args + i;
+
+			if (Z_TYPE_P(arg) != IS_ARRAY) {
+				php_error_docref(NULL, E_WARNING, "Argument #%d is not an array", i + 1);
+				RETURN_NULL();
+			}
+			count += zend_hash_num_elements(Z_ARRVAL_P(arg));
+		}
 
 		arg = args;
-		ZVAL_DEREF(arg);
 		src  = Z_ARRVAL_P(arg);
 		/* copy first array */
-		array_init_size(return_value, zend_hash_num_elements(src));
+		array_init_size(return_value, count);
 		dest = Z_ARRVAL_P(return_value);
 		if (src->u.flags & HASH_FLAG_PACKED) {
 			zend_hash_real_init(dest, 1);
@@ -3881,13 +3885,11 @@ static inline void php_array_merge_or_replace_wrapper(INTERNAL_FUNCTION_PARAMETE
 		if (recursive) {
 			for (i = 1; i < argc; i++) {
 				arg = args + i;
-				ZVAL_DEREF(arg);
 				php_array_merge_recursive(dest, Z_ARRVAL_P(arg));
 			}
 		} else {
 			for (i = 1; i < argc; i++) {
 				arg = args + i;
-				ZVAL_DEREF(arg);
 				php_array_merge(dest, Z_ARRVAL_P(arg));
 			}
 		}
@@ -4162,9 +4164,9 @@ PHP_FUNCTION(array_column)
 
 	ZEND_PARSE_PARAMETERS_START(2, 3)
 		Z_PARAM_ARRAY_HT(arr_hash)
-		Z_PARAM_ZVAL_DEREF_EX(zcolumn, 1, 0)
+		Z_PARAM_ZVAL_EX(zcolumn, 1, 0)
 		Z_PARAM_OPTIONAL
-		Z_PARAM_ZVAL_DEREF_EX(zkey, 1, 0)
+		Z_PARAM_ZVAL_EX(zkey, 1, 0)
 	ZEND_PARSE_PARAMETERS_END();
 
 	if ((zcolumn && !array_column_param_helper(zcolumn, "column")) ||
@@ -4295,7 +4297,7 @@ PHP_FUNCTION(array_pad)
 	ZEND_PARSE_PARAMETERS_START(3, 3)
 		Z_PARAM_ARRAY(input)
 		Z_PARAM_LONG(pad_size)
-		Z_PARAM_ZVAL_DEREF(pad_value)
+		Z_PARAM_ZVAL(pad_value)
 	ZEND_PARSE_PARAMETERS_END();
 
 	/* Do some initial calculations */
@@ -4547,7 +4549,7 @@ static int zval_user_compare(zval *a, zval *b) /* {{{ */
 	if (zend_call_function(&BG(user_compare_fci), &BG(user_compare_fci_cache)) == SUCCESS && Z_TYPE(retval) != IS_UNDEF) {
 		zend_long ret = zval_get_long(&retval);
 		zval_ptr_dtor(&retval);
-		return ret < 0 ? -1 : ret > 0 ? 1 : 0;;
+		return ret < 0 ? -1 : ret > 0 ? 1 : 0;
 	} else {
 		return 0;
 	}
@@ -5862,7 +5864,7 @@ PHP_FUNCTION(array_reduce)
 		Z_PARAM_ARRAY(input)
 		Z_PARAM_FUNC(fci, fci_cache)
 		Z_PARAM_OPTIONAL
-		Z_PARAM_ZVAL_DEREF(initial)
+		Z_PARAM_ZVAL(initial)
 	ZEND_PARSE_PARAMETERS_END();
 
 
@@ -6022,6 +6024,7 @@ PHP_FUNCTION(array_map)
 		zend_ulong num_key;
 		zend_string *str_key;
 		zval *zv, arg;
+		int ret;
 
 		if (Z_TYPE(arrays[0]) != IS_ARRAY) {
 			php_error_docref(NULL, E_WARNING, "Argument #%d should be an array", 2);
@@ -6044,13 +6047,11 @@ PHP_FUNCTION(array_map)
 			fci.no_separation = 0;
 
 			ZVAL_COPY(&arg, zv);
-
-			if (zend_call_function(&fci, &fci_cache) != SUCCESS || Z_TYPE(result) == IS_UNDEF) {
-				zval_dtor(return_value);
-				zval_ptr_dtor(&arg);
+			ret = zend_call_function(&fci, &fci_cache);
+			i_zval_ptr_dtor(&arg ZEND_FILE_LINE_CC);
+			if (ret != SUCCESS || Z_TYPE(result) == IS_UNDEF) {
+				zend_array_destroy(Z_ARR_P(return_value));
 				RETURN_NULL();
-			} else {
-				zval_ptr_dtor(&arg);
 			}
 			if (str_key) {
 				zend_hash_add_new(Z_ARRVAL_P(return_value), str_key, &result);
@@ -6134,7 +6135,7 @@ PHP_FUNCTION(array_map)
 
 				if (zend_call_function(&fci, &fci_cache) != SUCCESS || Z_TYPE(result) == IS_UNDEF) {
 					efree(array_pos);
-					zval_dtor(return_value);
+					zend_array_destroy(Z_ARR_P(return_value));
 					for (i = 0; i < n_arrays; i++) {
 						zval_ptr_dtor(&params[i]);
 					}

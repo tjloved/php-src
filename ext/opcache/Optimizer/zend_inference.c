@@ -1390,6 +1390,11 @@ int zend_inference_calc_range(const zend_op_array *op_array, zend_ssa *ssa, int 
 				return 1;
 			}
 			break;
+		case ZEND_COUNT:
+		case ZEND_FUNC_NUM_ARGS:
+			tmp->min = 0;
+			tmp->max = ZEND_LONG_MAX;
+			return 1;
 		case ZEND_DO_FCALL:
 		case ZEND_DO_ICALL:
 		case ZEND_DO_UCALL:
@@ -1778,8 +1783,11 @@ static int zend_infer_ranges(const zend_op_array *op_array, zend_ssa *ssa) /* {{
 				}                                                       \
 			}															\
 			if (ssa_var_info[__var].type != __type) { 					\
-				/*check_type_narrowing(op_array, ssa, worklist,*/			\
-					/*__var, ssa_var_info[__var].type, __type);*/			\
+				if (ssa_var_info[__var].type & ~__type) {				\
+					handle_type_narrowing(op_array, ssa,				\
+						__var, ssa_var_info[__var].type, __type);		\
+					assert(0);											\
+				}														\
 				ssa_var_info[__var].type = __type;						\
 				scdf_add_to_worklist(scdf, __var);                \
 			}															\
@@ -1916,20 +1924,22 @@ static void reset_dependent_vars(const zend_op_array *op_array, zend_ssa *ssa, z
 	}
 #endif
 }
+#endif
 
-static void check_type_narrowing(const zend_op_array *op_array, zend_ssa *ssa, zend_bitset worklist, int var, uint32_t old_type, uint32_t new_type)
+static void handle_type_narrowing(const zend_op_array *op_array, zend_ssa *ssa, int var, uint32_t old_type, uint32_t new_type)
 {
-	/* if new_type set resets some bits from old_type set
-	 * We have completely recalculate types of some dependent SSA variables
-	 * (this may occurs mainly because of incremental inter-precudure
-	 * type inference)
-	 */
-	if (old_type & ~new_type) {
-		ZEND_ASSERT(0); /* Currently this should never happen */
-		reset_dependent_vars(op_array, ssa, worklist, var);
+	if (1) {
+		/* Right now, this is always a bug */
+		zend_error(E_WARNING, "Narrowing occurred during type inference. Please file a bug report on bugs.php.net");
+	} else {
+		/* if new_type set resets some bits from old_type set
+		 * We have completely recalculate types of some dependent SSA variables
+		 * (this may occurs mainly because of incremental inter-precudure
+		 * type inference)
+		 */
+		//reset_dependent_vars(op_array, ssa, worklist, var);
 	}
 }
-#endif
 
 uint32_t zend_array_element_type(uint32_t t1, int write, int insert)
 {
@@ -2345,6 +2355,7 @@ static void zend_update_type_info(
 		case ZEND_ISSET_ISEMPTY_PROP_OBJ:
 		case ZEND_ISSET_ISEMPTY_STATIC_PROP:
 		case ZEND_ASSERT_CHECK:
+		case ZEND_IN_ARRAY:
 			UPDATE_SSA_TYPE(MAY_BE_FALSE|MAY_BE_TRUE, ssa_ops[i].result_def);
 			break;
 		case ZEND_CAST:
@@ -3256,7 +3267,7 @@ static void zend_update_type_info(
 				    opline->opcode == ZEND_FETCH_OBJ_RW ||
 				    opline->opcode == ZEND_FETCH_OBJ_FUNC_ARG) {
 					if (opline->opcode != ZEND_FETCH_DIM_FUNC_ARG) {
-						if (t1 & (MAY_BE_UNDEF|MAY_BE_NULL|MAY_BE_NULL)) {
+						if (t1 & (MAY_BE_UNDEF|MAY_BE_NULL|MAY_BE_FALSE)) {
 							tmp &= ~(MAY_BE_UNDEF|MAY_BE_NULL|MAY_BE_FALSE);
 							tmp |= MAY_BE_OBJECT | MAY_BE_RC1 | MAY_BE_RCN;
 						}
@@ -3316,6 +3327,20 @@ static void zend_update_type_info(
 				tmp |= MAY_BE_NULL;
 			}
 			UPDATE_SSA_TYPE(tmp, ssa_ops[i].result_def);
+			break;
+		case ZEND_COUNT:
+		case ZEND_FUNC_NUM_ARGS:
+			UPDATE_SSA_TYPE(MAY_BE_LONG, ssa_ops[i].result_def);
+			break;
+		case ZEND_FUNC_GET_ARGS:
+			UPDATE_SSA_TYPE(MAY_BE_ARRAY | MAY_BE_ARRAY_KEY_LONG | MAY_BE_ARRAY_OF_ANY, ssa_ops[i].result_def);
+			break;
+		case ZEND_GET_CLASS:
+		case ZEND_GET_CALLED_CLASS:
+			UPDATE_SSA_TYPE(MAY_BE_FALSE|MAY_BE_STRING, ssa_ops[i].result_def);
+			break;
+		case ZEND_GET_TYPE:
+			UPDATE_SSA_TYPE(MAY_BE_STRING, ssa_ops[i].result_def);
 			break;
 		case ZEND_DEFINED:
 			UPDATE_SSA_TYPE(MAY_BE_FALSE|MAY_BE_TRUE, ssa_ops[i].result_def);

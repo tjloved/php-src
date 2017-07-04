@@ -26,7 +26,13 @@
 #define ZEND_VM_KIND_CALL	1
 #define ZEND_VM_KIND_SWITCH	2
 #define ZEND_VM_KIND_GOTO	3
-#define ZEND_VM_KIND		ZEND_VM_KIND_CALL
+#define ZEND_VM_KIND_HYBRID	4
+/* HYBRID requires support for computed GOTO and global register variables*/
+#if (defined(__GNUC__) && defined(HAVE_GCC_GLOBAL_REGS))
+# define ZEND_VM_KIND		ZEND_VM_KIND_HYBRID
+#else
+# define ZEND_VM_KIND		ZEND_VM_KIND_CALL
+#endif
 
 #define ZEND_VM_OP_SPEC          0x00000001
 #define ZEND_VM_OP_CONST         0x00000002
@@ -254,30 +260,37 @@ END_EXTERN_C()
 #define ZEND_ISSET_ISEMPTY_THIS              186
 #define ZEND_SWITCH_LONG                     187
 #define ZEND_SWITCH_STRING                   188
-#define ZEND_PHI_ASSIGN                      190
-#define ZEND_IS_SMALLER_FLOAT                191
-#define ZEND_IS_SMALLER_INT                  192
-#define ZEND_ADD_INT_NO_OVERFLOW             193
-#define ZEND_FETCH_DIM_INT                   194
-#define ZEND_MOV_UNCOUNTED                   195
-#define ZEND_DIV_FLOAT                       196
-#define ZEND_ENSURE_HAVE_THIS                197
-#define ZEND_ASSERT_TYPE                     198
+#define ZEND_IN_ARRAY                        189
+#define ZEND_COUNT                           190
+#define ZEND_GET_CLASS                       191
+#define ZEND_GET_CALLED_CLASS                192
+#define ZEND_GET_TYPE                        193
+#define ZEND_FUNC_NUM_ARGS                   194
+#define ZEND_FUNC_GET_ARGS                   195
 #define ZEND_ADD_INT                         200
 #define ZEND_SUB_INT                         201
 #define ZEND_ADD_FLOAT                       202
 #define ZEND_SUB_FLOAT                       203
 #define ZEND_MUL_FLOAT                       204
-#define ZEND_FETCH_OBJ_R_FIXED               205
-#define ZEND_FETCH_DIM_INT_W                 206
-#define ZEND_POST_INC_INT                    207
-#define ZEND_POST_DEC_INT                    208
-#define ZEND_RECV_INIT_FAST                  209
-#define ZEND_SEND_VAR_FAST                   210
-#define ZEND_PRE_INC_INT                     211
-#define ZEND_PRE_INC_INT_NO_OVERFLOW         212
-#define ZEND_PRE_DEC_INT                     213
+#define ZEND_DIV_FLOAT                       205
+#define ZEND_IS_SMALLER_FLOAT                206
+#define ZEND_IS_SMALLER_INT                  207
+#define ZEND_ADD_INT_NO_OVERFLOW             208
+#define ZEND_PRE_INC_INT                     209
+#define ZEND_PRE_INC_INT_NO_OVERFLOW         210
+#define ZEND_PRE_DEC_INT                     211
+#define ZEND_POST_INC_INT                    212
+#define ZEND_POST_DEC_INT                    213
+#define ZEND_FETCH_DIM_INT                   214
+#define ZEND_FETCH_DIM_INT_W                 215
+#define ZEND_MOV_UNCOUNTED                   216
+#define ZEND_FETCH_OBJ_R_FIXED               217
+#define ZEND_PHI_ASSIGN                      218
+#define ZEND_ENSURE_HAVE_THIS                219
+#define ZEND_RECV_INIT_FAST                  220
+#define ZEND_SEND_VAR_FAST                   221
+#define ZEND_ASSERT_TYPE                     222
 
-#define ZEND_VM_LAST_OPCODE                  213
+#define ZEND_VM_LAST_OPCODE                  222
 
 #endif

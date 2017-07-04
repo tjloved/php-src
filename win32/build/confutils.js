@@ -381,10 +381,17 @@ function conf_process_args()
 				} else {
 					/* we matched the non-default arg */
 					if (argval == null) {
-						argval = arg.defval == "no" ? "yes" : "no";
+						if (arg.defval == "no") {
+							argval = "yes";
+						} else if (arg.defval == "no,shared") {
+							argval = "yes,shared";
+							shared = true;
+						} else {
+							argval = "no";
+						}
 					}
 				}
-				
+
 				arg.argval = argval;
 				eval("PHP_" + arg.symval + " = argval;");
 				eval("PHP_" + arg.symval + "_SHARED = shared;");
@@ -1221,6 +1228,9 @@ function SAPI(sapiname, file_list, makefiletarget, cflags, obj_dir)
 		}
 
 		ldflags += " /PGD:$(PGOPGD_DIR)\\" + makefiletarget.substring(0, makefiletarget.indexOf(".")) + ".pgd";
+	} else if (PHP_DEBUG != "yes") {
+		ADD_FLAG('CFLAGS_' + SAPI, "/GL");
+		ADD_FLAG('LDFLAGS_' + SAPI, "/LTCG:INCREMENTAL");
 	}
 
 	if (MODE_PHPIZE) {
@@ -1421,6 +1431,9 @@ function EXTENSION(extname, file_list, shared, cflags, dllname, obj_dir)
 			ADD_FLAG('CFLAGS_' + EXT, "/GL /O2");
 
 			ldflags = " /PGD:$(PGOPGD_DIR)\\" + dllname.substring(0, dllname.indexOf(".")) + ".pgd";
+		} else if (PHP_DEBUG != "yes") {
+			ADD_FLAG('CFLAGS_' + EXT, "/GL");
+			ADD_FLAG('LDFLAGS_' + EXT, "/LTCG:INCREMENTAL");
 		}
 
 		MFO.WriteLine("$(BUILD_DIR)\\" + libname + ": $(BUILD_DIR)\\" + dllname);
@@ -1463,6 +1476,9 @@ function EXTENSION(extname, file_list, shared, cflags, dllname, obj_dir)
 				ADD_FLAG("STATIC_EXT_CFLAGS", "/GL /O2");
 				static_pgo_enabled = true;
 			}
+		} else if (PHP_DEBUG != "yes") {
+			ADD_FLAG("STATIC_EXT_CFLAGS", "/GL");
+			ADD_FLAG('STATIC_EXT_LDFLAGS', "/LTCG:INCREMENTAL");
 		}
 
 		/* find the header that declares the module pointer,
@@ -2779,11 +2795,6 @@ function PHP_INSTALL_HEADERS(dir, headers_list)
 PHP_SNAPSHOT_BUILD = "no";
 if (!MODE_PHPIZE) {
 	ARG_ENABLE('snapshot-build', 'Build a snapshot; turns on everything it can and ignores build errors', 'no');
-
-	// one-shot build optimizes build by asking compiler to build
-	// several objects at once, reducing overhead of starting new
-	// compiler processes.
-	ARG_ENABLE('one-shot', 'Optimize for fast build - best for release and snapshot builders, not so hot for edit-and-rebuild hacking', 'no');
 }
 
 function toolset_option_handle()
@@ -2879,8 +2890,9 @@ function toolset_setup_project_tools()
 		ERROR('bison is required')
 	}
 
-	/* TODO throw error, ignore for now for BC. */
-	PATH_PROG('sed');
+	if (!PATH_PROG('sed')) {
+		ERROR('sed is required')
+	}
 
 	RE2C = PATH_PROG('re2c');
 	if (RE2C) {
@@ -2889,6 +2901,10 @@ function toolset_setup_project_tools()
 
 		RE2CVERS = probe_binary(RE2C, "version");
 		STDOUT.WriteLine('  Detected re2c version ' + RE2CVERS);
+
+		if (RE2CVERS.match(/^\d+.\d+$/)) {
+			RE2CVERS += ".0";
+		}
 
 		intvers = RE2CVERS.replace(pattern, '') - 0;
 		intmin = MINRE2C.replace(pattern, '') - 0;
@@ -3340,18 +3356,18 @@ function SETUP_OPENSSL(target, path_to_check, common_name, use_env, add_dir_part
 	var ret = 0;
 	var cflags_var = "CFLAGS_" + target.toUpperCase();
 
-	if (CHECK_LIB("ssleay32.lib", target, path_to_check, common_name) &&
-			CHECK_LIB("libeay32.lib", target, path_to_check, common_name) &&
-			CHECK_LIB("crypt32.lib", target, path_to_check, common_name) &&
-			CHECK_HEADER_ADD_INCLUDE("openssl/ssl.h", cflags_var, path_to_check, use_env, add_dir_part, add_to_flag_only)) {
-		/* Openssl 1.0.x and lower */
-		return 1;
-	} else if (CHECK_LIB("libcrypto.lib", target, path_to_check) &&
+	if (CHECK_LIB("libcrypto.lib", target, path_to_check) &&
 			CHECK_LIB("libssl.lib", target, path_to_check) &&
 			CHECK_LIB("crypt32.lib", target, path_to_check, common_name) &&
 			CHECK_HEADER_ADD_INCLUDE("openssl/ssl.h", cflags_var, path_to_check, use_env, add_dir_part, add_to_flag_only)) {
 		/* Openssl 1.1.x */
 		return 2;
+	} else if (CHECK_LIB("ssleay32.lib", target, path_to_check, common_name) &&
+			CHECK_LIB("libeay32.lib", target, path_to_check, common_name) &&
+			CHECK_LIB("crypt32.lib", target, path_to_check, common_name) &&
+			CHECK_HEADER_ADD_INCLUDE("openssl/ssl.h", cflags_var, path_to_check, use_env, add_dir_part, add_to_flag_only)) {
+		/* Openssl 1.0.x and lower */
+		return 1;
 	}
 
 	return ret;

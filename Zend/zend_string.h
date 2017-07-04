@@ -408,6 +408,21 @@ EMPTY_SWITCH_DEFAULT_CASE()
 	_(ZEND_STR_SEVERITY,               "severity") \
 	_(ZEND_STR_STRING,                 "string") \
 	_(ZEND_STR_TRACE,                  "trace") \
+	_(ZEND_STR_SCHEME,                 "scheme") \
+	_(ZEND_STR_HOST,                   "host") \
+	_(ZEND_STR_PORT,                   "port") \
+	_(ZEND_STR_USER,                   "user") \
+	_(ZEND_STR_PASS,                   "pass") \
+	_(ZEND_STR_PATH,                   "path") \
+	_(ZEND_STR_QUERY,                  "query") \
+	_(ZEND_STR_FRAGMENT,               "fragment") \
+	_(ZEND_STR_NULL,                   "NULL") \
+	_(ZEND_STR_BOOLEAN,                "boolean") \
+	_(ZEND_STR_INTEGER,                "integer") \
+	_(ZEND_STR_DOUBLE,                 "double") \
+	_(ZEND_STR_ARRAY,                  "array") \
+	_(ZEND_STR_RESOURCE,               "resource") \
+	_(ZEND_STR_CLOSED_RESOURCE,        "resource (closed)") \
 
 
 typedef enum _zend_known_string_id {
@@ -425,4 +440,6 @@ ZEND_KNOWN_STRINGS(_ZEND_STR_ID)
  * c-basic-offset: 4
  * indent-tabs-mode: t
  * End:
+ * vim600: sw=4 ts=4 fdm=marker
+ * vim<600: sw=4 ts=4
  */

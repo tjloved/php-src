@@ -16,6 +16,9 @@
    +----------------------------------------------------------------------+
  */
 
+#ifndef PHP_WIN32_WINUTIL_H
+#define PHP_WIN32_WINUTIL_H
+
 #ifdef PHP_EXPORTS
 # define PHP_WINUTIL_API __declspec(dllexport)
 #else
@@ -50,3 +53,13 @@ PHP_WINUTIL_API int php_win32_code_to_errno(unsigned long w32Err);
 
 PHP_WINUTIL_API char *php_win32_get_username(void);
 
+#endif
+
+/*
+ * Local variables:
+ * tab-width: 4
+ * c-basic-offset: 4
+ * End:
+ * vim600: sw=4 ts=4 fdm=marker
+ * vim<600: sw=4 ts=4
+ */
