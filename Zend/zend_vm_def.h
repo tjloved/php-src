@@ -4350,6 +4350,85 @@ ZEND_VM_HANDLER(67, ZEND_SEND_REF, VAR|CV, NUM)
 	ZEND_VM_NEXT_OPCODE();
 }
 
+ZEND_VM_HANDLER(198, ZEND_SEND_EXPLICIT_REF, VAR|CV, NUM, SPEC(QUICK_ARG))
+{
+	USE_OPLINE
+	zval *varptr, *arg;
+	zend_free_op free_op1;
+	uint32_t arg_num = opline->op2.num;
+
+	if (EXPECTED(arg_num <= MAX_ARG_FLAG_NUM)) {
+		if (!QUICK_ARG_SHOULD_BE_SENT_BY_REF(EX(call)->func, arg_num)) {
+			ZEND_VM_C_GOTO(invalid_send_ref);
+		}
+	} else if (!ARG_SHOULD_BE_SENT_BY_REF(EX(call)->func, arg_num)) {
+ZEND_VM_C_LABEL(invalid_send_ref):
+		SAVE_OPLINE();
+		zend_throw_error(NULL, "Cannot pass reference to by-value parameter %" PRIu32, arg_num);
+		FREE_UNFETCHED_OP1();
+		arg = ZEND_CALL_VAR(EX(call), opline->result.var);
+		ZVAL_UNDEF(arg);
+		HANDLE_EXCEPTION();
+	}
+
+	SAVE_OPLINE();
+	varptr = GET_OP1_ZVAL_PTR_PTR(BP_VAR_W);
+
+	arg = ZEND_CALL_VAR(EX(call), opline->result.var);
+	if (OP1_TYPE == IS_VAR && UNEXPECTED(Z_ISERROR_P(varptr))) {
+		ZVAL_NEW_EMPTY_REF(arg);
+		ZVAL_NULL(Z_REFVAL_P(arg));
+		ZEND_VM_NEXT_OPCODE();
+	}
+
+	if (Z_ISREF_P(varptr)) {
+		Z_ADDREF_P(varptr);
+		ZVAL_COPY_VALUE(arg, varptr);
+	} else {
+		ZVAL_NEW_REF(arg, varptr);
+		Z_ADDREF_P(arg);
+		ZVAL_REF(varptr, Z_REF_P(arg));
+	}
+
+	FREE_OP1_VAR_PTR();
+	ZEND_VM_NEXT_OPCODE();
+}
+
+ZEND_VM_HANDLER(199, ZEND_SEND_EXPLICIT_REF_FUNC, VAR, NUM)
+{
+	USE_OPLINE
+	zval *varptr, *arg;
+	zend_free_op free_op1;
+	uint32_t arg_num = opline->op2.num;
+
+	if (EXPECTED(arg_num <= MAX_ARG_FLAG_NUM)) {
+		if (!QUICK_ARG_SHOULD_BE_SENT_BY_REF(EX(call)->func, arg_num)) {
+			ZEND_VM_C_GOTO(invalid_send_ref);
+		}
+	} else if (!ARG_SHOULD_BE_SENT_BY_REF(EX(call)->func, arg_num)) {
+ZEND_VM_C_LABEL(invalid_send_ref):
+		SAVE_OPLINE();
+		zend_throw_error(NULL, "Cannot pass reference to by-value parameter %" PRIu32, arg_num);
+		FREE_UNFETCHED_OP1();
+		arg = ZEND_CALL_VAR(EX(call), opline->result.var);
+		ZVAL_UNDEF(arg);
+		HANDLE_EXCEPTION();
+	}
+
+	varptr = GET_OP1_ZVAL_PTR_PTR(BP_VAR_W);
+	arg = ZEND_CALL_VAR(EX(call), opline->result.var);
+	if (UNEXPECTED(!Z_ISREF_P(varptr))) {
+		SAVE_OPLINE();
+		zend_throw_error(NULL, "Cannot pass result of by-value function by reference");
+		FREE_UNFETCHED_OP1();
+		ZVAL_UNDEF(arg);
+		HANDLE_EXCEPTION();
+	}
+
+	ZVAL_COPY_VALUE(arg, varptr);
+	ZEND_VM_NEXT_OPCODE();
+}
+
 ZEND_VM_HOT_HANDLER(66, ZEND_SEND_VAR_EX, VAR|CV, NUM, SPEC(QUICK_ARG))
 {
 	USE_OPLINE
