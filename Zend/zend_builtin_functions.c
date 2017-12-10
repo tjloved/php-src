@@ -85,6 +85,7 @@ static ZEND_FUNCTION(gc_collect_cycles);
 static ZEND_FUNCTION(gc_enabled);
 static ZEND_FUNCTION(gc_enable);
 static ZEND_FUNCTION(gc_disable);
+static ZEND_FUNCTION(namespace_declare);
 
 /* {{{ arginfo */
 ZEND_BEGIN_ARG_INFO(arginfo_zend__void, 0)
@@ -232,6 +233,11 @@ ZEND_BEGIN_ARG_INFO_EX(arginfo_extension_loaded, 0, 0, 1)
 	ZEND_ARG_INFO(0, extension_name)
 ZEND_END_ARG_INFO()
 
+ZEND_BEGIN_ARG_INFO_EX(arginfo_namespace_declare, 0, 0, 2)
+	ZEND_ARG_INFO(0, namespace)
+	ZEND_ARG_INFO(0, declares)
+ZEND_END_ARG_INFO()
+
 /* }}} */
 
 static const zend_function_entry builtin_functions[] = { /* {{{ */
@@ -293,6 +299,7 @@ static const zend_function_entry builtin_functions[] = { /* {{{ */
 	ZEND_FE(gc_enabled, 		arginfo_zend__void)
 	ZEND_FE(gc_enable, 		arginfo_zend__void)
 	ZEND_FE(gc_disable, 		arginfo_zend__void)
+	ZEND_FE(namespace_declare, arginfo_namespace_declare)
 	ZEND_FE_END
 };
 /* }}} */
@@ -2695,6 +2702,92 @@ ZEND_FUNCTION(get_extension_funcs)
 	if (!array) {
 		RETURN_FALSE;
 	}
+}
+/* }}} */
+
+static zend_bool check_namespace(zend_string *namespace) {
+	if (ZSTR_LEN(namespace) == 0) {
+		zend_throw_error(NULL, "Namespace cannot be empty");
+		return 0;
+	}
+
+	if (ZSTR_VAL(namespace)[0] == '\\') {
+		zend_throw_error(NULL, "Namespace cannot start with \"\\\"");
+		return 0;
+	}
+
+	if (ZSTR_VAL(namespace)[ZSTR_LEN(namespace) - 1] == '\\') {
+		zend_throw_error(NULL, "Namespace cannot end with \"\\\"");
+		return 0;
+	}
+
+	return 1;
+}
+
+static zend_bool check_declare_directive(zend_string *name, zval *val) {
+	if (zend_string_equals_literal(name, "encoding")) {
+		zend_throw_error(NULL, "Cannot use \"encoding\" in namespace declare");
+		return 0;
+	} else if (zend_string_equals_literal(name, "ticks")) {
+		if (Z_TYPE_P(val) != IS_LONG || Z_LVAL_P(val) < 0) {
+			zend_throw_error(NULL, "Value of \"ticks\" must be a non-negative integer");
+			return 0;
+		}
+		return 1;
+	} else if (zend_string_equals_literal(name, "strict_types")) {
+		if (Z_TYPE_P(val) != IS_LONG || (Z_LVAL_P(val) != 0 && Z_LVAL_P(val) != 1)) {
+			zend_throw_error(NULL, "Value of \"strict_types\" must be 0 or 1");
+			return 0;
+		}
+		return 1;
+	} else {
+		// TODO: Should this be allowed or not?
+		return 1;
+	}
+}
+
+/* {{{ proto void namespace_declare(string namespace, array declares)
+   Defines per-namespace declare directives */
+ZEND_FUNCTION(namespace_declare)
+{
+	zend_string *namespace, *namespace_lc;
+	zval *declares;
+	zend_string *name;
+	zval *val;
+
+	if (zend_parse_parameters_throw(ZEND_NUM_ARGS(), "Sa", &namespace, &declares) == FAILURE) {
+		return;
+	}
+
+	if (!check_namespace(namespace)) {
+		return;
+	}
+
+	ZEND_HASH_FOREACH_STR_KEY_VAL(Z_ARRVAL_P(declares), name, val) {
+		if (!name) {
+			zend_throw_error(NULL, "Declare directive array must have string keys");
+			return;
+		}
+
+		ZVAL_DEREF(val);
+		if (!check_declare_directive(name, val)) {
+			return;
+		}
+	} ZEND_HASH_FOREACH_END();
+
+	if (!EG(namespace_declares)) {
+		EG(namespace_declares) = zend_new_array(0);
+	}
+
+	namespace_lc = zend_string_tolower(namespace);
+	if (zend_hash_add(EG(namespace_declares), namespace_lc, declares)) {
+		Z_TRY_ADDREF_P(declares);
+	} else {
+		zend_throw_error(NULL,
+			"Declares for namespace \"%s\" already defined", ZSTR_VAL(namespace));
+	}
+
+	zend_string_release(namespace_lc);
 }
 /* }}} */
 

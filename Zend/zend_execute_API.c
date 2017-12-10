@@ -179,6 +179,7 @@ void init_executor(void) /* {{{ */
 	memset(EG(ht_iterators), 0, sizeof(EG(ht_iterators_slots)));
 
 	EG(each_deprecation_thrown) = 0;
+	EG(namespace_declares) = NULL;
 
 	EG(active) = 1;
 }
@@ -377,6 +378,11 @@ void shutdown_executor(void) /* {{{ */
 
 		if (EG(ht_iterators) != EG(ht_iterators_slots)) {
 			efree(EG(ht_iterators));
+		}
+
+		if (EG(namespace_declares)) {
+			zend_hash_destroy(EG(namespace_declares));
+			FREE_HASHTABLE(EG(namespace_declares));
 		}
 	}
 
