@@ -425,6 +425,9 @@ void zend_init_compiler_data_structures(void) /* {{{ */
 	CG(start_lineno) = 0;
 
 	CG(encoding_declared) = 0;
+	CG(last_ns_declares) = NULL;
+	CG(last_namespaces) = NULL;
+	CG(last_num_namespaces) = 0;
 }
 /* }}} */
 
@@ -470,6 +473,9 @@ void shutdown_compiler(void) /* {{{ */
 	zend_stack_destroy(&CG(delayed_oplines_stack));
 	zend_hash_destroy(&CG(filenames_table));
 	zend_arena_destroy(CG(arena));
+	if (CG(last_namespaces)) {
+		efree(CG(last_namespaces));
+	}
 }
 /* }}} */
 

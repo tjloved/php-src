@@ -700,6 +700,25 @@ static void zend_file_cache_serialize_class(zval                     *zv,
 	SERIALIZE_PTR(ce->__debugInfo);
 }
 
+static void zend_file_cache_serialize_ns_info(
+	zend_persistent_script *script, zend_file_cache_metainfo *info, void *buf)
+{
+	SERIALIZE_PTR(script->ns_declares);
+
+	if (script->namespaces) {
+		uint32_t i;
+		zend_string **namespaces;
+
+		SERIALIZE_PTR(script->namespaces);
+		namespaces = script->namespaces;
+		UNSERIALIZE_PTR(namespaces);
+
+		for (i = 0; i < script->num_namespaces; i++) {
+			SERIALIZE_STR(namespaces[i]);
+		}
+	}
+}
+
 static void zend_file_cache_serialize(zend_persistent_script   *script,
                                       zend_file_cache_metainfo *info,
                                       void                     *buf)
@@ -721,6 +740,7 @@ static void zend_file_cache_serialize(zend_persistent_script   *script,
 	zend_file_cache_serialize_hash(&new_script->script.class_table, script, info, buf, zend_file_cache_serialize_class);
 	zend_file_cache_serialize_hash(&new_script->script.function_table, script, info, buf, zend_file_cache_serialize_func);
 	zend_file_cache_serialize_op_array(&new_script->script.main_op_array, script, info, buf);
+	zend_file_cache_serialize_ns_info(new_script, info, buf);
 
 	SERIALIZE_PTR(new_script->arena_mem);
 	new_script->mem = NULL;
@@ -1303,6 +1323,36 @@ static void zend_file_cache_unserialize(zend_persistent_script  *script,
 	UNSERIALIZE_PTR(script->arena_mem);
 }
 
+static void zend_file_cache_unserialize_ns_info(zend_persistent_script *script, void *buf)
+{
+	uint32_t i;
+
+	/* We're not unserializing into SHM right now */
+	script->mem = buf;
+	script->corrupted = 1;
+
+	UNSERIALIZE_PTR(script->ns_declares);
+	UNSERIALIZE_PTR(script->namespaces);
+	for (i = 0; i < script->num_namespaces; i++) {
+		UNSERIALIZE_STR(script->namespaces[i]);
+	}
+}
+
+static void zend_file_cache_migrate_ns_info_to_shm(
+	zend_persistent_script *script, void *old_mem, void *new_mem)
+{
+#define TO_SHM(ptr) \
+	if (ptr) (ptr) = (void *) ((char *) (ptr) - (char *) old_mem + (char *) new_mem)
+
+	uint32_t i;
+	TO_SHM(script->ns_declares);
+	TO_SHM(script->namespaces);
+	for (i = 0; i < script->num_namespaces; i++) {
+		script->namespaces[i] = accel_new_interned_string(script->namespaces[i]);
+	}
+#undef TO_SHM
+}
+
 zend_persistent_script *zend_file_cache_script_load(zend_file_handle *file_handle)
 {
 	zend_string *full_path = file_handle->opened_path;
@@ -1403,6 +1453,20 @@ zend_persistent_script *zend_file_cache_script_load(zend_file_handle *file_handl
 		return NULL;
 	}
 
+	{
+		/* Unserialize NS info only and check consistency */
+		zend_persistent_script *tmp_script
+			= (zend_persistent_script *) ((char *) mem + info.script_offset);
+		ZCG(mem) = (char *) mem + info.mem_size;
+		zend_file_cache_unserialize_ns_info(tmp_script, mem);
+		if (!zend_accel_check_ns_declares_consistency(tmp_script)) {
+			unlink(filename);
+			zend_arena_release(&CG(arena), checkpoint);
+			efree(filename);
+			return NULL;
+		}
+	}
+
 	if (!ZCG(accel_directives).file_cache_only &&
 	    !ZCSG(restart_in_progress) &&
 	    accelerator_shm_read_lock() == SUCCESS) {
@@ -1458,6 +1522,7 @@ use_process_mem:
 	script->corrupted = 0;
 
 	if (cache_it) {
+		zend_file_cache_migrate_ns_info_to_shm(script, mem, buf);
 		script->dynamic_members.checksum = zend_accel_script_checksum(script);
 		script->dynamic_members.last_used = ZCG(request_time);
 
