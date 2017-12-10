@@ -229,6 +229,7 @@ struct _zend_executor_globals {
 	zend_bool each_deprecation_thrown;
 
 	HashTable *namespace_declares;
+	HashTable *computed_namespace_declares;
 
 	void *reserved[ZEND_MAX_RESERVED_RESOURCES];
 };
