@@ -127,6 +127,12 @@ struct _zend_compiler_globals {
 	zval **static_members_table;
 	int last_static_member;
 #endif
+
+	/* Namespace information from last compilation, only collected if
+	 * ZEND_COMPILE_COLLECT_NS_INFO is enabled. */
+	const zend_declarables *last_ns_declares;
+	zend_string **last_namespaces;
+	uint32_t last_num_namespaces;
 };
 
 

@@ -683,7 +683,7 @@ BEGIN_EXTERN_C()
 void init_compiler(void);
 void shutdown_compiler(void);
 void zend_init_compiler_data_structures(void);
-const zend_declarables *zend_get_namespace_declares(zend_string *namespace_lc);
+ZEND_API const zend_declarables *zend_get_namespace_declares(zend_string *namespace_lc);
 
 void zend_oparray_context_begin(zend_oparray_context *prev_context);
 void zend_oparray_context_end(zend_oparray_context *prev_context);
@@ -1021,6 +1021,9 @@ END_EXTERN_C()
 
 /* disable builtin special case function calls */
 #define ZEND_COMPILE_NO_BUILTINS				(1<<10)
+
+/* collect last_ns_declares, last_namespaces, last_num_namespaces, for use by opcache */
+#define ZEND_COMPILE_COLLECT_NS_INFO			(1<<11)
 
 /* The default value for CG(compiler_options) */
 #define ZEND_COMPILE_DEFAULT					ZEND_COMPILE_HANDLE_OP_ARRAY
